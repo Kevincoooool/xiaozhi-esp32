@@ -30,7 +30,7 @@ extern "C" {
 #define CODEC_DEFAULT_BIT_WIDTH             (32)
 #define CODEC_DEFAULT_ADC_VOLUME            (24.0)
 #define CODEC_DEFAULT_CHANNEL               (1)
-#define CODEC_DEFAULT_VOLUME                (80)
+#define CODEC_DEFAULT_VOLUME                (60)
 
 #define BSP_LCD_BACKLIGHT_BRIGHTNESS_MAX    (95)
 #define BSP_LCD_BACKLIGHT_BRIGHTNESS_MIN    (0)
