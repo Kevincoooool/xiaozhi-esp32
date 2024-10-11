@@ -1,0 +1,5 @@
+## IDF Component Manager Manifest File
+dependencies:
+  esp-brookesia:
+    version: "*"
+    override_path: "../../../esp-brookesia"

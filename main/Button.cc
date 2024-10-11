@@ -9,7 +9,7 @@ Button::Button(gpio_num_t gpio_num) : gpio_num_(gpio_num) {
         .long_press_time = 3000,
         .short_press_time = 100,
         .gpio_button_config = {
-            .gpio_num = gpio_num,
+            .gpio_num = 35,
             .active_level = 0
         }
     };

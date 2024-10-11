@@ -217,14 +217,21 @@ void Application::Start()
         builtin_led.Blink(1000, 500);
         auto &wifi_ap = WifiConfigurationAp::GetInstance();
         wifi_ap.SetSsidPrefix("Xiaozhi");
-        label_ask_set_text("请用手机连接Wifi 进行配网");
+        label_ask_set_text("请用手机连接Xiaozhi开头的Wifi,连接后进入192.168.4.1输入wifi 密码进行配网");
 #ifdef CONFIG_USE_DISPLAY
         display_.SetText(wifi_ap.GetSsid() + "\n" + wifi_ap.GetWebServerUrl());
 #endif
         wifi_ap.Start();
+        while (1)
+        {
+            vTaskDelay(10);
+        }
+        
         return;
     }
 #endif
+    ESP_LOGI(TAG, "Psram:%u Free internal: %u minimal internal: %u", heap_caps_get_free_size(MALLOC_CAP_SPIRAM), heap_caps_get_free_size(MALLOC_CAP_INTERNAL), heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL));
+
     label_ask_set_text("网络连接成功");
     audio_device_.OnInputData([this](const int16_t *data, int size)
                               {
@@ -248,9 +255,11 @@ void Application::Start()
             } });
 #endif
                               });
+        ESP_LOGI(TAG, "Psram:%u Free internal: %u minimal internal: %u", heap_caps_get_free_size(MALLOC_CAP_SPIRAM), heap_caps_get_free_size(MALLOC_CAP_INTERNAL), heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL));
 
     // Initialize the audio device
     audio_device_.Start(CONFIG_AUDIO_INPUT_SAMPLE_RATE, CONFIG_AUDIO_OUTPUT_SAMPLE_RATE);
+        ESP_LOGI(TAG, "Psram:%u Free internal: %u minimal internal: %u", heap_caps_get_free_size(MALLOC_CAP_SPIRAM), heap_caps_get_free_size(MALLOC_CAP_INTERNAL), heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL));
 
     // OPUS encoder / decoder use a lot of stack memory
     const size_t opus_stack_size = 4096 * 8;
@@ -260,12 +269,14 @@ void Application::Start()
         Application* app = (Application*)arg;
         app->AudioEncodeTask();
         vTaskDelete(NULL); }, "opus_encode", opus_stack_size, this, 1, audio_encode_task_stack_, &audio_encode_task_buffer_);
+        ESP_LOGI(TAG, "Psram:%u Free internal: %u minimal internal: %u", heap_caps_get_free_size(MALLOC_CAP_SPIRAM), heap_caps_get_free_size(MALLOC_CAP_INTERNAL), heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL));
 
     xTaskCreate([](void *arg)
                 {
         Application* app = (Application*)arg;
         app->AudioPlayTask();
         vTaskDelete(NULL); }, "play_audio", 4096 * 2, this, 5, NULL);
+        ESP_LOGI(TAG, "Psram:%u Free internal: %u minimal internal: %u", heap_caps_get_free_size(MALLOC_CAP_SPIRAM), heap_caps_get_free_size(MALLOC_CAP_INTERNAL), heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL));
 
 #ifdef CONFIG_USE_AFE_SR
     wake_word_detect_.OnVadStateChange([this](bool speaking)
@@ -361,11 +372,11 @@ void Application::Start()
         vTaskDelete(NULL); }, "main_loop", 4096 * 2, this, 5, NULL);
     label_ask_set_text("可以唤醒我啦");
     // Launch a task to check for new firmware version
-    xTaskCreate([](void* arg) {
-        Application* app = (Application*)arg;
-        app->CheckNewVersion();
-        vTaskDelete(NULL);
-    }, "check_new_version", 4096 * 1, this, 1, NULL);
+    // xTaskCreate([](void *arg)
+    //             {
+    //     Application* app = (Application*)arg;
+    //     app->CheckNewVersion();
+    //     vTaskDelete(NULL); }, "check_new_version", 4096 * 1, this, 1, NULL);
 
 #ifdef CONFIG_USE_DISPLAY
     // Launch a task to update the display

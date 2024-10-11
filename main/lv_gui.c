@@ -23,10 +23,10 @@ static lv_obj_t *g_sr_mask = NULL;
 static lv_obj_t *g_sr_bar[8] = {NULL};
 #define LIMIT(x, min, max) ((x) <= (min) ? (min) : ((x) >= (max) ? (max) : (x)))
 uint8_t biaoqing = 0;
-// uint16_t Get_Set_Random(uint8_t set)
-// {
-// 	return LIMIT(esp_random() % set, 1, set);
-// }
+uint16_t Get_Set_Random(uint8_t set)
+{
+	return LIMIT(esp_random() % set, 1, set);
+}
 static int int16_sin(int32_t deg)
 {
     static const int16_t sin_0_90_table[] = {
@@ -221,7 +221,7 @@ void lv_main_page(void)
     // ESP_LOGI(TAG, "sr animation initialize");
 
     label_ask = lv_label_create(lv_scr_act());
-    lv_obj_set_width(label_ask, 260);
+    lv_obj_set_width(label_ask, 1000);
     lv_label_set_long_mode(label_ask, LV_LABEL_LONG_SCROLL_CIRCULAR); /*Circular scroll*/
     lv_obj_align(label_ask, LV_ALIGN_BOTTOM_LEFT, 10, -10);
     lv_obj_set_style_text_font(label_ask, &font_alipuhui20, LV_STATE_DEFAULT);
@@ -232,10 +232,10 @@ void lv_main_page(void)
     lv_obj_move_foreground(label_ask);
 
     label_reply = lv_label_create(lv_scr_act());
-    lv_obj_set_width(label_reply, 260);
+    lv_obj_set_width(label_reply, 1000);
     // lv_obj_set_height(label_reply, 200);
     // lv_label_set_long_mode(label_ask, LV_LABEL_LONG_SCROLL_CIRCULAR); /*Circular scroll*/
-    lv_obj_align(label_reply, LV_ALIGN_TOP_LEFT, 10, 10);
+    lv_obj_align(label_reply, LV_ALIGN_TOP_LEFT, 10, 65);
     lv_obj_set_style_text_font(label_reply, &font_alipuhui20, LV_STATE_DEFAULT);
     lv_obj_set_style_text_color(label_reply, lv_palette_main(LV_PALETTE_RED), 0);
 
@@ -252,9 +252,9 @@ void lv_main_page(void)
     lv_obj_set_style_bg_color(g_sr_mask, lv_obj_get_style_bg_color(lv_obj_get_parent(g_sr_mask), LV_PART_MAIN), LV_STATE_DEFAULT);
 
     lv_obj_set_style_bg_opa(g_sr_mask, LV_OPA_TRANSP, 0);
-    // lv_obj_align(g_sr_mask, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_align(g_sr_mask, LV_ALIGN_CENTER, 0, 0);
 
-    lv_obj_align(g_sr_mask, LV_ALIGN_BOTTOM_MID, 0, 0);
+    // lv_obj_align(g_sr_mask, LV_ALIGN_BOTTOM_MID, 0, 0);
     lv_obj_add_event_cb(g_sr_mask, sr_mask_event_handler, LV_EVENT_VALUE_CHANGED, NULL);
 
     lv_obj_t *obj_img = NULL;

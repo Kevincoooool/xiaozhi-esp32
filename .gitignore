@@ -1,6 +1,5 @@
 tmp/
 
-managed_components/
 build/
 .vscode/
 .devcontainer/

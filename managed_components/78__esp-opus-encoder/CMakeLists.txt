@@ -1,0 +1,9 @@
+idf_component_register(
+    SRCS
+        "OpusEncoder.cc"
+        "OpusResampler.cc"
+    INCLUDE_DIRS
+        "include"
+    PRIV_INCLUDE_DIRS
+        "."
+)

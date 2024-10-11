@@ -1,0 +1,13 @@
+dependencies:
+  espressif/esp_serial_slave_link:
+    version: ^1.1.0
+  idf:
+    version: '>=5.2'
+description: The component provides a general purpose PPP connectivity, typically
+  used as WiFi-PPP router
+repository: git://github.com/espressif/esp-protocols.git
+repository_info:
+  commit_sha: 68da69e4d8062295e59a34cbc4cdff6e33c9a472
+  path: components/eppp_link
+url: https://github.com/espressif/esp-protocols/tree/master/components/eppp_link
+version: 0.2.0

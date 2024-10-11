@@ -1,0 +1,9 @@
+menu "Builtin LED"
+
+    config BUILTIN_LED_GPIO
+        int "Builtin LED GPIO"
+        default 48
+        help
+            GPIO number of the builtin LED.
+
+endmenu

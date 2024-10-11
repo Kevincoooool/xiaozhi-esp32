@@ -1,0 +1,19 @@
+idf_component_register(
+    SRCS
+        "Ml307AtModem.cc"
+        "Ml307SslTransport.cc"
+        "Ml307Http.cc"
+        "Ml307Mqtt.cc"
+        "WebSocket.cc"
+        "TlsTransport.cc"
+        "EspHttp.cc"
+    INCLUDE_DIRS
+        "include"
+    PRIV_INCLUDE_DIRS
+        "."
+    REQUIRES
+        "esp_driver_gpio"
+        "esp_driver_uart"
+        "esp-tls"
+        "esp_http_client"
+)

@@ -1,0 +1,15 @@
+dependencies:
+  cmake_utilities: 0.*
+  idf: '>=5.0'
+  lvgl/lvgl:
+    public: true
+    version: '>=8.3,<9'
+description: ESP-Brookesia is a human-machine interaction development framework designed
+  for AIoT devices.
+issues: https://github.com/espressif/esp-brookesia/issues
+repository: git://github.com/espressif/esp-brookesia.git
+repository_info:
+  commit_sha: 2b0d70ffe8692c3579e73d754f124154dfae5741
+  path: .
+url: https://github.com/espressif/esp-brookesia
+version: 0.3.0
