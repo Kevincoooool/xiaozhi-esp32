@@ -1,7 +1,8 @@
 #include "AudioDevice.h"
 #include <esp_log.h>
 #include <cstring>
-
+#include <driver/gpio.h>
+#include <es8311.h>
 #define TAG "AudioDevice"
 
 AudioDevice::AudioDevice() {
@@ -32,6 +33,53 @@ void AudioDevice::Start(int input_sample_rate, int output_sample_rate) {
     ESP_ERROR_CHECK(i2s_channel_enable(tx_handle_));
     ESP_ERROR_CHECK(i2s_channel_enable(rx_handle_));
 
+    // Start PA
+    gpio_config_t io_conf = {
+        .pin_bit_mask = 1 << GPIO_NUM_13,
+        .mode = GPIO_MODE_OUTPUT,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    gpio_config(&io_conf);
+    gpio_set_level(GPIO_NUM_13, 1);
+
+    // Initialize I2C peripheral
+    const i2c_config_t es_i2c_cfg = {
+        .mode = I2C_MODE_MASTER,
+        .sda_io_num = GPIO_NUM_0,
+        .scl_io_num = GPIO_NUM_1,
+        .sda_pullup_en = GPIO_PULLUP_ENABLE,
+        .scl_pullup_en = GPIO_PULLUP_ENABLE,
+        .master = {
+            .clk_speed = 100000,
+        },
+        .clk_flags = 0,
+    };
+    ESP_ERROR_CHECK(i2c_param_config(I2C_NUM_0, &es_i2c_cfg));
+    ESP_ERROR_CHECK(i2c_driver_install(I2C_NUM_0, I2C_MODE_MASTER, 0, 0, 0));
+    
+    // Initialize es8311 codec
+    es8311_handle_t es_handle = es8311_create(I2C_NUM_0, ES8311_ADDRRES_0);
+    if (es_handle == NULL) {
+        ESP_LOGE(TAG, "es8311 create failed");
+        return;
+    }
+
+    const es8311_clock_config_t es_clk = {
+        .mclk_inverted = false,
+        .sclk_inverted = false,
+        .mclk_from_mclk_pin = true,
+        .mclk_frequency = output_sample_rate * 256,
+        .sample_frequency = output_sample_rate
+    };
+
+    ESP_ERROR_CHECK(es8311_init(es_handle, &es_clk, ES8311_RESOLUTION_16, ES8311_RESOLUTION_16));
+    ESP_ERROR_CHECK(es8311_sample_frequency_config(es_handle, output_sample_rate * 256, output_sample_rate));
+    ESP_ERROR_CHECK(es8311_voice_volume_set(es_handle, 70, NULL));
+    ESP_ERROR_CHECK(es8311_microphone_config(es_handle, false));
+    ESP_ERROR_CHECK(es8311_microphone_gain_set(es_handle, ES8311_MIC_GAIN_12DB));
+
     xTaskCreate([](void* arg) {
         auto audio_device = (AudioDevice*)arg;
         audio_device->InputTask();
@@ -60,11 +108,11 @@ void AudioDevice::CreateDuplexChannels() {
             .mclk_multiple = I2S_MCLK_MULTIPLE_256
         },
         .slot_cfg = {
-            .data_bit_width = I2S_DATA_BIT_WIDTH_32BIT,
+            .data_bit_width = I2S_DATA_BIT_WIDTH_16BIT,
             .slot_bit_width = I2S_SLOT_BIT_WIDTH_AUTO,
             .slot_mode = I2S_SLOT_MODE_MONO,
             .slot_mask = I2S_STD_SLOT_LEFT,
-            .ws_width = I2S_DATA_BIT_WIDTH_32BIT,
+            .ws_width = I2S_DATA_BIT_WIDTH_16BIT,
             .ws_pol = false,
             .bit_shift = true,
             .left_align = true,
@@ -72,11 +120,11 @@ void AudioDevice::CreateDuplexChannels() {
             .bit_order_lsb = false
         },
         .gpio_cfg = {
-            .mclk = I2S_GPIO_UNUSED,
-            .bclk = (gpio_num_t)CONFIG_AUDIO_DEVICE_I2S_MIC_GPIO_BCLK,
-            .ws = (gpio_num_t)CONFIG_AUDIO_DEVICE_I2S_MIC_GPIO_WS,
-            .dout = (gpio_num_t)CONFIG_AUDIO_DEVICE_I2S_SPK_GPIO_DOUT,
-            .din = (gpio_num_t)CONFIG_AUDIO_DEVICE_I2S_MIC_GPIO_DIN,
+            .mclk = GPIO_NUM_10,
+            .bclk = GPIO_NUM_8,
+            .ws = GPIO_NUM_12,
+            .dout = GPIO_NUM_11,
+            .din = GPIO_NUM_7,
             .invert_flags = {
                 .mclk_inv = false,
                 .bclk_inv = false,
@@ -150,17 +198,25 @@ void AudioDevice::CreateSimplexChannels() {
 }
 #endif
 
-void AudioDevice::Write(const int16_t* data, int samples) {
-    int32_t buffer[samples];
-    for (int i = 0; i < samples; i++) {
-        buffer[i] = int32_t(data[i]) << 15;
-    }
-
+int AudioDevice::Write(const int16_t* data, int samples) {
     size_t bytes_written;
-    ESP_ERROR_CHECK(i2s_channel_write(tx_handle_, buffer, samples * sizeof(int32_t), &bytes_written, portMAX_DELAY));
+    ESP_ERROR_CHECK(i2s_channel_write(tx_handle_, data, samples * sizeof(int16_t), &bytes_written, portMAX_DELAY));
+    return bytes_written / sizeof(int16_t);
+
+    // int32_t buffer[samples];
+    // for (int i = 0; i < samples; i++) {
+    //     buffer[i] = int32_t(data[i]) << 15;
+    // }
+
+    // size_t bytes_written;
+    // ESP_ERROR_CHECK(i2s_channel_write(tx_handle_, buffer, samples * sizeof(int32_t), &bytes_written, portMAX_DELAY));
 }
 
 int AudioDevice::Read(int16_t* dest, int samples) {
+    size_t bytes_read;
+    ESP_ERROR_CHECK(i2s_channel_read(rx_handle_, dest, samples * sizeof(int16_t), &bytes_read, portMAX_DELAY));
+    return bytes_read / sizeof(int16_t);
+    /*
     size_t bytes_read;
 
     int32_t bit32_buffer_[samples];
@@ -174,7 +230,7 @@ int AudioDevice::Read(int16_t* dest, int samples) {
         int32_t value = bit32_buffer_[i] >> 12;
         dest[i] = (value > INT16_MAX) ? INT16_MAX : (value < -INT16_MAX) ? -INT16_MAX : (int16_t)value;
     }
-    return samples;
+    return samples;*/
 }
 
 void AudioDevice::OnInputData(std::function<void(const int16_t*, int)> callback) {

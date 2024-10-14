@@ -38,7 +38,7 @@ private:
     void CreateSimplexChannels();
     void InputTask();
     int Read(int16_t* dest, int samples);
-    void Write(const int16_t* data, int samples);
+    int Write(const int16_t* data, int samples);
 };
 
 #endif // _AUDIO_DEVICE_H

@@ -6,6 +6,9 @@ set(SOURCES "AudioDevice.cc"
             "Display.cc"
             "Button.cc"
             "main.cc"
+            "lv_gui.c"
+            "font_dingdingjbt.c"
+            "img_src_mic_logo.c"
             )
 
 if(CONFIG_USE_AFE_SR)
