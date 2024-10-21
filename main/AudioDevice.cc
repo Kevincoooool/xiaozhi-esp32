@@ -17,7 +17,7 @@
 #define EXAMPLE_SAMPLE_RATE (16000)
 #define EXAMPLE_MCLK_MULTIPLE (384) // If not using 24-bit data width, 256 should be enough
 #define EXAMPLE_MCLK_FREQ_HZ (EXAMPLE_SAMPLE_RATE * EXAMPLE_MCLK_MULTIPLE)
-#define EXAMPLE_VOICE_VOLUME 70
+#define EXAMPLE_VOICE_VOLUME 75
 
 
 #define ES7210_I2C_ADDR             (0x40)
@@ -33,16 +33,19 @@
 /* I2C port and GPIOs */
 #define I2C_NUM I2C_NUM_0
 
-#define I2C_SCL_IO (GPIO_NUM_18)
-#define I2C_SDA_IO (GPIO_NUM_17)
+#define I2C_SCL_IO (GPIO_NUM_38)
+#define I2C_SDA_IO (GPIO_NUM_39)
 
 /* I2S port and GPIOs */
 #define I2S_NUM I2S_NUM_0
-#define I2S_MCK_IO (GPIO_NUM_16)
-#define I2S_BCK_IO (GPIO_NUM_9)
-#define I2S_WS_IO (GPIO_NUM_45)
-#define I2S_DO_IO (GPIO_NUM_8)
-#define I2S_DI_IO (GPIO_NUM_10)
+
+#define I2S_MCK_IO (GPIO_NUM_0)
+#define I2S_BCK_IO (GPIO_NUM_48)
+#define I2S_WS_IO (GPIO_NUM_47)
+#define I2S_DO_IO (GPIO_NUM_21)
+#define I2S_DI_IO (GPIO_NUM_45)
+
+
 static i2s_chan_handle_t tx_handle = NULL;
 static i2s_chan_handle_t rx_handle = NULL;
 static es7210_dev_handle_t es7210_handle = NULL;
@@ -73,18 +76,18 @@ static void es7210_init(bool is_tdm)
 static esp_err_t es8311_codec_init(void)
 {
     /* Initialize I2C peripheral */
-    // const i2c_config_t es_i2c_cfg = {
-    //     .mode = I2C_MODE_MASTER,
-    //     .sda_io_num = I2C_SDA_IO,
-    //     .scl_io_num = I2C_SCL_IO,
-    //     .sda_pullup_en = GPIO_PULLUP_ENABLE,
-    //     .scl_pullup_en = GPIO_PULLUP_ENABLE,
-    //     .master = {
-    //             .clk_speed = 400000,
-    //         }
-    // };
-    // ESP_RETURN_ON_ERROR(i2c_param_config(I2C_NUM, &es_i2c_cfg), TAG, "config i2c failed");
-    // ESP_RETURN_ON_ERROR(i2c_driver_install(I2C_NUM, I2C_MODE_MASTER, 0, 0, 0), TAG, "install i2c driver failed");
+    const i2c_config_t es_i2c_cfg = {
+        .mode = I2C_MODE_MASTER,
+        .sda_io_num = I2C_SDA_IO,
+        .scl_io_num = I2C_SCL_IO,
+        .sda_pullup_en = GPIO_PULLUP_ENABLE,
+        .scl_pullup_en = GPIO_PULLUP_ENABLE,
+        .master = {
+                .clk_speed = 400000,
+            }
+    };
+    ESP_RETURN_ON_ERROR(i2c_param_config(I2C_NUM, &es_i2c_cfg), TAG, "config i2c failed");
+    ESP_RETURN_ON_ERROR(i2c_driver_install(I2C_NUM, I2C_MODE_MASTER, 0, 0, 0), TAG, "install i2c driver failed");
 
     /* Initialize es8311 codec */
     es8311_handle_t es_handle = es8311_create(I2C_NUM, ES8311_ADDRRES_0);
@@ -198,9 +201,9 @@ void AudioDevice::Start(int input_sample_rate, int output_sample_rate) {
         ESP_LOGI(TAG, "es8311 codec init success");
     }
     es7210_init(true);
-    esp_rom_gpio_pad_select_gpio(GPIO_NUM_48);
-    gpio_set_direction(GPIO_NUM_48, GPIO_MODE_OUTPUT);
-    gpio_set_level(GPIO_NUM_48, 1); // 输出高电平
+    esp_rom_gpio_pad_select_gpio(GPIO_NUM_40);
+    gpio_set_direction(GPIO_NUM_40, GPIO_MODE_OUTPUT);
+    gpio_set_level(GPIO_NUM_40, 1); // 输出高电平
 
     xTaskCreate([](void* arg) {
         auto audio_device = (AudioDevice*)arg;

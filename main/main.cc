@@ -26,11 +26,6 @@
 #include "file_manager.h"
 #define TAG "main"
 
-#define BSP_IO_EXPANDER_I2C_ADDRESS_TCA9554A (ESP_IO_EXPANDER_I2C_TCA9554A_ADDRESS_000)
-#define BSP_IO_EXPANDER_I2C_ADDRESS_TCA9554 (ESP_IO_EXPANDER_I2C_TCA9554_ADDRESS_000)
-
-#define I2C_SCL_IO (GPIO_NUM_18)
-#define I2C_SDA_IO (GPIO_NUM_17)
 esp_err_t tfcard_ret = ESP_FAIL;
 static void lv_tick_task(void *arg)
 {
@@ -169,35 +164,11 @@ extern "C" void app_main(void)
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
-    /* Initialize I2C peripheral */
-    const i2c_config_t es_i2c_cfg = {
-        .mode = I2C_MODE_MASTER,
-        .sda_io_num = I2C_SDA_IO,
-        .scl_io_num = I2C_SCL_IO,
-        .sda_pullup_en = GPIO_PULLUP_ENABLE,
-        .scl_pullup_en = GPIO_PULLUP_ENABLE,
-        .master = {
-            .clk_speed = 400000,
-        }};
-    (i2c_param_config(I2C_NUM_0, &es_i2c_cfg));
-    (i2c_driver_install(I2C_NUM_0, I2C_MODE_MASTER, 0, 0, 0));
-    static esp_io_expander_handle_t io_expander = NULL; // IO expander tca9554 handle
-    if ((esp_io_expander_new_i2c_tca9554(I2C_NUM_0, BSP_IO_EXPANDER_I2C_ADDRESS_TCA9554, &io_expander) != ESP_OK) &&
-        (esp_io_expander_new_i2c_tca9554(I2C_NUM_0, BSP_IO_EXPANDER_I2C_ADDRESS_TCA9554A, &io_expander) != ESP_OK))
-    {
-        ESP_LOGE(TAG, "Failed to initialize IO expander");
-    }
-    else
-    {
-        ESP_LOGI(TAG, "Initialize IO expander OK");
 
-        (esp_io_expander_set_dir(io_expander, IO_EXPANDER_PIN_NUM_2, IO_EXPANDER_OUTPUT));
-        (esp_io_expander_set_level(io_expander, IO_EXPANDER_PIN_NUM_2, false));
-        vTaskDelay(200);
-        (esp_io_expander_set_level(io_expander, IO_EXPANDER_PIN_NUM_2, true));
-    }
     tfcard_ret = fm_sdcard_init();
-
+       esp_rom_gpio_pad_select_gpio(GPIO_NUM_15);
+    gpio_set_direction(GPIO_NUM_15, GPIO_MODE_OUTPUT);
+    gpio_set_level(GPIO_NUM_15, 1); // 输出高电平
     //     /* Waiting for modem powerup */
     //     ESP_LOGI(TAG, "====================================");
     //     ESP_LOGI(TAG, "     ESP 4G Cat.1 Wi-Fi Router");
@@ -217,7 +188,7 @@ extern "C" void app_main(void)
 
     // Otherwise, launch the application
 
-    xTaskCreatePinnedToCore(&gui_task, "gui task", 1024 * 5, NULL, 5, NULL, 0);
+    // xTaskCreatePinnedToCore(&gui_task, "gui task", 1024 * 5, NULL, 5, NULL, 0);
     vTaskDelay(1000);
     // label_ask_set_text("可以唤醒我啦");
     Application::GetInstance().Start();
