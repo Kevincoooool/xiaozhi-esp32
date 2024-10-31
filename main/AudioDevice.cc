@@ -39,7 +39,7 @@
 /* I2S port and GPIOs */
 #define I2S_NUM I2S_NUM_0
 
-#define I2S_MCK_IO (GPIO_NUM_0)
+#define I2S_MCK_IO (GPIO_NUM_42)
 #define I2S_BCK_IO (GPIO_NUM_48)
 #define I2S_WS_IO (GPIO_NUM_47)
 #define I2S_DO_IO (GPIO_NUM_21)
@@ -201,9 +201,9 @@ void AudioDevice::Start(int input_sample_rate, int output_sample_rate) {
         ESP_LOGI(TAG, "es8311 codec init success");
     }
     es7210_init(true);
-    esp_rom_gpio_pad_select_gpio(GPIO_NUM_40);
-    gpio_set_direction(GPIO_NUM_40, GPIO_MODE_OUTPUT);
-    gpio_set_level(GPIO_NUM_40, 1); // 输出高电平
+    esp_rom_gpio_pad_select_gpio(GPIO_NUM_17);
+    gpio_set_direction(GPIO_NUM_17, GPIO_MODE_OUTPUT);
+    gpio_set_level(GPIO_NUM_17, 1); // 输出高电平
 
     xTaskCreate([](void* arg) {
         auto audio_device = (AudioDevice*)arg;
