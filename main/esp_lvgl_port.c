@@ -24,16 +24,16 @@ static const char *TAG = "esp_lvgl";
 #define EXAMPLE_LCD_PIXEL_CLOCK_HZ (60 * 1000 * 1000)
 #define EXAMPLE_LCD_BK_LIGHT_ON_LEVEL 0
 #define EXAMPLE_LCD_BK_LIGHT_OFF_LEVEL !EXAMPLE_LCD_BK_LIGHT_ON_LEVEL
-#define EXAMPLE_PIN_NUM_SCLK 1
-#define EXAMPLE_PIN_NUM_MOSI 0
+#define EXAMPLE_PIN_NUM_SCLK 14
+#define EXAMPLE_PIN_NUM_MOSI 13
 #define EXAMPLE_PIN_NUM_MISO -1
-#define EXAMPLE_PIN_NUM_LCD_DC 2
-#define EXAMPLE_PIN_NUM_LCD_RST -1
-#define EXAMPLE_PIN_NUM_LCD_CS 46
-#define EXAMPLE_PIN_NUM_BK_LIGHT -1
+#define EXAMPLE_PIN_NUM_LCD_DC 46
+#define EXAMPLE_PIN_NUM_LCD_RST 40
+#define EXAMPLE_PIN_NUM_LCD_CS 16
+#define EXAMPLE_PIN_NUM_BK_LIGHT 3
 #define EXAMPLE_PIN_NUM_TOUCH_CS -1
-#define EXAMPLE_LCD_H_RES 280
-#define EXAMPLE_LCD_V_RES 240
+#define EXAMPLE_LCD_H_RES 240
+#define EXAMPLE_LCD_V_RES 280
 #define EXAMPLE_LCD_CMD_BITS 8
 #define EXAMPLE_LCD_PARAM_BITS 8
 #define EXAMPLE_LVGL_TICK_PERIOD_MS 10
@@ -49,10 +49,10 @@ static bool example_notify_lvgl_flush_ready(esp_lcd_panel_io_handle_t panel_io, 
 static void example_lvgl_flush_cb(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t *color_map)
 {
     esp_lcd_panel_handle_t panel_handle = (esp_lcd_panel_handle_t)drv->user_data;
-    int offsetx1 = area->x1 + 20;
-    int offsetx2 = area->x2 + 20;
-    int offsety1 = area->y1;
-    int offsety2 = area->y2;
+    int offsetx1 = area->x1;
+    int offsetx2 = area->x2;
+    int offsety1 = area->y1+20;
+    int offsety2 = area->y2+20;
     // copy a buffer's content to a specific area of the display
     esp_lcd_panel_draw_bitmap(panel_handle, offsetx1, offsety1, offsetx2 + 1, offsety2 + 1, color_map);
 }
@@ -136,8 +136,8 @@ void esp_lvgl_adapter_init(void *arg)
 
     ESP_ERROR_CHECK(esp_lcd_panel_reset(panel_handle));
     ESP_ERROR_CHECK(esp_lcd_panel_init(panel_handle));
-    ESP_ERROR_CHECK(esp_lcd_panel_swap_xy(panel_handle, true));
-    ESP_ERROR_CHECK(esp_lcd_panel_mirror(panel_handle, false, true));
+    ESP_ERROR_CHECK(esp_lcd_panel_swap_xy(panel_handle, false));
+    ESP_ERROR_CHECK(esp_lcd_panel_mirror(panel_handle, false, false));
     ESP_ERROR_CHECK(esp_lcd_panel_invert_color(panel_handle, true));
     ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel_handle, true));
 
@@ -197,10 +197,13 @@ void esp_lvgl_adapter_init(void *arg)
     esp_timer_handle_t lvgl_tick_timer = NULL;
     ESP_ERROR_CHECK(esp_timer_create(&lvgl_tick_timer_args, &lvgl_tick_timer));
     ESP_ERROR_CHECK(esp_timer_start_periodic(lvgl_tick_timer, EXAMPLE_LVGL_TICK_PERIOD_MS * 1000));
+    esp_rom_gpio_pad_select_gpio(EXAMPLE_PIN_NUM_BK_LIGHT);
+    gpio_set_direction(EXAMPLE_PIN_NUM_BK_LIGHT, GPIO_MODE_OUTPUT);
+    gpio_set_level(EXAMPLE_PIN_NUM_BK_LIGHT, 1);
 
     lv_main_page();
-    if (tfcard_ret == ESP_OK)
-        avi_player_load();
+    // if (tfcard_ret == ESP_OK)
+    //     avi_player_load();
     while (1)
     {
         /* Delay 1 tick (assumes FreeRTOS tick is 10ms */
