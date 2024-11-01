@@ -35,7 +35,7 @@ elseif(CONFIG_BOARD_TYPE_KEVIN_BOX_0)
     # add all files from boards/kevin-box-0
     set(BOARD_TYPE "kevin-box-0")
     file(GLOB BOARD_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/boards/${BOARD_TYPE}/*.cc)
-    list(APPEND SOURCES ${BOARD_SOURCES} "Ml307Board.cc")
+    list(APPEND SOURCES ${BOARD_SOURCES} "WifiBoard.cc")
     list(APPEND INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/boards/${BOARD_TYPE})
     list(APPEND SOURCES "BoxAudioDevice.cc")
 elseif(CONFIG_BOARD_TYPE_KEVIN_BOX_1)
@@ -59,7 +59,12 @@ if(CONFIG_USE_AFE_SR)
 endif()
 
 idf_component_register(SRCS ${SOURCES}
-                    EMBED_FILES "assets/err_reg.p3" "assets/err_pin.p3" "assets/err_wificonfig.p3"
+                    EMBED_FILES "assets/err_reg.p3" "assets/err_pin.p3" "assets/err_wificonfig.p3" "assets/nishuo.p3"
+                    "assets/haode.p3"
+                    "assets/dakai.p3"
+                    "assets/guanbi.p3"
+                    "assets/liangyidian.p3"
+                    "assets/anyidian.p3"
                     INCLUDE_DIRS ${INCLUDE_DIRS}
                     )
 

@@ -132,6 +132,7 @@ private:
     void SetDecodeSampleRate(int sample_rate);
     void StartWebSocketClient();
     void CheckNewVersion();
+    void uart_task();
 
     void AudioEncodeTask();
     void AudioPlayTask();

@@ -7,10 +7,11 @@
 #include <esp_adc/adc_oneshot.h>
 #include <esp_adc/adc_cali.h>
 #include <esp_adc/adc_cali_scheme.h>
+#include "WifiBoard.h"
 
 static const char *TAG = "KevinBoxBoard";
 
-class KevinBoxBoard : public Ml307Board {
+class KevinBoxBoard : public WifiBoard {
 private:
     adc_oneshot_unit_handle_t adc1_handle_;
     adc_cali_handle_t adc1_cali_handle_;
@@ -29,7 +30,7 @@ private:
     void Enable4GModule() {
         // Make GPIO15 HIGH to enable the 4G module
         gpio_config_t ml307_enable_config = {
-            .pin_bit_mask = (1ULL << 15),
+            .pin_bit_mask = (1ULL << 15)|| (1ULL << 18),
             .mode = GPIO_MODE_OUTPUT,
             .pull_up_en = GPIO_PULLUP_DISABLE,
             .pull_down_en = GPIO_PULLDOWN_DISABLE,
@@ -37,6 +38,7 @@ private:
         };
         gpio_config(&ml307_enable_config);
         gpio_set_level(GPIO_NUM_15, 1);
+        gpio_set_level(GPIO_NUM_18, 1);
     }
 
     virtual void InitializeADC() {
@@ -64,8 +66,9 @@ public:
         ESP_LOGI(TAG, "Initializing KevinBoxBoard");
         InitializeADC();
         MountStorage();
-        Enable4GModule();
-        Ml307Board::Initialize();
+        // Enable4GModule();
+        // Ml307Board::Initialize();
+        WifiBoard::Initialize();
     }
 
     virtual AudioDevice* CreateAudioDevice() override {
