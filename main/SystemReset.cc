@@ -15,7 +15,7 @@ SystemReset::SystemReset() {
     gpio_config_t io_conf;
     io_conf.intr_type = GPIO_INTR_DISABLE;
     io_conf.mode = GPIO_MODE_INPUT;
-    io_conf.pin_bit_mask = (1ULL << GPIO_NUM_1) | (1ULL << GPIO_NUM_2);
+    io_conf.pin_bit_mask = (1ULL << GPIO_NUM_7) | (1ULL << GPIO_NUM_6);
     io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
     io_conf.pull_up_en = GPIO_PULLUP_ENABLE;
     gpio_config(&io_conf);
@@ -23,13 +23,13 @@ SystemReset::SystemReset() {
 
 
 void SystemReset::CheckButtons() {
-    if (gpio_get_level(GPIO_NUM_2) == 0) {
+    if (gpio_get_level(GPIO_NUM_7) == 0) {
         ESP_LOGI(TAG, "Button is pressed, reset to factory");
         ResetNvsFlash();
         ResetToFactory();
     }
 
-    if (gpio_get_level(GPIO_NUM_1) == 0) {
+    if (gpio_get_level(GPIO_NUM_6) == 0) {
         ESP_LOGI(TAG, "Button is pressed, reset NVS flash");
         ResetNvsFlash();
     }
