@@ -93,7 +93,7 @@ void BoxAudioDevice::Initialize() {
     es8311_codec_cfg_t es8311_cfg = {};
     es8311_cfg.ctrl_if = out_ctrl_if_;
     es8311_cfg.gpio_if = gpio_if_;
-    es8311_cfg.codec_mode = ESP_CODEC_DEV_WORK_MODE_DAC;
+    es8311_cfg.codec_mode = ESP_CODEC_DEV_WORK_MODE_BOTH;
     es8311_cfg.pa_pin = AUDIO_CODEC_PA_PIN;
     es8311_cfg.use_mclk = true;
     es8311_cfg.hw_gain.pa_voltage = 5.0;
@@ -102,7 +102,7 @@ void BoxAudioDevice::Initialize() {
     assert(out_codec_if_ != NULL);
 
     esp_codec_dev_cfg_t dev_cfg = {
-        .dev_type = ESP_CODEC_DEV_TYPE_OUT,
+        .dev_type = ESP_CODEC_DEV_TYPE_IN_OUT,
         .codec_if = out_codec_if_,
         .data_if = data_if_,
     };
@@ -110,20 +110,53 @@ void BoxAudioDevice::Initialize() {
     assert(output_dev_ != NULL);
 
     // Input
-    i2c_cfg.addr = AUDIO_CODEC_ES7210_ADDR;
-    in_ctrl_if_ = audio_codec_new_i2c_ctrl(&i2c_cfg);
-    assert(in_ctrl_if_ != NULL);
+    // i2c_cfg.addr = AUDIO_CODEC_ES7210_ADDR;
+    // in_ctrl_if_ = audio_codec_new_i2c_ctrl(&i2c_cfg);
+    // assert(in_ctrl_if_ != NULL);
 
-    es7210_codec_cfg_t es7210_cfg = {};
-    es7210_cfg.ctrl_if = in_ctrl_if_;
-    es7210_cfg.mic_selected = ES7120_SEL_MIC1 | ES7120_SEL_MIC2 | ES7120_SEL_MIC3 | ES7120_SEL_MIC4;
-    in_codec_if_ = es7210_codec_new(&es7210_cfg);
-    assert(in_codec_if_ != NULL);
+    // es7210_codec_cfg_t es7210_cfg = {};
+    // es7210_cfg.ctrl_if = in_ctrl_if_;
+    // es7210_cfg.mic_selected = ES7120_SEL_MIC1 | ES7120_SEL_MIC2 | ES7120_SEL_MIC3 | ES7120_SEL_MIC4;
+    // in_codec_if_ = es7210_codec_new(&es7210_cfg);
+    // assert(in_codec_if_ != NULL);
 
-    dev_cfg.dev_type = ESP_CODEC_DEV_TYPE_IN;
-    dev_cfg.codec_if = in_codec_if_;
-    input_dev_ = esp_codec_dev_new(&dev_cfg);
-    assert(input_dev_ != NULL);
+    // dev_cfg.dev_type = ESP_CODEC_DEV_TYPE_IN;
+    // dev_cfg.codec_if = in_codec_if_;
+    // input_dev_ = esp_codec_dev_new(&dev_cfg);
+    // assert(input_dev_ != NULL);
+
+    // in_ctrl_if_ = audio_codec_new_i2c_ctrl(&i2c_cfg);
+    // assert(in_ctrl_if_ != NULL);
+    // esp_codec_dev_hw_gain_t gain = {
+    //     .pa_voltage = 5.0,
+    //     .codec_dac_voltage = 3.3,
+    // };
+
+    // es8311_codec_cfg_t es8311_in_cfg = {
+    //     .ctrl_if = in_ctrl_if_,
+    //     .gpio_if = gpio_if_,
+    //     .codec_mode = ESP_CODEC_DEV_WORK_MODE_BOTH,
+    //     .pa_pin = -1,
+    //     .pa_reverted = false,
+    //     .master_mode = false,
+    //     .use_mclk = true,
+    //     .digital_mic = false,
+    //     .invert_mclk = false,
+    //     .invert_sclk = false,
+    //     .hw_gain = gain,
+    // };
+
+    // const audio_codec_if_t *es8311_dev = es8311_codec_new(&es8311_in_cfg);
+    // assert(es8311_dev);
+
+    // esp_codec_dev_cfg_t codec_es8311_dev_cfg = {
+    //     .dev_type = ESP_CODEC_DEV_TYPE_IN,
+    //     .codec_if = es8311_dev,
+    //     .data_if = data_if_,
+    // };
+
+    // input_dev_ = esp_codec_dev_new(&codec_es8311_dev_cfg);
+    // assert(input_dev_ != NULL);
 
     ESP_LOGI(TAG, "BoxAudioDevice initialized");
 }
@@ -220,7 +253,7 @@ void BoxAudioDevice::CreateDuplexChannels() {
 
 int BoxAudioDevice::Read(int16_t *buffer, int samples) {
     if (input_enabled_) {
-        ESP_ERROR_CHECK_WITHOUT_ABORT(esp_codec_dev_read(input_dev_, (void*)buffer, samples * sizeof(int16_t)));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(esp_codec_dev_read(output_dev_, (void*)buffer, samples * sizeof(int16_t)));
     }
     return samples;
 }
@@ -244,18 +277,18 @@ void BoxAudioDevice::EnableInput(bool enable) {
     if (enable) {
         esp_codec_dev_sample_info_t fs = {
             .bits_per_sample = 16,
-            .channel = 4,
-            .channel_mask = ESP_CODEC_DEV_MAKE_CHANNEL_MASK(0),
+            .channel = 1,
+            // .channel_mask = ESP_CODEC_DEV_MAKE_CHANNEL_MASK(0),
             .sample_rate = (uint32_t)output_sample_rate_,
             .mclk_multiple = 0,
         };
-        if (input_reference_) {
-            fs.channel_mask |= ESP_CODEC_DEV_MAKE_CHANNEL_MASK(1);
-        }
-        ESP_ERROR_CHECK(esp_codec_dev_open(input_dev_, &fs));
-        ESP_ERROR_CHECK(esp_codec_dev_set_in_channel_gain(input_dev_, ESP_CODEC_DEV_MAKE_CHANNEL_MASK(0), 30.0));
+        // if (input_reference_) {
+        //     fs.channel_mask |= ESP_CODEC_DEV_MAKE_CHANNEL_MASK(1);
+        // }
+        ESP_ERROR_CHECK(esp_codec_dev_open(output_dev_, &fs));
+        // ESP_ERROR_CHECK(esp_codec_dev_set_in_channel_gain(input_dev_, ESP_CODEC_DEV_MAKE_CHANNEL_MASK(0), 30.0));
     } else {
-        ESP_ERROR_CHECK(esp_codec_dev_close(input_dev_));
+        // ESP_ERROR_CHECK(esp_codec_dev_close(output_dev_));
     }
     AudioDevice::EnableInput(enable);
 }
@@ -276,7 +309,7 @@ void BoxAudioDevice::EnableOutput(bool enable) {
         ESP_ERROR_CHECK(esp_codec_dev_open(output_dev_, &fs));
         ESP_ERROR_CHECK(esp_codec_dev_set_out_vol(output_dev_, output_volume_));
     } else {
-        ESP_ERROR_CHECK(esp_codec_dev_close(output_dev_));
+        // ESP_ERROR_CHECK(esp_codec_dev_close(output_dev_));
     }
     AudioDevice::EnableOutput(enable);
 }

@@ -52,6 +52,14 @@ elseif(CONFIG_BOARD_TYPE_LICHUANG_DEV)
     list(APPEND SOURCES ${BOARD_SOURCES} "WifiBoard.cc")
     list(APPEND INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/boards/${BOARD_TYPE})
     list(APPEND SOURCES "BoxAudioDevice.cc")
+    elseif(CONFIG_BOARD_TYPE_LEO_AI)
+        # add all files from boards/lichuang-dev
+        set(BOARD_TYPE "leo_ai")
+        file(GLOB BOARD_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/boards/${BOARD_TYPE}/*.cc)
+        list(APPEND SOURCES ${BOARD_SOURCES} "WifiBoard.cc")
+        list(APPEND INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/boards/${BOARD_TYPE})
+        list(APPEND SOURCES "BoxAudioDevice.cc")
+    
 endif()
 
 if(CONFIG_USE_AFE_SR)
