@@ -169,6 +169,9 @@ extern "C" void app_main(void)
        esp_rom_gpio_pad_select_gpio(GPIO_NUM_15);
     gpio_set_direction(GPIO_NUM_15, GPIO_MODE_OUTPUT);
     gpio_set_level(GPIO_NUM_15, 1); // 输出高电平
+    esp_rom_gpio_pad_select_gpio(GPIO_NUM_18);
+    gpio_set_direction(GPIO_NUM_18, GPIO_MODE_OUTPUT);
+    gpio_set_level(GPIO_NUM_18, 1); // 输出高电平
     //     /* Waiting for modem powerup */
     //     ESP_LOGI(TAG, "====================================");
     //     ESP_LOGI(TAG, "     ESP 4G Cat.1 Wi-Fi Router");
