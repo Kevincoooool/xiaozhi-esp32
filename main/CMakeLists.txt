@@ -14,6 +14,7 @@ set(SOURCES "AudioDevice.cc"
             "file_manager.c"
             "img_src_mic_logo.c"
             "my_esp_lvgl_port.c"
+            "esp32_s3_szp.c"
             )
 set(INCLUDE_DIRS ".")
 

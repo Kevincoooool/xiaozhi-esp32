@@ -18,22 +18,23 @@
 #include "lvgl.h"
 #include "lv_gui.h"
 #include "avi_player.h"
+#include "esp32_s3_szp.h"
 
 static const char *TAG = "esp_lvgl";
 #define LCD_HOST SPI2_HOST
 #define EXAMPLE_LCD_PIXEL_CLOCK_HZ (60 * 1000 * 1000)
 #define EXAMPLE_LCD_BK_LIGHT_ON_LEVEL 0
 #define EXAMPLE_LCD_BK_LIGHT_OFF_LEVEL !EXAMPLE_LCD_BK_LIGHT_ON_LEVEL
-#define EXAMPLE_PIN_NUM_SCLK 1
-#define EXAMPLE_PIN_NUM_MOSI 0
+#define EXAMPLE_PIN_NUM_SCLK 41
+#define EXAMPLE_PIN_NUM_MOSI 40
 #define EXAMPLE_PIN_NUM_MISO -1
-#define EXAMPLE_PIN_NUM_LCD_DC 2
+#define EXAMPLE_PIN_NUM_LCD_DC 39
 #define EXAMPLE_PIN_NUM_LCD_RST -1
-#define EXAMPLE_PIN_NUM_LCD_CS 46
-#define EXAMPLE_PIN_NUM_BK_LIGHT -1
+#define EXAMPLE_PIN_NUM_LCD_CS -1
+#define EXAMPLE_PIN_NUM_BK_LIGHT 42
 #define EXAMPLE_PIN_NUM_TOUCH_CS -1
-#define EXAMPLE_LCD_H_RES 280
-#define EXAMPLE_LCD_V_RES 240
+#define EXAMPLE_LCD_H_RES 240
+#define EXAMPLE_LCD_V_RES 320
 #define EXAMPLE_LCD_CMD_BITS 8
 #define EXAMPLE_LCD_PARAM_BITS 8
 #define EXAMPLE_LVGL_TICK_PERIOD_MS 10
@@ -49,8 +50,8 @@ static bool example_notify_lvgl_flush_ready(esp_lcd_panel_io_handle_t panel_io, 
 static void example_lvgl_flush_cb(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t *color_map)
 {
     esp_lcd_panel_handle_t panel_handle = (esp_lcd_panel_handle_t)drv->user_data;
-    int offsetx1 = area->x1 + 20;
-    int offsetx2 = area->x2 + 20;
+    int offsetx1 = area->x1 ;
+    int offsetx2 = area->x2 ;
     int offsety1 = area->y1;
     int offsety2 = area->y2;
     // copy a buffer's content to a specific area of the display
@@ -135,6 +136,7 @@ void esp_lvgl_adapter_init(void *arg)
     ESP_ERROR_CHECK(esp_lcd_new_panel_st7789(io_handle, &panel_config, &panel_handle));
 
     ESP_ERROR_CHECK(esp_lcd_panel_reset(panel_handle));
+    lcd_cs(0);  // 拉低CS引脚
     ESP_ERROR_CHECK(esp_lcd_panel_init(panel_handle));
     ESP_ERROR_CHECK(esp_lcd_panel_swap_xy(panel_handle, true));
     ESP_ERROR_CHECK(esp_lcd_panel_mirror(panel_handle, false, true));

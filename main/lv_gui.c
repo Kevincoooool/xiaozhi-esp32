@@ -242,6 +242,18 @@ void lv_main_page(void)
     lv_label_set_text(label_reply, "AI:");
     lv_obj_add_event_cb(label_reply, sr2_label_event_handler, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_move_foreground(label_reply);
+
+     lv_obj_t *   label_mid = lv_label_create(lv_scr_act());
+    // lv_obj_set_width(label_reply, 260);
+    // lv_obj_set_height(label_reply, 200);
+    // lv_label_set_long_mode(label_ask, LV_LABEL_LONG_SCROLL_CIRCULAR); /*Circular scroll*/
+    lv_obj_align(label_mid, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_text_font(label_mid, &font_alipuhui20, LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(label_mid, lv_palette_main(LV_PALETTE_DEEP_ORANGE), 0);
+
+    lv_label_set_text(label_mid, "XiaoZhi-XiaGe");
+    lv_obj_move_foreground(label_mid);
+
     g_sr_mask = lv_obj_create(lv_scr_act());
     // lv_obj_set_size(g_sr_mask, lv_obj_get_width(lv_obj_get_parent(g_sr_mask)), lv_obj_get_height(lv_obj_get_parent(g_sr_mask)));
     lv_obj_set_size(g_sr_mask, lv_obj_get_width(lv_obj_get_parent(g_sr_mask)), 100);

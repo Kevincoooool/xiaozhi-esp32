@@ -23,6 +23,7 @@
 #include "esp_netif.h"
 #include "file_manager.h"
 #include "my_esp_lvgl_port.h"
+#include "esp32_s3_szp.h"
 
 #define TAG "main"
 
@@ -31,6 +32,7 @@
 
 #define I2C_SCL_IO (GPIO_NUM_18)
 #define I2C_SDA_IO (GPIO_NUM_17)
+
 esp_err_t tfcard_ret = ESP_FAIL;
 
 extern "C" void app_main(void)
@@ -46,6 +48,7 @@ extern "C" void app_main(void)
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
+    pca9557_init();  // IO扩展芯片初始化
 
     // tfcard_ret = fm_sdcard_init();
 

@@ -31,19 +31,19 @@ void BoxAudioDevice::Initialize() {
     input_channels_ = input_reference_ ? 2 : 1; // 输入通道数
 
     // Initialize I2C peripheral
-    i2c_master_bus_config_t i2c_bus_cfg = {
-        .i2c_port = I2C_NUM_1,
-        .sda_io_num = (gpio_num_t)AUDIO_CODEC_I2C_SDA_PIN,
-        .scl_io_num = (gpio_num_t)AUDIO_CODEC_I2C_SCL_PIN,
-        .clk_source = I2C_CLK_SRC_DEFAULT,
-        .glitch_ignore_cnt = 7,
-        .intr_priority = 0,
-        .trans_queue_depth = 0,
-        .flags = {
-            .enable_internal_pullup = 0,
-        },
-    };
-    ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_bus_cfg, &i2c_master_handle_));
+    // i2c_master_bus_config_t i2c_bus_cfg = {
+    //     .i2c_port = I2C_NUM_1,
+    //     .sda_io_num = (gpio_num_t)AUDIO_CODEC_I2C_SDA_PIN,
+    //     .scl_io_num = (gpio_num_t)AUDIO_CODEC_I2C_SCL_PIN,
+    //     .clk_source = I2C_CLK_SRC_DEFAULT,
+    //     .glitch_ignore_cnt = 7,
+    //     .intr_priority = 0,
+    //     .trans_queue_depth = 0,
+    //     .flags = {
+    //         .enable_internal_pullup = 0,
+    //     },
+    // };
+    // ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_bus_cfg, &i2c_master_handle_));
 
     CreateDuplexChannels();
 
