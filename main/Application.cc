@@ -11,6 +11,7 @@
 #include <arpa/inet.h>
 
 #include "Application.h"
+#include "lv_gui.h"
 
 #define TAG "Application"
 
@@ -20,7 +21,8 @@ extern const char p3_err_pin_start[] asm("_binary_err_pin_p3_start");
 extern const char p3_err_pin_end[] asm("_binary_err_pin_p3_end");
 extern const char p3_err_wificonfig_start[] asm("_binary_err_wificonfig_p3_start");
 extern const char p3_err_wificonfig_end[] asm("_binary_err_wificonfig_p3_end");
-
+char ask_text[256] = {0}; // 存储提问的文字
+char minimax_content[2048] = {0};
 
 Application::Application()
     : boot_button_((gpio_num_t)BOOT_BUTTON_GPIO),
@@ -32,10 +34,12 @@ Application::Application()
 
     opus_encoder_.Configure(16000, 1);
     opus_decoder_ = opus_decoder_create(opus_decode_sample_rate_, 1, NULL);
-    if (opus_decode_sample_rate_ != AUDIO_OUTPUT_SAMPLE_RATE) {
+    if (opus_decode_sample_rate_ != AUDIO_OUTPUT_SAMPLE_RATE)
+    {
         output_resampler_.Configure(AUDIO_OUTPUT_SAMPLE_RATE, opus_decode_sample_rate_);
     }
-    if (16000 != AUDIO_INPUT_SAMPLE_RATE) {
+    if (16000 != AUDIO_INPUT_SAMPLE_RATE)
+    {
         input_resampler_.Configure(AUDIO_INPUT_SAMPLE_RATE, 16000);
         reference_resampler_.Configure(AUDIO_INPUT_SAMPLE_RATE, 16000);
     }
@@ -44,66 +48,85 @@ Application::Application()
     firmware_upgrade_.SetHeader("Device-Id", SystemInfo::GetMacAddress().c_str());
 }
 
-Application::~Application() {
-    if (update_display_timer_ != nullptr) {
+Application::~Application()
+{
+    if (update_display_timer_ != nullptr)
+    {
         esp_timer_stop(update_display_timer_);
         esp_timer_delete(update_display_timer_);
     }
-    if (ws_client_ != nullptr) {
+    if (ws_client_ != nullptr)
+    {
         delete ws_client_;
     }
-    if (opus_decoder_ != nullptr) {
+    if (opus_decoder_ != nullptr)
+    {
         opus_decoder_destroy(opus_decoder_);
     }
-    if (audio_encode_task_stack_ != nullptr) {
+    if (audio_encode_task_stack_ != nullptr)
+    {
         heap_caps_free(audio_encode_task_stack_);
     }
-    if (main_loop_task_stack_ != nullptr) {
+    if (main_loop_task_stack_ != nullptr)
+    {
         heap_caps_free(main_loop_task_stack_);
     }
-    if (audio_device_ != nullptr) {
+    if (audio_device_ != nullptr)
+    {
         delete audio_device_;
     }
 
     vEventGroupDelete(event_group_);
 }
 
-void Application::CheckNewVersion() {
+void Application::CheckNewVersion()
+{
     // Check if there is a new firmware version available
     firmware_upgrade_.CheckVersion();
-    if (firmware_upgrade_.HasNewVersion()) {
+    if (firmware_upgrade_.HasNewVersion())
+    {
         // Wait for the chat state to be idle
-        while (chat_state_ != kChatStateIdle) {
+        while (chat_state_ != kChatStateIdle)
+        {
             vTaskDelay(100);
         }
         SetChatState(kChatStateUpgrading);
-        firmware_upgrade_.StartUpgrade([this](int progress, size_t speed) {
+        firmware_upgrade_.StartUpgrade([this](int progress, size_t speed)
+                                       {
             char buffer[64];
             snprintf(buffer, sizeof(buffer), "Upgrading...\n %d%% %zuKB/s", progress, speed / 1024);
-            display_.SetText(buffer);
-        });
+            display_.SetText(buffer); });
         // If upgrade success, the device will reboot and never reach here
         ESP_LOGI(TAG, "Firmware upgrade failed...");
         SetChatState(kChatStateIdle);
-    } else {
+    }
+    else
+    {
         firmware_upgrade_.MarkCurrentVersionValid();
     }
 }
 
-void Application::Alert(const std::string&& title, const std::string&& message) {
+void Application::Alert(const std::string &&title, const std::string &&message)
+{
     ESP_LOGE(TAG, "Alert: %s, %s", title.c_str(), message.c_str());
     display_.ShowNotification(std::string(title + "\n" + message));
 
-    if (message == "PIN is not ready") {
+    if (message == "PIN is not ready")
+    {
         PlayLocalFile(p3_err_pin_start, p3_err_pin_end - p3_err_pin_start);
-    } else if (message == "Configuring WiFi") {
+    }
+    else if (message == "Configuring WiFi")
+    {
         PlayLocalFile(p3_err_wificonfig_start, p3_err_wificonfig_end - p3_err_wificonfig_start);
-    } else if (message == "Registration denied") {
+    }
+    else if (message == "Registration denied")
+    {
         PlayLocalFile(p3_err_reg_start, p3_err_reg_end - p3_err_reg_start);
     }
 }
 
-void Application::PlayLocalFile(const char* data, size_t size) {
+void Application::PlayLocalFile(const char *data, size_t size)
+{
     ESP_LOGI(TAG, "PlayLocalFile: %zu bytes", size);
     SetDecodeSampleRate(16000);
 
@@ -125,12 +148,13 @@ void Application::PlayLocalFile(const char* data, size_t size) {
     }
 }
 
-void Application::Start() {
-    auto& builtin_led = BuiltinLed::GetInstance();
+void Application::Start()
+{
+    auto &builtin_led = BuiltinLed::GetInstance();
     builtin_led.SetBlue();
     builtin_led.StartContinuousBlink(100);
 
-    auto& board = Board::GetInstance();
+    auto &board = Board::GetInstance();
     board.Initialize();
 
     audio_device_ = board.CreateAudioDevice();
@@ -162,37 +186,39 @@ void Application::Start() {
             }
         }
 #ifdef CONFIG_USE_AFE_SR
-        if (audio_processor_.IsRunning()) {
-            audio_processor_.Input(data);
-        }
-        if (wake_word_detect_.IsDetectionRunning()) {
-            wake_word_detect_.Feed(data);
-        }
+                                   if (audio_processor_.IsRunning())
+                                   {
+                                       audio_processor_.Input(data);
+                                   }
+                                   if (wake_word_detect_.IsDetectionRunning())
+                                   {
+                                       wake_word_detect_.Feed(data);
+                                   }
 #else
-        Schedule([this, data = std::move(data)]() {
+                                   Schedule([this, data = std::move(data)]()
+                                            {
             if (chat_state_ == kChatStateListening) {
                 std::lock_guard<std::mutex> lock(mutex_);
                 audio_encode_queue_.emplace_back(std::move(data));
                 cv_.notify_all();
-            }
-        });
+            } });
 #endif
-    });
+                               });
 
     // OPUS encoder / decoder use a lot of stack memory
     const size_t opus_stack_size = 4096 * 8;
-    audio_encode_task_stack_ = (StackType_t*)heap_caps_malloc(opus_stack_size, MALLOC_CAP_SPIRAM);
-    audio_encode_task_ = xTaskCreateStatic([](void* arg) {
+    audio_encode_task_stack_ = (StackType_t *)heap_caps_malloc(opus_stack_size, MALLOC_CAP_SPIRAM);
+    audio_encode_task_ = xTaskCreateStatic([](void *arg)
+                                           {
         Application* app = (Application*)arg;
         app->AudioEncodeTask();
-        vTaskDelete(NULL);
-    }, "opus_encode", opus_stack_size, this, 1, audio_encode_task_stack_, &audio_encode_task_buffer_);
+        vTaskDelete(NULL); }, "opus_encode", opus_stack_size, this, 1, audio_encode_task_stack_, &audio_encode_task_buffer_);
 
-    xTaskCreate([](void* arg) {
+    xTaskCreate([](void *arg)
+                {
         Application* app = (Application*)arg;
         app->AudioPlayTask();
-        vTaskDelete(NULL);
-    }, "play_audio", 4096 * 4, this, 4, NULL);
+        vTaskDelete(NULL); }, "play_audio", 4096 * 4, this, 4, NULL);
 
     board.StartNetwork();
     firmware_upgrade_.SetPostData(board.GetJson());
@@ -200,8 +226,9 @@ void Application::Start() {
     builtin_led.SetGreen();
     builtin_led.BlinkOnce();
 
-    boot_button_.OnClick([this]() {
-        Schedule([this]() {
+    boot_button_.OnClick([this]()
+                         { Schedule([this]()
+                                    {
             if (chat_state_ == kChatStateIdle) {
                 SetChatState(kChatStateConnecting);
                 StartWebSocketClient();
@@ -222,65 +249,60 @@ void Application::Start() {
                 if (ws_client_ && ws_client_->IsConnected()) {
                     ws_client_->Close();
                 }
-            }
-        });
-    });
+            } }); });
 
-    volume_up_button_.OnClick([this]() {
-        Schedule([this]() {
+    volume_up_button_.OnClick([this]()
+                              { Schedule([this]()
+                                         {
             auto volume = audio_device_->output_volume() + 10;
             if (volume > 100) {
                 volume = 100;
             }
             audio_device_->SetOutputVolume(volume);
-            display_.ShowNotification("Volume\n" + std::to_string(volume));
-        });
-    });
+            display_.ShowNotification("Volume\n" + std::to_string(volume)); }); });
 
-    volume_up_button_.OnLongPress([this]() {
-        Schedule([this]() {
+    volume_up_button_.OnLongPress([this]()
+                                  { Schedule([this]()
+                                             {
             audio_device_->SetOutputVolume(100);
-            display_.ShowNotification("Volume\n100");
-        });
-    });
+            display_.ShowNotification("Volume\n100"); }); });
 
-    volume_down_button_.OnClick([this]() {
-        Schedule([this]() {
+    volume_down_button_.OnClick([this]()
+                                { Schedule([this]()
+                                           {
             auto volume = audio_device_->output_volume() - 10;
             if (volume < 0) {
                 volume = 0;
             }
             audio_device_->SetOutputVolume(volume);
-            display_.ShowNotification("Volume\n" + std::to_string(volume));
-        });
-    });
+            display_.ShowNotification("Volume\n" + std::to_string(volume)); }); });
 
-    volume_down_button_.OnLongPress([this]() {
-        Schedule([this]() {
+    volume_down_button_.OnLongPress([this]()
+                                    { Schedule([this]()
+                                               {
             audio_device_->SetOutputVolume(0);
-            display_.ShowNotification("Volume\n0");
-        });
-    });
+            display_.ShowNotification("Volume\n0"); }); });
 
     const size_t main_loop_stack_size = 4096 * 2;
-    main_loop_task_stack_ = (StackType_t*)heap_caps_malloc(main_loop_stack_size, MALLOC_CAP_SPIRAM);
-    xTaskCreateStatic([](void* arg) {
+    main_loop_task_stack_ = (StackType_t *)heap_caps_malloc(main_loop_stack_size, MALLOC_CAP_SPIRAM);
+    xTaskCreateStatic([](void *arg)
+                      {
         Application* app = (Application*)arg;
         app->MainLoop();
-        vTaskDelete(NULL);
-    }, "main_loop", main_loop_stack_size, this, 1, main_loop_task_stack_, &main_loop_task_buffer_);
+        vTaskDelete(NULL); }, "main_loop", main_loop_stack_size, this, 1, main_loop_task_stack_, &main_loop_task_buffer_);
 
     // Launch a task to check for new firmware version
-    xTaskCreate([](void* arg) {
+    xTaskCreate([](void *arg)
+                {
         Application* app = (Application*)arg;
         app->CheckNewVersion();
-        vTaskDelete(NULL);
-    }, "check_new_version", 4096 * 2, this, 1, NULL);
+        vTaskDelete(NULL); }, "check_new_version", 4096 * 2, this, 1, NULL);
 
 #ifdef CONFIG_USE_AFE_SR
     wake_word_detect_.Initialize(audio_device_->input_channels(), audio_device_->input_reference());
-    wake_word_detect_.OnVadStateChange([this](bool speaking) {
-        Schedule([this, speaking]() {
+    wake_word_detect_.OnVadStateChange([this](bool speaking)
+                                       { Schedule([this, speaking]()
+                                                  {
             auto& builtin_led = BuiltinLed::GetInstance();
             if (chat_state_ == kChatStateListening) {
                 if (speaking) {
@@ -289,12 +311,11 @@ void Application::Start() {
                     builtin_led.SetRed(8);
                 }
                 builtin_led.TurnOn();
-            }
-        });
-    });
+            } }); });
 
-    wake_word_detect_.OnWakeWordDetected([this]() {
-        Schedule([this]() {
+    wake_word_detect_.OnWakeWordDetected([this]()
+                                         { Schedule([this]()
+                                                    {
             if (chat_state_ == kChatStateIdle) {
                 // Encode the wake word data and start websocket client at the same time
                 // They both consume a lot of time (700ms), so we can do them in parallel
@@ -322,28 +343,26 @@ void Application::Start() {
             }
 
             // Resume detection
-            wake_word_detect_.StartDetection();
-        });
-    });
+            wake_word_detect_.StartDetection(); }); });
     wake_word_detect_.StartDetection();
 
     audio_processor_.Initialize(audio_device_->input_channels(), audio_device_->input_reference());
-    audio_processor_.OnOutput([this](std::vector<int16_t>&& data) {
-        Schedule([this, data = std::move(data)]() {
+    audio_processor_.OnOutput([this](std::vector<int16_t> &&data)
+                              { Schedule([this, data = std::move(data)]()
+                                         {
             if (chat_state_ == kChatStateListening) {
                 std::lock_guard<std::mutex> lock(mutex_);
                 audio_encode_queue_.emplace_back(std::move(data));
                 cv_.notify_all();
-            }
-        });
-    });
+            } }); });
 #endif
 
     SetChatState(kChatStateIdle);
     display_.UpdateDisplay();
 }
 
-void Application::Schedule(std::function<void()> callback) {
+void Application::Schedule(std::function<void()> callback)
+{
     std::lock_guard<std::mutex> lock(mutex_);
     main_tasks_.push_back(callback);
     cv_.notify_all();
@@ -352,12 +371,13 @@ void Application::Schedule(std::function<void()> callback) {
 // The Main Loop controls the chat state and websocket connection
 // If other tasks need to access the websocket or chat state,
 // they should use Schedule to call this function
-void Application::MainLoop() {
-    while (true) {
+void Application::MainLoop()
+{
+    while (true)
+    {
         std::unique_lock<std::mutex> lock(mutex_);
-        cv_.wait(lock, [this]() {
-            return !main_tasks_.empty();
-        });
+        cv_.wait(lock, [this]()
+                 { return !main_tasks_.empty(); });
         auto task = std::move(main_tasks_.front());
         main_tasks_.pop_front();
         lock.unlock();
@@ -365,14 +385,16 @@ void Application::MainLoop() {
     }
 }
 
-void Application::AbortSpeaking() {
+void Application::AbortSpeaking()
+{
     ESP_LOGI(TAG, "Abort speaking");
     skip_to_end_ = true;
 
-    if (ws_client_ && ws_client_->IsConnected()) {
-        cJSON* root = cJSON_CreateObject();
+    if (ws_client_ && ws_client_->IsConnected())
+    {
+        cJSON *root = cJSON_CreateObject();
         cJSON_AddStringToObject(root, "type", "abort");
-        char* json = cJSON_PrintUnformatted(root);
+        char *json = cJSON_PrintUnformatted(root);
 
         std::lock_guard<std::mutex> lock(mutex_);
         ws_client_->Send(json);
@@ -381,8 +403,9 @@ void Application::AbortSpeaking() {
     }
 }
 
-void Application::SetChatState(ChatState state) {
-    const char* state_str[] = {
+void Application::SetChatState(ChatState state)
+{
+    const char *state_str[] = {
         "unknown",
         "idle",
         "connecting",
@@ -391,50 +414,58 @@ void Application::SetChatState(ChatState state) {
         "wake_word_detected",
         "testing",
         "upgrading",
-        "invalid_state"
-    };
-    if (chat_state_ == state) {
+        "invalid_state"};
+    if (chat_state_ == state)
+    {
         // No need to update the state
         return;
     }
     chat_state_ = state;
     ESP_LOGI(TAG, "STATE: %s", state_str[chat_state_]);
 
-    auto& builtin_led = BuiltinLed::GetInstance();
-    switch (chat_state_) {
-        case kChatStateUnknown:
-        case kChatStateIdle:
-            builtin_led.TurnOff();
-            audio_device_->EnableOutput(false);
-            break;
-        case kChatStateConnecting:
-            builtin_led.SetBlue();
-            builtin_led.TurnOn();
-            break;
-        case kChatStateListening:
-            builtin_led.SetRed();
-            builtin_led.TurnOn();
-            break;
-        case kChatStateSpeaking:
-            builtin_led.SetGreen();
-            builtin_led.TurnOn();
-            audio_device_->EnableOutput(true);
-            break;
-        case kChatStateWakeWordDetected:
-            builtin_led.SetBlue();
-            builtin_led.TurnOn();
-            break;
-        case kChatStateUpgrading:
-            builtin_led.SetGreen();
-            builtin_led.StartContinuousBlink(100);
-            break;
+    auto &builtin_led = BuiltinLed::GetInstance();
+    switch (chat_state_)
+    {
+    case kChatStateUnknown:
+    case kChatStateIdle:
+        builtin_led.TurnOff();
+        sr_anim_stop();
+        label_ask_set_text("可以唤醒我啦");
+        label_reply_set_text("");
+        audio_device_->EnableOutput(false);
+        break;
+    case kChatStateConnecting:
+        builtin_led.SetBlue();
+        builtin_led.TurnOn();
+        break;
+    case kChatStateListening:
+        builtin_led.SetRed();
+        builtin_led.TurnOn();
+        sr_anim_start();
+        label_ask_set_text("聆听中...");
+        break;
+    case kChatStateSpeaking:
+        builtin_led.SetGreen();
+        builtin_led.TurnOn();
+        audio_device_->EnableOutput(true);
+        sr_anim_stop();
+        break;
+    case kChatStateWakeWordDetected:
+        builtin_led.SetBlue();
+        builtin_led.TurnOn();
+        break;
+    case kChatStateUpgrading:
+        builtin_led.SetGreen();
+        builtin_led.StartContinuousBlink(100);
+        break;
     }
 
-    if (ws_client_ && ws_client_->IsConnected()) {
-        cJSON* root = cJSON_CreateObject();
+    if (ws_client_ && ws_client_->IsConnected())
+    {
+        cJSON *root = cJSON_CreateObject();
         cJSON_AddStringToObject(root, "type", "state");
         cJSON_AddStringToObject(root, "state", state_str[chat_state_]);
-        char* json = cJSON_PrintUnformatted(root);
+        char *json = cJSON_PrintUnformatted(root);
 
         std::lock_guard<std::mutex> lock(mutex_);
         ws_client_->Send(json);
@@ -454,23 +485,26 @@ BinaryProtocol3* Application::AllocateBinaryProtocol3(const uint8_t* payload, si
     return protocol;
 }
 
-void Application::AudioEncodeTask() {
+void Application::AudioEncodeTask()
+{
     ESP_LOGI(TAG, "Audio encode task started");
     const int max_audio_play_queue_size_ = 2; // avoid decoding too fast
 
-    while (true) {
+    while (true)
+    {
         std::unique_lock<std::mutex> lock(mutex_);
-        cv_.wait(lock, [this]() {
-            return !audio_encode_queue_.empty() || (!audio_decode_queue_.empty() && audio_play_queue_.size() < max_audio_play_queue_size_);
-        });
+        cv_.wait(lock, [this]()
+                 { return !audio_encode_queue_.empty() || (!audio_decode_queue_.empty() && audio_play_queue_.size() < max_audio_play_queue_size_); });
 
-        if (!audio_encode_queue_.empty()) {
+        if (!audio_encode_queue_.empty())
+        {
             auto pcm = std::move(audio_encode_queue_.front());
             audio_encode_queue_.pop_front();
             lock.unlock();
 
             // Encode audio data
-            opus_encoder_.Encode(pcm, [this](const uint8_t* opus, size_t opus_size) {
+            opus_encoder_.Encode(pcm, [this](const uint8_t *opus, size_t opus_size)
+                                 {
                 auto protocol = AllocateBinaryProtocol3(opus, opus_size);
                 Schedule([this, protocol, opus_size]() {
                     if (ws_client_ && ws_client_->IsConnected()) {
@@ -479,25 +513,29 @@ void Application::AudioEncodeTask() {
                         }
                     }
                     heap_caps_free(protocol);
-                });
-            });
-        } else if (!audio_decode_queue_.empty()) {
+                }); });
+        }
+        else if (!audio_decode_queue_.empty())
+        {
             auto packet = std::move(audio_decode_queue_.front());
             audio_decode_queue_.pop_front();
             lock.unlock();
 
-            if (packet->type == kAudioPacketTypeData && !skip_to_end_) {
+            if (packet->type == kAudioPacketTypeData && !skip_to_end_)
+            {
                 int frame_size = opus_decode_sample_rate_ * opus_duration_ms_ / 1000;
                 packet->pcm.resize(frame_size);
 
                 int ret = opus_decode(opus_decoder_, packet->opus.data(), packet->opus.size(), packet->pcm.data(), frame_size, 0);
-                if (ret < 0) {
+                if (ret < 0)
+                {
                     ESP_LOGE(TAG, "Failed to decode audio, error code: %d", ret);
                     delete packet;
                     continue;
                 }
 
-                if (opus_decode_sample_rate_ != AUDIO_OUTPUT_SAMPLE_RATE) {
+                if (opus_decode_sample_rate_ != AUDIO_OUTPUT_SAMPLE_RATE)
+                {
                     int target_size = output_resampler_.GetOutputSamples(frame_size);
                     std::vector<int16_t> resampled(target_size);
                     output_resampler_.Process(packet->pcm.data(), frame_size, resampled.data());
@@ -512,11 +550,14 @@ void Application::AudioEncodeTask() {
     }
 }
 
-void Application::HandleAudioPacket(AudioPacket* packet) {
+void Application::HandleAudioPacket(AudioPacket *packet)
+{
     switch (packet->type)
     {
-    case kAudioPacketTypeData: {
-        if (skip_to_end_) {
+    case kAudioPacketTypeData:
+    {
+        if (skip_to_end_)
+        {
             break;
         }
 
@@ -527,24 +568,33 @@ void Application::HandleAudioPacket(AudioPacket* packet) {
     case kAudioPacketTypeStart:
         break_speaking_ = false;
         skip_to_end_ = false;
-        Schedule([this]() {
-            SetChatState(kChatStateSpeaking);
-        });
+        Schedule([this]()
+                 { SetChatState(kChatStateSpeaking); });
         break;
     case kAudioPacketTypeStop:
-        Schedule([this]() {
+        Schedule([this]()
+                 {
             if (ws_client_ && ws_client_->IsConnected()) {
                 SetChatState(kChatStateListening);
             } else {
                 SetChatState(kChatStateIdle);
-            }
-        });
+            } });
         break;
     case kAudioPacketTypeSentenceStart:
         ESP_LOGI(TAG, "<< %s", packet->text.c_str());
+        // strcpy(ask_text, packet->text.c_str());
+        memset(ask_text, 0, sizeof(ask_text));
+        strcpy(ask_text, packet->text.c_str());
+        biaoqing = Get_Set_Random(6);
+
+        ESP_LOGI(TAG, "ask_text: %s biaoqing:%d", ask_text, biaoqing);
+        // lv_label_set_text(label1, packet->text.c_str());
+        label_reply_set_text(ask_text);
+        // lv_label_set_text_fmt(label1, "我:%s", packet->text.c_str());
         break;
     case kAudioPacketTypeSentenceEnd:
-        if (break_speaking_) {
+        if (break_speaking_)
+        {
             skip_to_end_ = true;
         }
         break;
@@ -556,14 +606,15 @@ void Application::HandleAudioPacket(AudioPacket* packet) {
     delete packet;
 }
 
-void Application::AudioPlayTask() {
+void Application::AudioPlayTask()
+{
     ESP_LOGI(TAG, "Audio play task started");
 
-    while (true) {
+    while (true)
+    {
         std::unique_lock<std::mutex> lock(mutex_);
-        cv_.wait(lock, [this]() {
-            return !audio_play_queue_.empty();
-        });
+        cv_.wait(lock, [this]()
+                 { return !audio_play_queue_.empty(); });
         auto packet = std::move(audio_play_queue_.front());
         audio_play_queue_.pop_front();
         cv_.notify_all();
@@ -573,23 +624,28 @@ void Application::AudioPlayTask() {
     }
 }
 
-void Application::SetDecodeSampleRate(int sample_rate) {
-    if (opus_decode_sample_rate_ == sample_rate) {
+void Application::SetDecodeSampleRate(int sample_rate)
+{
+    if (opus_decode_sample_rate_ == sample_rate)
+    {
         return;
     }
 
     opus_decoder_destroy(opus_decoder_);
     opus_decode_sample_rate_ = sample_rate;
     opus_decoder_ = opus_decoder_create(opus_decode_sample_rate_, 1, NULL);
-    if (opus_decode_sample_rate_ != AUDIO_OUTPUT_SAMPLE_RATE) {
+    if (opus_decode_sample_rate_ != AUDIO_OUTPUT_SAMPLE_RATE)
+    {
         ESP_LOGI(TAG, "Resampling audio from %d to %d", opus_decode_sample_rate_, AUDIO_OUTPUT_SAMPLE_RATE);
         output_resampler_.Configure(opus_decode_sample_rate_, AUDIO_OUTPUT_SAMPLE_RATE);
     }
 }
 
-void Application::ParseBinaryProtocol3(const char* data, size_t size) {
-    for (const char* p = data; p < data + size; ) {
-        auto protocol = (BinaryProtocol3*)p;
+void Application::ParseBinaryProtocol3(const char *data, size_t size)
+{
+    for (const char *p = data; p < data + size;)
+    {
+        auto protocol = (BinaryProtocol3 *)p;
         p += sizeof(BinaryProtocol3);
 
         auto packet = new AudioPacket();
@@ -604,8 +660,10 @@ void Application::ParseBinaryProtocol3(const char* data, size_t size) {
     }
 }
 
-void Application::StartWebSocketClient() {
-    if (ws_client_ != nullptr) {
+void Application::StartWebSocketClient()
+{
+    if (ws_client_ != nullptr)
+    {
         ESP_LOGW(TAG, "WebSocket client already exists");
         delete ws_client_;
     }
@@ -617,7 +675,8 @@ void Application::StartWebSocketClient() {
     ws_client_->SetHeader("Protocol-Version", std::to_string(PROTOCOL_VERSION).c_str());
     ws_client_->SetHeader("Device-Id", SystemInfo::GetMacAddress().c_str());
 
-    ws_client_->OnConnected([this]() {
+    ws_client_->OnConnected([this]()
+                            {
         ESP_LOGI(TAG, "Websocket connected");
         
         // Send hello message to describe the client
@@ -627,10 +686,10 @@ void Application::StartWebSocketClient() {
         message += "\"audio_params\":{";
         message += "\"format\":\"opus\", \"sample_rate\":16000, \"channels\":1";
         message += "}}";
-        ws_client_->Send(message);
-    });
+        ws_client_->Send(message); });
 
-    ws_client_->OnData([this](const char* data, size_t len, bool binary) {
+    ws_client_->OnData([this](const char *data, size_t len, bool binary)
+                       {
         if (binary) {
             ParseBinaryProtocol3(data, len);
             cv_.notify_all();
@@ -667,6 +726,11 @@ void Application::StartWebSocketClient() {
                     auto text = cJSON_GetObjectItem(root, "text");
                     if (text != NULL) {
                         ESP_LOGI(TAG, ">> %s", text->valuestring);
+                        // lv_label_set_text_fmt(label_reply, "AI:%s", text->valuestring);
+                            memset(minimax_content, 0, sizeof(minimax_content));
+                            strcpy(minimax_content, text->valuestring);
+                            ESP_LOGI(TAG, "minimax_content: %s", minimax_content);
+                            label_ask_set_text(minimax_content);
                     }
                 } else if (strcmp(type->valuestring, "llm") == 0) {
                     auto emotion = cJSON_GetObjectItem(root, "emotion");
@@ -680,14 +744,13 @@ void Application::StartWebSocketClient() {
                 ESP_LOGE(TAG, "Missing message type, data: %s", data);
             }
             cJSON_Delete(root);
-        }
-    });
+        } });
 
-    ws_client_->OnError([this](int error) {
-        ESP_LOGE(TAG, "Websocket error: %d", error);
-    });
+    ws_client_->OnError([this](int error)
+                        { ESP_LOGE(TAG, "Websocket error: %d", error); });
 
-    ws_client_->OnDisconnected([this]() {
+    ws_client_->OnDisconnected([this]()
+                               {
         ESP_LOGI(TAG, "Websocket disconnected");
         Schedule([this]() {
 #ifdef CONFIG_USE_AFE_SR
@@ -696,10 +759,10 @@ void Application::StartWebSocketClient() {
             delete ws_client_;
             ws_client_ = nullptr;
             SetChatState(kChatStateIdle);
-        });
-    });
+        }); });
 
-    if (!ws_client_->Connect(url.c_str())) {
+    if (!ws_client_->Connect(url.c_str()))
+    {
         ESP_LOGE(TAG, "Failed to connect to websocket server");
         return;
     }
