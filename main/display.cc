@@ -8,6 +8,7 @@
 #include "application.h"
 
 #define TAG "Display"
+LV_FONT_DECLARE(font_dingding);
 
 void Display::SetupUI() {
     if (disp_ == nullptr) {
@@ -20,11 +21,15 @@ void Display::SetupUI() {
     // lv_obj_set_style_text_font(label_, font_, 0);
     lv_obj_set_style_text_color(label_, lv_color_black(), 0);
     lv_label_set_text(label_, "Initializing...");
+    lv_obj_set_style_text_font(label_, &font_dingding, LV_STATE_DEFAULT);
+
     lv_obj_set_width(label_, disp_->driver->hor_res);
     lv_obj_set_height(label_, disp_->driver->ver_res);
 
     notification_ = lv_label_create(lv_disp_get_scr_act(disp_));
-    // lv_obj_set_style_text_font(notification_, font_, 0);
+    // lv_obj_set_style_text_font(notification_, font_, 0);        
+    lv_obj_set_style_text_font(notification_, &font_dingding, LV_STATE_DEFAULT);
+
     lv_obj_set_style_text_color(notification_, lv_color_black(), 0);
     lv_label_set_text(notification_, "Notification\nTest");
     lv_obj_set_width(notification_, disp_->driver->hor_res);
