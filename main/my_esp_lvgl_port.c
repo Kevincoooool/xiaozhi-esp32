@@ -10,7 +10,7 @@
 #include "driver/spi_master.h"
 #include "esp_err.h"
 #include "esp_log.h"
-#include "esp_lvgl_port.h"
+#include "my_esp_lvgl_port.h"
 #include "esp_lcd_touch_cst816s.h"
 #include "esp_lcd_panel_io.h"
 #include "esp_lcd_panel_vendor.h"
@@ -18,7 +18,6 @@
 #include "lvgl.h"
 #include "lv_gui.h"
 #include "avi_player.h"
-#include "esp32_s3_szp.h"
 
 static const char *TAG = "esp_lvgl";
 #define LCD_HOST SPI2_HOST
@@ -39,6 +38,28 @@ static const char *TAG = "esp_lvgl";
 #define EXAMPLE_LCD_PARAM_BITS 8
 #define EXAMPLE_LVGL_TICK_PERIOD_MS 10
 
+#define SET_BITS(_m, _s, _v) ((_v) ? (_m) | ((_s)) : (_m) & ~((_s)))
+
+i2c_master_dev_handle_t pca9557_handle;
+esp_err_t pca9557_register_read(uint8_t reg_addr, uint8_t *data, size_t len)
+{
+    return (i2c_master_receive(pca9557_handle, &data, len, 1000));
+}
+void pca9557_set_register(i2c_master_dev_handle_t pca9557_handle, uint8_t data_addr, uint8_t data)
+{
+    uint8_t data_[2] = {data_addr, data};
+
+    ESP_ERROR_CHECK(i2c_master_transmit(pca9557_handle, data_, 2, 1000));
+}
+// 设置PCA9557芯片的某个IO引脚输出高低电平
+void pca9557_set_output_state(uint8_t gpio_bit, uint8_t level)
+{
+    uint8_t data;
+
+    pca9557_register_read(0x01, &data, 1);
+    pca9557_set_register(pca9557_handle, 0x01, SET_BITS(data, gpio_bit, level));
+}
+
 /**************************** LVGL相关处理函数 **********************************/
 static bool example_notify_lvgl_flush_ready(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_io_event_data_t *edata, void *user_ctx)
 {
@@ -50,8 +71,8 @@ static bool example_notify_lvgl_flush_ready(esp_lcd_panel_io_handle_t panel_io, 
 static void example_lvgl_flush_cb(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t *color_map)
 {
     esp_lcd_panel_handle_t panel_handle = (esp_lcd_panel_handle_t)drv->user_data;
-    int offsetx1 = area->x1 ;
-    int offsetx2 = area->x2 ;
+    int offsetx1 = area->x1;
+    int offsetx2 = area->x2;
     int offsety1 = area->y1;
     int offsety2 = area->y2;
     // copy a buffer's content to a specific area of the display
@@ -93,7 +114,15 @@ SemaphoreHandle_t xGuiSemaphore;
 void esp_lvgl_adapter_init(void *arg)
 {
     xGuiSemaphore = xSemaphoreCreateMutex();
-
+    gpio_config_t bl_enable_config = {
+        .pin_bit_mask = (1ULL << EXAMPLE_PIN_NUM_BK_LIGHT),
+        .mode = GPIO_MODE_OUTPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    gpio_config(&bl_enable_config);
+    gpio_set_level(EXAMPLE_PIN_NUM_BK_LIGHT, 0);
     /************* 初始化液晶屏  ************/
     static lv_disp_draw_buf_t disp_buf;
     static lv_disp_drv_t disp_drv;
@@ -101,10 +130,10 @@ void esp_lvgl_adapter_init(void *arg)
     ESP_LOGI(TAG, "Initialize SPI bus");
     spi_bus_config_t buscfg = {
         .mosi_io_num = EXAMPLE_PIN_NUM_MOSI,
-        .miso_io_num = EXAMPLE_PIN_NUM_MISO,
+        .miso_io_num = GPIO_NUM_NC,
         .sclk_io_num = EXAMPLE_PIN_NUM_SCLK,
-        .quadwp_io_num = -1,
-        .quadhd_io_num = -1,
+        .quadwp_io_num = GPIO_NUM_NC,
+        .quadhd_io_num = GPIO_NUM_NC,
         .max_transfer_sz = EXAMPLE_LCD_H_RES * 80 * sizeof(uint16_t),
     };
     ESP_ERROR_CHECK(spi_bus_initialize(LCD_HOST, &buscfg, SPI_DMA_CH_AUTO));
@@ -114,7 +143,7 @@ void esp_lvgl_adapter_init(void *arg)
     esp_lcd_panel_io_spi_config_t io_config = {
         .cs_gpio_num = EXAMPLE_PIN_NUM_LCD_CS,
         .dc_gpio_num = EXAMPLE_PIN_NUM_LCD_DC,
-        .spi_mode = 0,
+        .spi_mode = 2,
         .pclk_hz = EXAMPLE_LCD_PIXEL_CLOCK_HZ,
         .trans_queue_depth = 10,
         .on_color_trans_done = example_notify_lvgl_flush_ready,
@@ -136,12 +165,16 @@ void esp_lvgl_adapter_init(void *arg)
     ESP_ERROR_CHECK(esp_lcd_new_panel_st7789(io_handle, &panel_config, &panel_handle));
 
     ESP_ERROR_CHECK(esp_lcd_panel_reset(panel_handle));
-    lcd_cs(0);  // 拉低CS引脚
-    ESP_ERROR_CHECK(esp_lcd_panel_init(panel_handle));
-    ESP_ERROR_CHECK(esp_lcd_panel_swap_xy(panel_handle, true));
-    ESP_ERROR_CHECK(esp_lcd_panel_mirror(panel_handle, false, true));
-    ESP_ERROR_CHECK(esp_lcd_panel_invert_color(panel_handle, true));
-    ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel_handle, true));
+        pca9557_set_register(pca9557_handle, 0x03, 0xf8);
+
+    pca9557_set_output_state(BIT(0), 0);
+    pca9557_set_output_state(BIT(1), 1);
+
+    esp_lcd_panel_init(panel_handle);  // 初始化配置寄存器
+
+    esp_lcd_panel_invert_color(panel_handle, true); // 颜色反转
+    esp_lcd_panel_swap_xy(panel_handle, true);  // 显示翻转 
+    esp_lcd_panel_mirror(panel_handle, true, false); // 镜像
 
     /************* 初始化触摸屏 **************/
     esp_lcd_touch_handle_t tp = NULL;

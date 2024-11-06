@@ -248,7 +248,7 @@ void lv_main_page(void)
     // lv_obj_set_height(label_reply, 200);
     // lv_label_set_long_mode(label_ask, LV_LABEL_LONG_SCROLL_CIRCULAR); /*Circular scroll*/
     lv_obj_align(label_mid, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_set_style_text_font(label_mid, &font_alipuhui20, LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(label_mid, &font_dingdingjinbuti, LV_STATE_DEFAULT);
     lv_obj_set_style_text_color(label_mid, lv_palette_main(LV_PALETTE_DEEP_ORANGE), 0);
 
     lv_label_set_text(label_mid, "XiaoZhi-XiaGe");

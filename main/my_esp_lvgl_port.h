@@ -9,15 +9,19 @@
 #ifndef _my_esp_lvgl_port_
 #define _my_esp_lvgl_port_
 
+#include <driver/i2c_master.h>
+#include <driver/i2s_tdm.h>
 #ifdef __cplusplus
 extern "C"
 {
 #endif
+extern i2c_master_dev_handle_t pca9557_handle;
 void esp_lvgl_adapter_init(void *arg);
 bool esp_lvgl_lock(int timeout_ms);
 
 
 void esp_lvgl_unlock(void);
+void pca9557_set_register(i2c_master_dev_handle_t pca9557_handle, uint8_t data_addr, uint8_t data);
 
 #ifdef __cplusplus
 } /* extern "C" */

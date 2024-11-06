@@ -22,7 +22,6 @@
 #include "esp_netif.h"
 #include "file_manager.h"
 #include "my_esp_lvgl_port.h"
-#include "esp32_s3_szp.h"
 
 #define TAG "main"
 
@@ -47,14 +46,13 @@ extern "C" void app_main(void)
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
-    pca9557_init();  // IO扩展芯片初始化
 
     // tfcard_ret = fm_sdcard_init();
-
+Application::GetInstance().Start();
     xTaskCreatePinnedToCore(&esp_lvgl_adapter_init, "esp_lvgl_adapter_init task", 1024 * 5, NULL, 15, NULL, 1);
     vTaskDelay(1000);
     // label_ask_set_text("可以唤醒我啦");
-    Application::GetInstance().Start();
+    
     // if (tfcard_ret == ESP_OK)
     // {
     //     while (1)
