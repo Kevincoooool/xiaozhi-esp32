@@ -42,7 +42,7 @@ BoxAudioCodec::BoxAudioCodec(void* i2c_master_handle, int input_sample_rate, int
     es8311_cfg.ctrl_if = out_ctrl_if_;
     es8311_cfg.gpio_if = gpio_if_;
     es8311_cfg.codec_mode = ESP_CODEC_DEV_WORK_MODE_BOTH;
-    es8311_cfg.pa_pin = AUDIO_CODEC_PA_PIN;
+    es8311_cfg.pa_pin = pa_pin;
     es8311_cfg.use_mclk = true;
     es8311_cfg.hw_gain.pa_voltage = 5.0;
     es8311_cfg.hw_gain.codec_dac_voltage = 3.3;
@@ -262,7 +262,7 @@ void BoxAudioCodec::EnableOutput(bool enable) {
 
 int BoxAudioCodec::Read(int16_t* dest, int samples) {
     if (input_enabled_) {
-        ESP_ERROR_CHECK_WITHOUT_ABORT(esp_codec_dev_read(input_dev_, (void*)dest, samples * sizeof(int16_t)));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(esp_codec_dev_read(output_dev_, (void*)dest, samples * sizeof(int16_t)));
     }
     return samples;
 }
