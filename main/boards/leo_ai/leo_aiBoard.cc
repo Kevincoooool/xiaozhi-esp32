@@ -42,14 +42,18 @@ private:
             },
         };
         ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_bus_cfg, &codec_i2c_bus_));
-        // Initialize PCA9557
     }
 
     void InitializeButtons()
     {
-        boot_button_.OnClick([this]()
-                             { Application::GetInstance().ToggleChatState(); });
-
+        // boot_button_.OnClick([this]()
+        //                      { Application::GetInstance().ToggleChatState(); });
+        boot_button_.OnPressDown([this]() {
+            Application::GetInstance().StartListening();
+        });
+        boot_button_.OnPressUp([this]() {
+            Application::GetInstance().StopListening();
+        });
         volume_up_button_.OnClick([this]()
                                   {
             auto codec = GetAudioCodec();
