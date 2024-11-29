@@ -6,131 +6,56 @@ config OTA_VERSION_URL
     help
         The application will access this URL to check for updates.
 
+choice CONNECTION_TYPE
+    prompt "Connection Type"
+    default CONNECTION_TYPE_MQTT_UDP
+    help
+        网络数据传输协议
+    config CONNECTION_TYPE_MQTT_UDP
+        bool "MQTT + UDP"
+    config CONNECTION_TYPE_WEBSOCKET
+        bool "Websocket"
+endchoice
+
 config WEBSOCKET_URL
+    depends on CONNECTION_TYPE_WEBSOCKET
     string "Websocket URL"
     default "wss://api.tenclass.net/xiaozhi/v1/"
     help
         Communication with the server through websocket after wake up.
 
 config WEBSOCKET_ACCESS_TOKEN
+    depends on CONNECTION_TYPE_WEBSOCKET
     string "Websocket Access Token"
     default "test-token"
     help
         Access token for websocket communication.
 
-config AUDIO_INPUT_SAMPLE_RATE
-    int "Audio Input Sample Rate"
-    default 16000
+choice BOARD_TYPE
+    prompt "Board Type"
+    default BOARD_TYPE_BREAD_COMPACT_WIFI
     help
-        Audio input sample rate.
-
-config AUDIO_OUTPUT_SAMPLE_RATE
-    int "Audio Output Sample Rate"
-    default 24000
-    help
-        Audio output sample rate.
-
-config AUDIO_DEVICE_I2S_MIC_GPIO_WS
-    int "I2S GPIO WS"
-    default 4
-    help
-        GPIO number of the I2S WS.
-
-config AUDIO_DEVICE_I2S_MIC_GPIO_BCLK
-    int "I2S GPIO BCLK"
-    default 5
-    help
-        GPIO number of the I2S BCLK.
-
-config AUDIO_DEVICE_I2S_MIC_GPIO_DIN
-    int "I2S GPIO DIN"
-    default 6
-    help
-        GPIO number of the I2S DIN.
-
-config AUDIO_DEVICE_I2S_SPK_GPIO_DOUT
-    int "I2S GPIO DOUT"
-    default 7
-    help
-        GPIO number of the I2S DOUT.
-    
-config AUDIO_DEVICE_I2S_SIMPLEX
-    bool "I2S Simplex"
-    default y
-    help
-        Enable I2S Simplex mode.
-    
-config AUDIO_DEVICE_I2S_SPK_GPIO_BCLK
-    int "I2S SPK GPIO BCLK"
-    default 15
-    depends on AUDIO_DEVICE_I2S_SIMPLEX
-    help
-        GPIO number of the I2S MIC BCLK.
-    
-config AUDIO_DEVICE_I2S_SPK_GPIO_WS
-    int "I2S SPK GPIO WS"
-    default 16
-    depends on AUDIO_DEVICE_I2S_SIMPLEX
-    help
-        GPIO number of the I2S MIC WS.
-
-config BOOT_BUTTON_GPIO
-    int "Boot Button GPIO"
-    default 0
-    help
-        GPIO number of the boot button.
+        Board type. 开发板类型
+    config BOARD_TYPE_BREAD_COMPACT_WIFI
+        bool "面包板新版接线（WiFi）"
+    config BOARD_TYPE_BREAD_COMPACT_ML307
+        bool "面包板新版接线（ML307 AT）"
+    config BOARD_TYPE_ESP_BOX_3
+        bool "ESP BOX 3"
+    config BOARD_TYPE_KEVIN_BOX_1
+        bool "Kevin Box 1"
+    config BOARD_TYPE_KEVIN_BOX_2
+        bool "Kevin Box 2"
+    config BOARD_TYPE_KEVIN_C3
+        bool "Kevin C3"
+    config BOARD_TYPE_LICHUANG_DEV
+        bool "立创开发板"
+endchoice
 
 config USE_AFE_SR
     bool "Use Espressif AFE SR"
     default y
     help
         Use AFE SR for wake word detection.
-
-config USE_ML307
-    bool "Use ML307"
-    default n
-    help
-        Use ML307 as the modem.
-
-config ML307_RX_PIN
-    int "ML307 RX Pin"
-    default 11
-    depends on USE_ML307
-    help
-        GPIO number of the ML307 RX.
-
-config ML307_TX_PIN
-    int "ML307 TX Pin"
-    default 12
-    depends on USE_ML307
-    help
-        GPIO number of the ML307 TX.
-
-config USE_DISPLAY
-    bool "Use Display"
-    default n
-    help
-        Use Display.
-
-config DISPLAY_HEIGHT
-    int "Display Height"
-    default 32
-    depends on USE_DISPLAY
-    help
-        Display height in pixels.
-
-config DISPLAY_SDA_PIN
-    int "Display SDA Pin"
-    default 41
-    depends on USE_DISPLAY
-    help
-        GPIO number of the Display SDA.
-
-config DISPLAY_SCL_PIN
-    int "Display SCL Pin"
-    default 42
-    depends on USE_DISPLAY
-    help
-        GPIO number of the Display SCL.
 
 endmenu

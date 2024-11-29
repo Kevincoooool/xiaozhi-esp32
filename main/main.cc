@@ -5,16 +5,8 @@
 #include <driver/gpio.h>
 #include <esp_event.h>
 
-#include "Application.h"
-#include "SystemInfo.h"
-#include "SystemReset.h"
-#include "lvgl.h"
-#include "driver/ledc.h"
-#include "lv_gui.h"
-#include "esp_lcd_panel_io.h"
-#include "esp_lcd_panel_vendor.h"
-#include "esp_lcd_panel_ops.h"
-#include "esp_lcd_touch_cst816s.h"
+#include "application.h"
+#include "system_info.h"
 
 #define TAG "main"
 
@@ -118,17 +110,13 @@ static void example_lvgl_touch_cb(lv_indev_drv_t *drv, lv_indev_data_t *data)
 }
 extern "C" void app_main(void)
 {
-    // Check if the reset button is pressed
-    SystemReset system_reset;
-    system_reset.CheckButtons();
-
     // Initialize the default event loop
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
     // Initialize NVS flash for WiFi configuration
     esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
-    {
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_LOGW(TAG, "Erasing NVS flash to fix corruption");
         ESP_ERROR_CHECK(nvs_flash_erase());
         ret = nvs_flash_init();
     }
