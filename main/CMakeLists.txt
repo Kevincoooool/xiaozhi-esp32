@@ -15,9 +15,6 @@ set(SOURCES "audio_codecs/audio_codec.cc"
             "settings.cc"
             "background_task.cc"
             "main.cc"
-            "lv_gui.c"
-            "font_dingdingjbt.c"
-            "img_src_mic_logo.c"
             )
 
 set(INCLUDE_DIRS "." "display" "audio_codecs" "protocols" "audio_processing")
