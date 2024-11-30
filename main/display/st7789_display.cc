@@ -13,7 +13,7 @@
 #define ST7789_LVGL_TICK_PERIOD_MS 2
 #define ST7789_LVGL_TASK_MAX_DELAY_MS 20
 #define ST7789_LVGL_TASK_MIN_DELAY_MS 1
-#define ST7789_LVGL_TASK_STACK_SIZE (4 * 1024)
+#define ST7789_LVGL_TASK_STACK_SIZE (2 * 1024)
 #define ST7789_LVGL_TASK_PRIORITY 10
 
 LV_FONT_DECLARE(font_puhui_14_1);
@@ -155,12 +155,12 @@ St7789Display::St7789Display(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_h
     // alloc draw buffers used by LVGL
     static lv_disp_draw_buf_t disp_buf; // contains internal graphic buffer(s) called draw buffer(s)
     // it's recommended to choose the size of the draw buffer(s) to be at least 1/10 screen sized
-    lv_color_t *buf1 = (lv_color_t *)heap_caps_malloc(width_ * 10 * sizeof(lv_color_t), MALLOC_CAP_DMA);
+    lv_color_t *buf1 = (lv_color_t *)heap_caps_malloc(width_ * 1 * sizeof(lv_color_t), MALLOC_CAP_DMA);
     assert(buf1);
-    lv_color_t *buf2 = (lv_color_t *)heap_caps_malloc(width_ * 10 * sizeof(lv_color_t), MALLOC_CAP_DMA);
-    assert(buf2);
+    // lv_color_t *buf2 = (lv_color_t *)heap_caps_malloc(width_ * 10 * sizeof(lv_color_t), MALLOC_CAP_DMA);
+    // assert(buf2);
     // initialize LVGL draw buffers
-    lv_disp_draw_buf_init(&disp_buf, buf1, buf2, width_ * 10);
+    lv_disp_draw_buf_init(&disp_buf, buf1, NULL, width_ * 1);
 
     ESP_LOGI(TAG, "Register display driver to LVGL");
     lv_disp_drv_init(&disp_drv);
