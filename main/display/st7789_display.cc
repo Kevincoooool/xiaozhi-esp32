@@ -13,7 +13,7 @@
 #define ST7789_LVGL_TICK_PERIOD_MS 2
 #define ST7789_LVGL_TASK_MAX_DELAY_MS 200
 #define ST7789_LVGL_TASK_MIN_DELAY_MS 1
-#define ST7789_LVGL_TASK_STACK_SIZE (2 * 1024)
+#define ST7789_LVGL_TASK_STACK_SIZE (2.5 * 1024)
 #define ST7789_LVGL_TASK_PRIORITY 10
 LV_FONT_DECLARE(font_dingding);
 LV_FONT_DECLARE(font_puhui_14_1);
@@ -159,7 +159,7 @@ St7789Display::St7789Display(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_h
     // it's recommended to choose the size of the draw buffer(s) to be at least 1/10 screen sized
     lv_color_t *buf1 = (lv_color_t *)heap_caps_malloc(width_ * 1 * sizeof(lv_color_t), MALLOC_CAP_DMA);
     assert(buf1);
-    // lv_color_t *buf2 = (lv_color_t *)heap_caps_malloc(width_ * 1 * sizeof(lv_color_t), MALLOC_CAP_DMA);
+    // lv_color_t *buf2 = (lv_color_t *)heap_caps_malloc(width_ * 0.5 * sizeof(lv_color_t), MALLOC_CAP_DMA);
     // assert(buf2);
     // initialize LVGL draw buffers
     lv_disp_draw_buf_init(&disp_buf, buf1, NULL, width_ * 1);
@@ -345,7 +345,7 @@ void St7789Display::SetupUI()
     lv_obj_set_flex_grow(notification_label_, 1);
     lv_obj_set_style_text_align(notification_label_, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_text(notification_label_, "通知");
-    lv_label_set_long_mode(notification_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    // lv_label_set_long_mode(notification_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
 
     lv_obj_add_flag(notification_label_, LV_OBJ_FLAG_HIDDEN);
     lv_obj_set_style_text_font(notification_label_, &font_dingding, 0);
@@ -357,7 +357,7 @@ void St7789Display::SetupUI()
     lv_obj_set_style_text_align(status_label_, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_font(status_label_, &font_dingding, 0);
     lv_obj_set_style_text_color(status_label_, lv_palette_main(LV_PALETTE_GREEN), 0);
-    lv_label_set_long_mode(status_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    // lv_label_set_long_mode(status_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
 
     battery_label_ = lv_label_create(status_bar_);
     lv_label_set_text(battery_label_, "");
@@ -370,7 +370,7 @@ void St7789Display::SetupUI()
     lv_obj_set_width(reply_label_, LV_HOR_RES);
     lv_obj_set_height(reply_label_, 100);
     lv_obj_set_flex_grow(reply_label_, 2);
-    lv_label_set_long_mode(reply_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    // lv_label_set_long_mode(reply_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
     lv_label_set_text(reply_label_, "XiaoZhi AI");
     lv_obj_set_style_text_align(reply_label_, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_font(reply_label_, &font_dingding, 0);
