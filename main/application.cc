@@ -21,6 +21,15 @@ extern const char p3_err_pin_end[] asm("_binary_err_pin_p3_end");
 extern const char p3_err_wificonfig_start[] asm("_binary_err_wificonfig_p3_start");
 extern const char p3_err_wificonfig_end[] asm("_binary_err_wificonfig_p3_end");
 
+static const char* const STATE_STRINGS[] = {
+    "unknown",
+    "idle",
+    "connecting",
+    "listening",
+    "speaking",
+    "upgrading",
+    "invalid_state"
+};
 
 Application::Application() : background_task_(4096 * 8) {
     event_group_ = xEventGroupCreate();
@@ -30,14 +39,6 @@ Application::Application() : background_task_(4096 * 8) {
 }
 
 Application::~Application() {
-    if (protocol_ != nullptr) {
-        delete protocol_;
-    }
-    if (opus_decoder_ != nullptr)
-    {
-        opus_decoder_destroy(opus_decoder_);
-    }
-
     vEventGroupDelete(event_group_);
 }
 
@@ -84,7 +85,7 @@ void Application::CheckNewVersion() {
     }
 }
 
-void Application::Alert(const std::string&& title, const std::string&& message) {
+void Application::Alert(const std::string& title, const std::string& message) {
     ESP_LOGW(TAG, "Alert: %s, %s", title.c_str(), message.c_str());
     auto display = Board::GetInstance().GetDisplay();
     display->ShowNotification(message);
@@ -112,7 +113,7 @@ void Application::PlayLocalFile(const char *data, size_t size)
         p += sizeof(BinaryProtocol3);
 
         auto payload_size = ntohs(p3->payload_size);
-        std::string opus;
+        std::vector<uint8_t> opus;
         opus.resize(payload_size);
         memcpy(opus.data(), p3->payload, payload_size);
         p += payload_size;
@@ -122,14 +123,17 @@ void Application::PlayLocalFile(const char *data, size_t size)
     }
 }
 
-void Application::ToggleChatState()
-{
-    Schedule([this]()
-             {
+void Application::ToggleChatState() {
+    Schedule([this]() {
+        if (!protocol_) {
+            ESP_LOGE(TAG, "Protocol not initialized");
+            return;
+        }
+
         if (chat_state_ == kChatStateIdle) {
             SetChatState(kChatStateConnecting);
             if (!protocol_->OpenAudioChannel()) {
-                ESP_LOGE(TAG, "Failed to open audio channel");
+                Alert("Error", "Failed to open audio channel");
                 SetChatState(kChatStateIdle);
                 return;
             }
@@ -147,13 +151,18 @@ void Application::ToggleChatState()
 
 void Application::StartListening() {
     Schedule([this]() {
+        if (!protocol_) {
+            ESP_LOGE(TAG, "Protocol not initialized");
+            return;
+        }
+        
         keep_listening_ = false;
         if (chat_state_ == kChatStateIdle) {
             if (!protocol_->IsAudioChannelOpened()) {
                 SetChatState(kChatStateConnecting);
                 if (!protocol_->OpenAudioChannel()) {
                     SetChatState(kChatStateIdle);
-                    ESP_LOGE(TAG, "Failed to open audio channel");
+                    Alert("Error", "Failed to open audio channel");
                     return;
                 }
             }
@@ -192,8 +201,8 @@ void Application::Start() {
     /* Setup the audio codec */
     auto codec = board.GetAudioCodec();
     opus_decode_sample_rate_ = codec->output_sample_rate();
-    opus_decoder_ = opus_decoder_create(opus_decode_sample_rate_, 1, NULL);
-    opus_encoder_.Configure(16000, 1, OPUS_FRAME_DURATION_MS);
+    opus_decoder_ = std::make_unique<OpusDecoderWrapper>(opus_decode_sample_rate_, 1);
+    opus_encoder_ = std::make_unique<OpusEncoderWrapper>(16000, 1, OPUS_FRAME_DURATION_MS);
     if (codec->input_sample_rate() != 16000) {
         input_resampler_.Configure(codec->input_sample_rate(), 16000);
         reference_resampler_.Configure(codec->input_sample_rate(), 16000);
@@ -230,9 +239,9 @@ void Application::Start() {
 #if CONFIG_IDF_TARGET_ESP32S3
     audio_processor_.Initialize(codec->input_channels(), codec->input_reference());
     audio_processor_.OnOutput([this](std::vector<int16_t>&& data) {
-        background_task_.Schedule([this, data = std::move(data)]() {
-            opus_encoder_.Encode(data, [this](const uint8_t* opus, size_t opus_size) {
-                Schedule([this, opus = std::string(reinterpret_cast<const char*>(opus), opus_size)]() {
+        background_task_.Schedule([this, data = std::move(data)]() mutable {
+            opus_encoder_->Encode(std::move(data), [this](std::vector<uint8_t>&& opus) {
+                Schedule([this, opus = std::move(opus)]() {
                     protocol_->SendAudio(opus);
                 });
             });
@@ -266,7 +275,7 @@ void Application::Start() {
                     return;
                 }
                 
-                std::string opus;
+                std::vector<uint8_t> opus;
                 // Encode and send the wake word data to the server
                 while (wake_word_detect_.GetWakeWordOpus(opus)) {
                     protocol_->SendAudio(opus);
@@ -288,14 +297,14 @@ void Application::Start() {
     // Initialize the protocol
     display->SetStatus("初始化协议");
 #ifdef CONFIG_CONNECTION_TYPE_WEBSOCKET
-    protocol_ = new WebsocketProtocol();
+    protocol_ = std::make_unique<WebsocketProtocol>();
 #else
-    protocol_ = new MqttProtocol();
+    protocol_ = std::make_unique<MqttProtocol>();
 #endif
     protocol_->OnNetworkError([this](const std::string& message) {
         Alert("Error", std::move(message));
     });
-    protocol_->OnIncomingAudio([this](const std::string& data) {
+    protocol_->OnIncomingAudio([this](std::vector<uint8_t>&& data) {
         std::lock_guard<std::mutex> lock(mutex_);
         if (chat_state_ == kChatStateSpeaking) {
             audio_decode_queue_.emplace_back(std::move(data));
@@ -370,9 +379,8 @@ void Application::Start() {
 }
 
 void Application::Schedule(std::function<void()> callback) {
-    mutex_.lock();
-    main_tasks_.push_back(callback);
-    mutex_.unlock();
+    std::lock_guard<std::mutex> lock(mutex_);
+    main_tasks_.push_back(std::move(callback));
     xEventGroupSetBits(event_group_, SCHEDULE_EVENT);
 }
 
@@ -404,7 +412,7 @@ void Application::MainLoop() {
 
 void Application::ResetDecoder() {
     std::lock_guard<std::mutex> lock(mutex_);
-    opus_decoder_ctl(opus_decoder_, OPUS_RESET_STATE);
+    opus_decoder_->ResetState();
     audio_decode_queue_.clear();
     last_output_time_ = std::chrono::steady_clock::now();
     Board::GetInstance().GetAudioCodec()->EnableOutput(true);
@@ -418,9 +426,11 @@ void Application::OutputAudio() {
     std::unique_lock<std::mutex> lock(mutex_);
     if (audio_decode_queue_.empty()) {
         // Disable the output if there is no audio data for a long time
-        auto duration = std::chrono::duration_cast<std::chrono::seconds>(now - last_output_time_).count();
-        if (duration > max_silence_seconds) {
-            codec->EnableOutput(false);
+        if (chat_state_ == kChatStateIdle) {
+            auto duration = std::chrono::duration_cast<std::chrono::seconds>(now - last_output_time_).count();
+            if (duration > max_silence_seconds) {
+                codec->EnableOutput(false);
+            }
         }
         return;
     }
@@ -435,24 +445,21 @@ void Application::OutputAudio() {
     audio_decode_queue_.pop_front();
     lock.unlock();
 
-    background_task_.Schedule([this, codec, opus = std::move(opus)]() {
+    background_task_.Schedule([this, codec, opus = std::move(opus)]() mutable {
         if (aborted_) {
             return;
         }
-        int frame_size = opus_decode_sample_rate_ * OPUS_FRAME_DURATION_MS / 1000;
-        std::vector<int16_t> pcm(frame_size);
 
-        int ret = opus_decode(opus_decoder_, (const unsigned char*)opus.data(), opus.size(), pcm.data(), frame_size, 0);
-        if (ret < 0) {
-            ESP_LOGE(TAG, "Failed to decode audio, error code: %d", ret);
+        std::vector<int16_t> pcm;
+        if (!opus_decoder_->Decode(std::move(opus), pcm)) {
             return;
         }
 
         // Resample if the sample rate is different
         if (opus_decode_sample_rate_ != codec->output_sample_rate()) {
-            int target_size = output_resampler_.GetOutputSamples(frame_size);
+            int target_size = output_resampler_.GetOutputSamples(pcm.size());
             std::vector<int16_t> resampled(target_size);
-            output_resampler_.Process(pcm.data(), frame_size, resampled.data());
+            output_resampler_.Process(pcm.data(), pcm.size(), resampled.data());
             pcm = std::move(resampled);
         }
         
@@ -500,9 +507,9 @@ void Application::InputAudio() {
     }
 #else
     if (chat_state_ == kChatStateListening) {
-        background_task_.Schedule([this, data = std::move(data)]() {
-            opus_encoder_.Encode(data, [this](const uint8_t* opus, size_t opus_size) {
-                Schedule([this, opus = std::string(reinterpret_cast<const char*>(opus), opus_size)]() {
+        background_task_.Schedule([this, data = std::move(data)]() mutable {
+            opus_encoder_->Encode(std::move(data), [this](std::vector<uint8_t>&& opus) {
+                Schedule([this, opus = std::move(opus)]() {
                     protocol_->SendAudio(opus);
                 });
             });
@@ -517,24 +524,13 @@ void Application::AbortSpeaking(AbortReason reason) {
     protocol_->SendAbortSpeaking(reason);
 }
 
-void Application::SetChatState(ChatState state)
-{
-    const char *state_str[] = {
-        "unknown",
-        "idle",
-        "connecting",
-        "listening",
-        "speaking",
-        "upgrading",
-        "invalid_state"};
-    if (chat_state_ == state)
-    {
-        // No need to update the state
+void Application::SetChatState(ChatState state) {
+    if (chat_state_ == state) {
         return;
     }
-
+    
     chat_state_ = state;
-    ESP_LOGI(TAG, "STATE: %s", state_str[chat_state_]);
+    ESP_LOGI(TAG, "STATE: %s", STATE_STRINGS[chat_state_]);
     // The state is changed, wait for all background tasks to finish
     background_task_.WaitForCompletion();
 
@@ -561,7 +557,7 @@ void Application::SetChatState(ChatState state)
             display->SetStatus("聆听中...");
             display->SetEmotion("neutral");
             ResetDecoder();
-            opus_encoder_.ResetState();
+            opus_encoder_->ResetState();
 #if CONFIG_IDF_TARGET_ESP32S3
             audio_processor_.Start();
 #endif
@@ -592,9 +588,8 @@ void Application::SetDecodeSampleRate(int sample_rate)
         return;
     }
 
-    opus_decoder_destroy(opus_decoder_);
     opus_decode_sample_rate_ = sample_rate;
-    opus_decoder_ = opus_decoder_create(opus_decode_sample_rate_, 1, NULL);
+    opus_decoder_ = std::make_unique<OpusDecoderWrapper>(opus_decode_sample_rate_, 1);
 
     auto codec = Board::GetInstance().GetAudioCodec();
     if (opus_decode_sample_rate_ != codec->output_sample_rate())
