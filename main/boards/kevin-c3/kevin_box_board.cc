@@ -1,3 +1,4 @@
+
 #include "wifi_board.h"
 #include "audio_codecs/es8311_audio_codec.h"
 #include "application.h"
@@ -9,6 +10,7 @@
 #include <wifi_station.h>
 #include <esp_log.h>
 #include <driver/i2c_master.h>
+#include "esp_efuse_table.h"
 
 #define TAG "KevinBoxBoard"
 
@@ -16,6 +18,7 @@ class KevinBoxBoard : public WifiBoard {
 private:
     i2c_master_bus_handle_t codec_i2c_bus_;
     Button boot_button_;
+    Button touch_button_;
 
     void InitializeCodecI2c() {
         // Initialize I2C peripheral
@@ -41,11 +44,15 @@ private:
                 ResetWifiConfiguration();
             }
         });
+        
         boot_button_.OnPressDown([this]() {
             Application::GetInstance().StartListening();
         });
         boot_button_.OnPressUp([this]() {
             Application::GetInstance().StopListening();
+        });
+        touch_button_.OnClick([this]() {
+            Application::GetInstance().ToggleChatState();
         });
     }
 
@@ -56,7 +63,9 @@ private:
     }
 
 public:
-    KevinBoxBoard() : boot_button_(BOOT_BUTTON_GPIO) {
+    KevinBoxBoard() : boot_button_(BOOT_BUTTON_GPIO) ,
+                        touch_button_(BOOT_N_GPIO) {
+        esp_efuse_write_field_bit(ESP_EFUSE_VDD_SPI_AS_GPIO);
         InitializeCodecI2c();
         InitializeButtons();
         InitializeIot();
