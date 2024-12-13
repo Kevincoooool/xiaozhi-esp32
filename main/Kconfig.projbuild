@@ -33,7 +33,7 @@ config WEBSOCKET_ACCESS_TOKEN
 
 choice BOARD_TYPE
     prompt "Board Type"
-    default BOARD_TYPE_BREAD_COMPACT_WIFI
+    default BOARD_TYPE_SANGSHU
     help
         Board type. 开发板类型
     config BOARD_TYPE_BREAD_COMPACT_WIFI
@@ -50,6 +50,8 @@ choice BOARD_TYPE
         bool "Kevin C3"
     config BOARD_TYPE_LICHUANG_DEV
         bool "立创开发板"
+    config BOARD_TYPE_SANGSHU
+        bool "xiaoliang"
 endchoice
 
 endmenu
