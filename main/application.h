@@ -88,6 +88,7 @@ private:
     OpusResampler input_resampler_;
     OpusResampler reference_resampler_;
     OpusResampler output_resampler_;
+        void uart_task();
 
     void MainLoop();
     void InputAudio();

@@ -38,20 +38,20 @@ private:
     }
 
     void InitializeButtons() {
-        boot_button_.OnClick([this]() {
-            auto& app = Application::GetInstance();
-            if (app.GetChatState() == kChatStateUnknown && !WifiStation::GetInstance().IsConnected()) {
-                ResetWifiConfiguration();
-            }
-        });
+        // boot_button_.OnClick([this]() {
+        //     auto& app = Application::GetInstance();
+        //     if (app.GetChatState() == kChatStateUnknown && !WifiStation::GetInstance().IsConnected()) {
+        //         ResetWifiConfiguration();
+        //     }
+        // });
         
-        boot_button_.OnPressDown([this]() {
+        touch_button_.OnPressDown([this]() {
             Application::GetInstance().StartListening();
         });
-        boot_button_.OnPressUp([this]() {
+        touch_button_.OnPressUp([this]() {
             Application::GetInstance().StopListening();
         });
-        touch_button_.OnClick([this]() {
+        boot_button_.OnClick([this]() {
             Application::GetInstance().ToggleChatState();
         });
     }
