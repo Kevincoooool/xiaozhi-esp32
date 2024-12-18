@@ -11,6 +11,7 @@ class Display {
 public:
     Display();
     virtual ~Display();
+    virtual void SetReply(const std::string &text);
 
     virtual void SetStatus(const std::string &status);
     virtual void ShowNotification(const std::string &notification, int duration_ms = 3000);
@@ -36,6 +37,7 @@ protected:
     const char* battery_icon_ = nullptr;
     const char* network_icon_ = nullptr;
     bool muted_ = false;
+    lv_obj_t *reply_label_ = nullptr;
 
     esp_timer_handle_t notification_timer_ = nullptr;
     esp_timer_handle_t update_timer_ = nullptr;

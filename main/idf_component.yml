@@ -12,4 +12,5 @@ dependencies:
   ## Required IDF version
   idf:
     version: ">=5.3"
+  espressif/esp_lcd_panel_io_additions: "^1.0.1"
 

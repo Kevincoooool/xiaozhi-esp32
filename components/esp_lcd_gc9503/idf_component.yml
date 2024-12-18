@@ -1,0 +1,11 @@
+dependencies:
+
+  cmake_utilities:
+    version: 0.*
+  idf:
+    version: '>5.0.4,!=5.1.1'
+description: ESP LCD GC9503
+targets:
+- esp32s3
+url: https://github.com/espressif/esp-bsp/tree/master/components/lcd/esp_lcd_gc9503
+version: 3.0.1
