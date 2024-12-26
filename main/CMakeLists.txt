@@ -9,6 +9,8 @@ set(SOURCES "audio_codecs/audio_codec.cc"
             "protocols/protocol.cc"
             "protocols/mqtt_protocol.cc"
             "protocols/websocket_protocol.cc"
+            "iot/thing.cc"
+            "iot/thing_manager.cc"
             "system_info.cc"
             "application.cc"
             "ota.cc"
@@ -19,6 +21,10 @@ set(SOURCES "audio_codecs/audio_codec.cc"
             )
 
 set(INCLUDE_DIRS "." "display" "audio_codecs" "protocols" "audio_processing")
+
+# 添加 IOT 相关文件
+file(GLOB IOT_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/iot/things/*.cc)
+list(APPEND SOURCES ${IOT_SOURCES})
 
 # 字体
 file(GLOB FONT_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/fonts/*.c)
@@ -60,7 +66,8 @@ endif()
 
 idf_component_register(SRCS ${SOURCES}
                     EMBED_FILES "assets/err_reg.p3" "assets/err_pin.p3" "assets/err_wificonfig.p3"
-                    INCLUDE_DIRS ${INCLUDE_DIRS} ${INCLUDES} 
+                    INCLUDE_DIRS ${INCLUDE_DIRS}
+                    WHOLE_ARCHIVE
                     )
 
 # 使用 target_compile_definitions 来定义 BOARD_TYPE
