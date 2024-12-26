@@ -1,3 +1,4 @@
+
 #include "iot/thing.h"
 #include "board.h"
 #include "audio_codec.h"
@@ -12,7 +13,7 @@ namespace iot {
 // 这里仅定义 Lamp 的属性和方法，不包含具体的实现
 class Lamp : public Thing {
 private:
-    gpio_num_t gpio_num_ = GPIO_NUM_18;
+    gpio_num_t gpio_num_ = GPIO_NUM_6;
     bool power_ = false;
 
     void InitializeGpio() {

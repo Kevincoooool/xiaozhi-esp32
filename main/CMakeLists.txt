@@ -66,8 +66,8 @@ endif()
 
 idf_component_register(SRCS ${SOURCES}
                     EMBED_FILES "assets/err_reg.p3" "assets/err_pin.p3" "assets/err_wificonfig.p3"
-                    INCLUDE_DIRS ${INCLUDE_DIRS}
-                    WHOLE_ARCHIVE
+                    INCLUDE_DIRS ${INCLUDE_DIRS} ${INCLUDES}
+                    
                     )
 
 # 使用 target_compile_definitions 来定义 BOARD_TYPE

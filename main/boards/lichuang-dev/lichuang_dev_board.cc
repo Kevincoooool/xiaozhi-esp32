@@ -71,20 +71,6 @@ private:
         ESP_ERROR_CHECK(spi_bus_initialize(SPI3_HOST, &buscfg, SPI_DMA_CH_AUTO));
     }
 
-    void InitializeButtons() {
-        boot_button_.OnClick([this]() {
-            auto& app = Application::GetInstance();
-            if (app.GetChatState() == kChatStateUnknown && !WifiStation::GetInstance().IsConnected()) {
-                ResetWifiConfiguration();
-            }
-        });
-        boot_button_.OnPressDown([this]() {
-            Application::GetInstance().StartListening();
-        });
-        boot_button_.OnPressUp([this]() {
-            Application::GetInstance().StopListening();
-        });
-    }
 
     void InitializeSt7789Display() {
         esp_lcd_panel_io_handle_t panel_io = nullptr;

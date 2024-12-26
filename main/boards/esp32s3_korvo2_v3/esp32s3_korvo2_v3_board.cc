@@ -1,27 +1,44 @@
 #include "wifi_board.h"
 #include "audio_codecs/box_audio_codec.h"
 #include "display/st7789_display.h"
-#include "system_reset.h"
 #include "application.h"
 #include "button.h"
 #include "led.h"
 #include "config.h"
+#include "i2c_device.h"
+#include "iot/thing_manager.h"
 
 #include <esp_log.h>
-#include <driver/i2c_master.h>
 #include <esp_lcd_panel_vendor.h>
+#include <driver/i2c_master.h>
+#include <driver/spi_common.h>
 #include <wifi_station.h>
 
 #define TAG "esp32s3_korvo2_v3"
 
-class esp32s3_korvo2_v3Board : public WifiBoard
+class esp32s3_korvo2_v3_board : public WifiBoard
 {
 private:
-    i2c_master_bus_handle_t display_i2c_bus_;
     Button boot_button_;
-    i2c_master_bus_handle_t codec_i2c_bus_;
+    i2c_master_bus_handle_t i2c_bus_;
     St7789Display* display_;
+    void InitializeI2c() {
+        // Initialize I2C peripheral
+        i2c_master_bus_config_t i2c_bus_cfg = {
+            .i2c_port = (i2c_port_t)1,
+            .sda_io_num = AUDIO_CODEC_I2C_SDA_PIN,
+            .scl_io_num = AUDIO_CODEC_I2C_SCL_PIN,
+            .clk_source = I2C_CLK_SRC_DEFAULT,
+            .glitch_ignore_cnt = 7,
+            .intr_priority = 0,
+            .trans_queue_depth = 0,
+            .flags = {
+                .enable_internal_pullup = 1,
+            },
+        };
+        ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_bus_cfg, &i2c_bus_));
 
+    }
     void InitializeSpi()
     {
         spi_bus_config_t buscfg = {};
@@ -32,6 +49,20 @@ private:
         buscfg.quadhd_io_num = GPIO_NUM_NC;
         buscfg.max_transfer_sz = DISPLAY_WIDTH * DISPLAY_HEIGHT * sizeof(uint16_t);
         ESP_ERROR_CHECK(spi_bus_initialize(SPI3_HOST, &buscfg, SPI_DMA_CH_AUTO));
+    }
+        void InitializeButtons() {
+        boot_button_.OnClick([this]() {
+            auto& app = Application::GetInstance();
+            if (app.GetChatState() == kChatStateUnknown && !WifiStation::GetInstance().IsConnected()) {
+                ResetWifiConfiguration();
+            }
+        });
+        boot_button_.OnPressDown([this]() {
+            Application::GetInstance().StartListening();
+        });
+        boot_button_.OnPressUp([this]() {
+            Application::GetInstance().StopListening();
+        });
     }
     void InitializeSt7789Display()
     {
@@ -65,53 +96,22 @@ private:
         display_ = new St7789Display(panel_io, panel, DISPLAY_BACKLIGHT_PIN, DISPLAY_BACKLIGHT_OUTPUT_INVERT,
                                      DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY);
     }
-    void InitializeButtons() {
-        boot_button_.OnClick([this]() {
-            auto& app = Application::GetInstance();
-            if (app.GetChatState() == kChatStateUnknown && !WifiStation::GetInstance().IsConnected()) {
-                ResetWifiConfiguration();
-            }
-        });
-        boot_button_.OnPressDown([this]() {
-            Application::GetInstance().StartListening();
-        });
-        boot_button_.OnPressUp([this]() {
-            Application::GetInstance().StopListening();
-        });
+   // 物联网初始化，添加对 AI 可见设备
+    void InitializeIot() {
+        auto& thing_manager = iot::ThingManager::GetInstance();
+        thing_manager.AddThing(iot::CreateThing("Speaker"));
+        thing_manager.AddThing(iot::CreateThing("Lamp"));
     }
 
-    void InitializeCodecI2c() {
-        // Initialize I2C peripheral
-        i2c_master_bus_config_t i2c_bus_cfg = {
-            .i2c_port = I2C_NUM_1,
-            .sda_io_num = AUDIO_CODEC_I2C_SDA_PIN,
-            .scl_io_num = AUDIO_CODEC_I2C_SCL_PIN,
-            .clk_source = I2C_CLK_SRC_DEFAULT,
-            .glitch_ignore_cnt = 7,
-            .intr_priority = 0,
-            .trans_queue_depth = 0,
-            .flags = {
-                .enable_internal_pullup = 1,
-            },
-        };
-        ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_bus_cfg, &codec_i2c_bus_));
-    }
 public:
-    esp32s3_korvo2_v3Board() : boot_button_(BOOT_BUTTON_GPIO)
-    {
-
-    }
-
-    virtual void Initialize() override
+    esp32s3_korvo2_v3_board() : boot_button_(BOOT_BUTTON_GPIO)
     {
         ESP_LOGI(TAG, "Initializing esp32s3_korvo2_v3 Board");
-        InitializeCodecI2c();
-
+        InitializeI2c();
         InitializeSpi();
         InitializeButtons();
         InitializeSt7789Display();  
-
-        WifiBoard::Initialize();
+        // InitializeIot();
     }
 
     virtual Led* GetBuiltinLed() override {
@@ -120,10 +120,14 @@ public:
     }
 
     virtual AudioCodec* GetAudioCodec() override {
-        static BoxAudioCodec audio_codec(codec_i2c_bus_, AUDIO_INPUT_SAMPLE_RATE, AUDIO_OUTPUT_SAMPLE_RATE,
-            AUDIO_I2S_GPIO_MCLK, AUDIO_I2S_GPIO_BCLK, AUDIO_I2S_GPIO_WS, AUDIO_I2S_GPIO_DOUT, AUDIO_I2S_GPIO_DIN,
-            AUDIO_CODEC_PA_PIN, AUDIO_CODEC_ES8311_ADDR, AUDIO_CODEC_ES7210_ADDR, AUDIO_INPUT_REFERENCE);
-        return &audio_codec;
+        static BoxAudioCodec* audio_codec = nullptr;
+        if (audio_codec == nullptr) {
+            audio_codec = new BoxAudioCodec(i2c_bus_, AUDIO_INPUT_SAMPLE_RATE, AUDIO_OUTPUT_SAMPLE_RATE,
+                AUDIO_I2S_GPIO_MCLK, AUDIO_I2S_GPIO_BCLK, AUDIO_I2S_GPIO_WS, AUDIO_I2S_GPIO_DOUT, AUDIO_I2S_GPIO_DIN,
+                AUDIO_CODEC_PA_PIN, AUDIO_CODEC_ES8311_ADDR, AUDIO_CODEC_ES7210_ADDR, AUDIO_INPUT_REFERENCE);
+            audio_codec->SetOutputVolume(AUDIO_DEFAULT_OUTPUT_VOLUME);
+        }
+        return audio_codec;
     }
 
     virtual Display *GetDisplay() override
@@ -132,4 +136,4 @@ public:
     }
 };
 
-DECLARE_BOARD(esp32s3_korvo2_v3Board);
+DECLARE_BOARD(esp32s3_korvo2_v3_board);
