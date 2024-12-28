@@ -9,6 +9,13 @@ dependencies:
   espressif/button: "^3.3.1"
   lvgl/lvgl: "~8.4.0"
   esp_lvgl_port: "~2.4.1"
+  
+  espressif/esp_wifi_remote:
+    version: "0.*"
+    
+  espressif/esp_hosted:
+    version: "0.*"
+
   ## Required IDF version
   idf:
     version: ">=5.3"

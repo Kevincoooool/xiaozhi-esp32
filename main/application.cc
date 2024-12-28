@@ -225,13 +225,13 @@ void Application::Start() {
     board.StartNetwork();
 
     // Check for new firmware version or get the MQTT broker address
-    xTaskCreate([](void* arg) {
-        Application* app = (Application*)arg;
-        app->CheckNewVersion();
-        vTaskDelete(NULL);
-    }, "check_new_version", 4096 * 2, this, 1, nullptr);
+    // xTaskCreate([](void* arg) {
+    //     Application* app = (Application*)arg;
+    //     app->CheckNewVersion();
+    //     vTaskDelete(NULL);
+    // }, "check_new_version", 4096 * 2, this, 5, nullptr);
 
-#if CONFIG_IDF_TARGET_ESP32S3
+#if CONFIG_IDF_TARGET_ESP32S3 || CONFIG_IDF_TARGET_ESP32P4 
     audio_processor_.Initialize(codec->input_channels(), codec->input_reference());
     audio_processor_.OnOutput([this](std::vector<int16_t>&& data) {
         background_task_.Schedule([this, data = std::move(data)]() mutable {
@@ -262,7 +262,7 @@ void Application::Start() {
         Schedule([this, &wake_word]() {
             if (chat_state_ == kChatStateIdle) {
                 SetChatState(kChatStateConnecting);
-                wake_word_detect_.EncodeWakeWordData();
+                // wake_word_detect_.EncodeWakeWordData();
 
                 if (!protocol_->OpenAudioChannel()) {
                     ESP_LOGE(TAG, "Failed to open audio channel");
@@ -271,11 +271,11 @@ void Application::Start() {
                     return;
                 }
                 
-                std::vector<uint8_t> opus;
+                // std::vector<uint8_t> opus;
                 // Encode and send the wake word data to the server
-                while (wake_word_detect_.GetWakeWordOpus(opus)) {
-                    protocol_->SendAudio(opus);
-                }
+                // while (wake_word_detect_.GetWakeWordOpus(opus)) {
+                //     protocol_->SendAudio(opus);
+                // }
                 // Set the chat state to wake word detected
                 protocol_->SendWakeWordDetected(wake_word);
                 ESP_LOGI(TAG, "Wake word detected: %s", wake_word.c_str());
@@ -508,7 +508,7 @@ void Application::InputAudio() {
         }
     }
     
-#if CONFIG_IDF_TARGET_ESP32S3
+#if CONFIG_IDF_TARGET_ESP32S3 || CONFIG_IDF_TARGET_ESP32P4 
     if (audio_processor_.IsRunning()) {
         audio_processor_.Input(data);
     }
@@ -568,7 +568,7 @@ void Application::SetChatState(ChatState state) {
             display->SetEmotion("neutral");
             ResetDecoder();
             opus_encoder_->ResetState();
-#if CONFIG_IDF_TARGET_ESP32S3
+#if CONFIG_IDF_TARGET_ESP32S3 || CONFIG_IDF_TARGET_ESP32P4 
             audio_processor_.Start();
 #endif
             UpdateIotStates();
@@ -578,7 +578,7 @@ void Application::SetChatState(ChatState state) {
             builtin_led->TurnOn();
             display->SetStatus("说话中...");
             ResetDecoder();
-#if CONFIG_IDF_TARGET_ESP32S3
+#if CONFIG_IDF_TARGET_ESP32S3 || CONFIG_IDF_TARGET_ESP32P4 
             audio_processor_.Stop();
 #endif
             break;

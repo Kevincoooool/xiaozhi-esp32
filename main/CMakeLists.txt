@@ -46,17 +46,23 @@ elseif(CONFIG_BOARD_TYPE_KEVIN_BOX_1)
     set(BOARD_TYPE "kevin-box-1")
 elseif(CONFIG_BOARD_TYPE_KEVIN_BOX_2)
     set(BOARD_TYPE "kevin-box-2")
+elseif(CONFIG_BOARD_TYPE_KEVIN_P4)
+    set(BOARD_TYPE "kevin-p4")
 elseif(CONFIG_BOARD_TYPE_KEVIN_C3)
     set(BOARD_TYPE "kevin-c3")
 elseif(CONFIG_BOARD_TYPE_LICHUANG_DEV)
     set(BOARD_TYPE "lichuang-dev")
 elseif(CONFIG_BOARD_TYPE_TERRENCE_C3_DEV)
     set(BOARD_TYPE "terrence-c3-dev")
+
+    
 endif()
 file(GLOB BOARD_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/boards/${BOARD_TYPE}/*.cc)
 list(APPEND SOURCES ${BOARD_SOURCES})
 
 if(CONFIG_IDF_TARGET_ESP32S3)
+    list(APPEND SOURCES "audio_processing/audio_processor.cc" "audio_processing/wake_word_detect.cc")
+elseif(CONFIG_IDF_TARGET_ESP32P4)
     list(APPEND SOURCES "audio_processing/audio_processor.cc" "audio_processing/wake_word_detect.cc")
 endif()
 

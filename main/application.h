@@ -17,7 +17,7 @@
 #include "ota.h"
 #include "background_task.h"
 
-#if CONFIG_IDF_TARGET_ESP32S3
+#if CONFIG_IDF_TARGET_ESP32S3 || CONFIG_IDF_TARGET_ESP32P4 
 #include "wake_word_detect.h"
 #include "audio_processor.h"
 #endif
@@ -62,7 +62,7 @@ private:
     Application();
     ~Application();
 
-#if CONFIG_IDF_TARGET_ESP32S3
+#if CONFIG_IDF_TARGET_ESP32S3 || CONFIG_IDF_TARGET_ESP32P4 
     WakeWordDetect wake_word_detect_;
     AudioProcessor audio_processor_;
 #endif
