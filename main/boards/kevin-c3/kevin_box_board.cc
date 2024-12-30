@@ -17,6 +17,7 @@ class KevinBoxBoard : public WifiBoard {
 private:
     i2c_master_bus_handle_t codec_i2c_bus_;
     Button boot_button_;
+    Button touch_button_;
 
     void InitializeCodecI2c() {
         // Initialize I2C peripheral
@@ -41,6 +42,10 @@ private:
             if (app.GetChatState() == kChatStateUnknown && !WifiStation::GetInstance().IsConnected()) {
                 ResetWifiConfiguration();
             }
+            else
+            {
+                Application::GetInstance().ToggleChatState();
+            }
         });
         boot_button_.OnPressDown([this]() {
             Application::GetInstance().StartListening();
@@ -48,6 +53,13 @@ private:
         boot_button_.OnPressUp([this]() {
             Application::GetInstance().StopListening();
         });
+        touch_button_.OnPressDown([this]() {
+            Application::GetInstance().StartListening();
+        });
+        touch_button_.OnPressUp([this]() {
+            Application::GetInstance().StopListening();
+        });
+
     }
 
     // 物联网初始化，添加对 AI 可见设备
@@ -57,7 +69,8 @@ private:
     }
 
 public:
-    KevinBoxBoard() : boot_button_(BOOT_BUTTON_GPIO) {  
+    KevinBoxBoard() : boot_button_(BOOT_BUTTON_GPIO),
+        touch_button_(TOUCH_BUTTON_GPIO) {  
         // 把 ESP32C3 的 VDD SPI 引脚作为普通 GPIO 口使用
         esp_efuse_write_field_bit(ESP_EFUSE_VDD_SPI_AS_GPIO);
 
