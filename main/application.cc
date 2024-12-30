@@ -34,6 +34,65 @@ static const char* const STATE_STRINGS[] = {
     "invalid_state"
 };
 
+#define BUF_SIZE (1024)
+uint8_t uart_data[BUF_SIZE] = {0};
+
+
+void Application::uart_task(void)
+{
+    /* Configure parameters of an UART driver,
+     * communication pins and install the driver */
+    uart_config_t uart_config = {
+        .baud_rate = 115200,
+        .data_bits = UART_DATA_8_BITS,
+        .parity = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .source_clk = UART_SCLK_DEFAULT,
+    };
+
+
+
+    size_t recv_length = 0;
+    int intr_alloc_flags = 0;
+
+
+#if CONFIG_UART_ISR_IN_IRAM
+    intr_alloc_flags = ESP_INTR_FLAG_IRAM;
+#endif
+
+    ESP_ERROR_CHECK(uart_driver_install(UART_NUM_1, BUF_SIZE, BUF_SIZE, 0, NULL, intr_alloc_flags));
+    ESP_ERROR_CHECK(uart_param_config(UART_NUM_1, &uart_config));
+    ESP_ERROR_CHECK(uart_set_pin(UART_NUM_1, 4, 3, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
+    
+    while (1)
+    {
+        // Read data from the UART
+        memset(uart_data, 0, BUF_SIZE);
+        // memset(uart_data_0, 0, BUF_SIZE);
+        // uart_write_bytes(UART_NUM_1, (const char *)data, len);
+        uart_get_buffered_data_len(UART_NUM_1, &recv_length);
+        if (recv_length)
+        {
+            ESP_LOGI(TAG, "recv_length:%d ", recv_length);
+
+            // data[len] = '\0';
+            ESP_LOGI(TAG, "Recv str: %s", (char *)uart_data);
+            int len = uart_read_bytes(UART_NUM_1, uart_data, recv_length, 10 / portTICK_PERIOD_MS);
+
+            esp_log_buffer_hex(TAG, uart_data, len);
+
+            if (uart_data[0] == 0xAA && uart_data[1]== 0x55 && uart_data[2] == 0x00  && uart_data[3]== 0x55 && uart_data[4]== 0xAA)
+            {
+                ToggleChatState();
+
+            }
+
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
 Application::Application() : background_task_(4096 * 8) {
     event_group_ = xEventGroupCreate();
 
@@ -189,7 +248,11 @@ void Application::Start() {
     auto builtin_led = board.GetBuiltinLed();
     builtin_led->SetBlue();
     builtin_led->StartContinuousBlink(100);
-
+        xTaskCreate([](void *arg)
+                {
+        Application* app = (Application*)arg;
+        app->uart_task();
+        vTaskDelete(NULL); }, "uart_task", 1024 * 4, this, 5, NULL);
     /* Setup the display */
     auto display = board.GetDisplay();
 

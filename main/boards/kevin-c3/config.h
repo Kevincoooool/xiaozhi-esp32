@@ -1,3 +1,4 @@
+
 #ifndef _BOARD_CONFIG_H_
 #define _BOARD_CONFIG_H_
 
@@ -19,6 +20,7 @@
 
 #define BUILTIN_LED_GPIO        GPIO_NUM_3
 #define BOOT_BUTTON_GPIO        GPIO_NUM_9
+#define BOOT_N_GPIO        GPIO_NUM_6
 
 #define ML307_RX_PIN GPIO_NUM_4
 #define ML307_TX_PIN GPIO_NUM_5

@@ -11,6 +11,7 @@
 #include <esp_log.h>
 #include <esp_efuse_table.h>
 #include <driver/i2c_master.h>
+#include "esp_efuse_table.h"
 
 #define TAG "KevinBoxBoard"
 
@@ -18,6 +19,7 @@ class KevinBoxBoard : public Ml307Board {
 private:
     i2c_master_bus_handle_t codec_i2c_bus_;
     Button boot_button_;
+    Button touch_button_;
 
     void InitializeCodecI2c() {
         // Initialize I2C peripheral
@@ -46,8 +48,11 @@ private:
         boot_button_.OnPressDown([this]() {
             Application::GetInstance().StartListening();
         });
-        boot_button_.OnPressUp([this]() {
+        touch_button_.OnPressUp([this]() {
             Application::GetInstance().StopListening();
+        });
+        boot_button_.OnClick([this]() {
+            Application::GetInstance().ToggleChatState();
         });
     }
 
