@@ -1,4 +1,5 @@
-#include "wifi_board.h"
+// #include "wifi_board.h"
+#include "ml307_board.h"
 #include "audio_codecs/es8311_audio_codec.h"
 #include "application.h"
 #include "button.h"
@@ -13,7 +14,7 @@
 
 #define TAG "KevinBoxBoard"
 
-class KevinBoxBoard : public WifiBoard {
+class KevinBoxBoard : public Ml307Board {
 private:
     i2c_master_bus_handle_t codec_i2c_bus_;
     Button boot_button_;
@@ -36,12 +37,12 @@ private:
     }
 
     void InitializeButtons() {
-        boot_button_.OnClick([this]() {
-            auto& app = Application::GetInstance();
-            if (app.GetChatState() == kChatStateUnknown && !WifiStation::GetInstance().IsConnected()) {
-                ResetWifiConfiguration();
-            }
-        });
+        // boot_button_.OnClick([this]() {
+        //     auto& app = Application::GetInstance();
+        //     if (app.GetChatState() == kChatStateUnknown && !WifiStation::GetInstance().IsConnected()) {
+        //         ResetWifiConfiguration();
+        //     }
+        // });
         boot_button_.OnPressDown([this]() {
             Application::GetInstance().StartListening();
         });
@@ -57,7 +58,8 @@ private:
     }
 
 public:
-    KevinBoxBoard() : boot_button_(BOOT_BUTTON_GPIO) {  
+    KevinBoxBoard() : 
+    Ml307Board(ML307_TX_PIN, ML307_RX_PIN, 4096),boot_button_(BOOT_BUTTON_GPIO) {  
         // 把 ESP32C3 的 VDD SPI 引脚作为普通 GPIO 口使用
         esp_efuse_write_field_bit(ESP_EFUSE_VDD_SPI_AS_GPIO);
 
