@@ -2,6 +2,7 @@ set(SOURCES "audio_codecs/audio_codec.cc"
             "audio_codecs/no_audio_codec.cc"
             "audio_codecs/box_audio_codec.cc"
             "audio_codecs/es8311_audio_codec.cc"
+            "audio_codecs/cores3_audio_codec.cc"
             "display/display.cc"
             "display/no_display.cc"
             "display/st7789_display.cc"
@@ -55,6 +56,8 @@ elseif(CONFIG_BOARD_TYPE_KEVIN_SP_V3_DEV)
     set(BOARD_TYPE "kevin-sp-v3-dev")
 elseif(CONFIG_BOARD_TYPE_ESP32S3_KORVO2_V3)
     set(BOARD_TYPE "esp32s3_korvo2_v3")
+elseif(CONFIG_BOARD_TYPE_M5STACK_CORE_S3)
+    set(BOARD_TYPE "m5stack-core-s3")
 endif()
 file(GLOB BOARD_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/boards/${BOARD_TYPE}/*.cc)
 list(APPEND SOURCES ${BOARD_SOURCES})

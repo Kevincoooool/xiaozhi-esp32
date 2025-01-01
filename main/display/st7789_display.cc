@@ -374,3 +374,10 @@ void St7789Display::SetupUI()
 
 
 }
+
+void St7789Display::SetChatMessage(const std::string &role, const std::string &content) {
+    if (chat_message_label_ == nullptr) {
+        return;
+    }
+    lv_label_set_text(chat_message_label_, content.c_str());
+}
