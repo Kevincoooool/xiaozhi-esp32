@@ -312,7 +312,7 @@ void St7789Display::SetupUI()
     // lv_obj_center(emotion_label_);
     lv_obj_set_style_text_color(emotion_label_, lv_palette_main(LV_PALETTE_GREEN), 0);
     lv_obj_set_style_align(emotion_label_, LV_ALIGN_CENTER, 0);
-
+    lv_obj_set_y(emotion_label_, -50);
     /* Status bar */
     lv_obj_set_flex_flow(status_bar_, LV_FLEX_FLOW_ROW_WRAP);
     lv_obj_set_style_pad_all(status_bar_, 0, 0);
@@ -330,6 +330,7 @@ void St7789Display::SetupUI()
     // lv_obj_set_align(network_label_, LV_ALIGN_TOP_LEFT);
 
     notification_label_ = lv_label_create(status_bar_);
+    lv_obj_set_width(notification_label_, LV_HOR_RES-40);
     lv_obj_set_flex_grow(notification_label_, 1);
     lv_obj_set_style_text_align(notification_label_, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_text(notification_label_, "通知");
@@ -340,6 +341,7 @@ void St7789Display::SetupUI()
     lv_obj_set_style_text_color(notification_label_, lv_palette_main(LV_PALETTE_GREEN), 0);
 
     status_label_ = lv_label_create(status_bar_);
+    lv_obj_set_width(status_label_, LV_HOR_RES-40);
     lv_obj_set_flex_grow(status_label_, 1);
     lv_label_set_text(status_label_, "正在初始化");
     lv_obj_set_style_text_align(status_label_, LV_TEXT_ALIGN_CENTER, 0);
@@ -356,10 +358,10 @@ void St7789Display::SetupUI()
 
     reply_label_ = lv_label_create(lv_scr_act());
     lv_obj_set_width(reply_label_, LV_HOR_RES);
-    lv_obj_set_height(reply_label_, 100);
+    lv_obj_set_height(reply_label_, 150);
     lv_obj_set_flex_grow(reply_label_, 2);
-    lv_label_set_long_mode(reply_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
-    lv_label_set_text(reply_label_, "XiaoZhi AI");
+    // lv_label_set_long_mode(reply_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    lv_label_set_text(reply_label_, "XiaoZhi AI\nESP32S3 Korvo 2V3\n开发板\n酷世DIY");
     lv_obj_set_style_text_align(reply_label_, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_font(reply_label_, &font_dingding, 0);
     lv_obj_set_style_text_color(reply_label_, lv_palette_main(LV_PALETTE_GREEN), 0);
