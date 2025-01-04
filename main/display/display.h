@@ -12,6 +12,7 @@ public:
     Display();
     virtual ~Display();
 
+    virtual void SetReply(const std::string &text);
     virtual void SetStatus(const std::string &status);
     virtual void ShowNotification(const std::string &notification, int duration_ms = 3000);
     virtual void SetEmotion(const std::string &emotion);
@@ -30,6 +31,7 @@ protected:
     lv_obj_t *emotion_label_ = nullptr;
     lv_obj_t *network_label_ = nullptr;
     lv_obj_t *status_label_ = nullptr;
+    lv_obj_t *reply_label_ = nullptr;
     lv_obj_t *notification_label_ = nullptr;
     lv_obj_t *mute_label_ = nullptr;
     lv_obj_t *battery_label_ = nullptr;
