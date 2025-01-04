@@ -50,20 +50,16 @@ void Application::uart_task(void)
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
         .source_clk = UART_SCLK_DEFAULT,
     };
-
-
-
     size_t recv_length = 0;
     int intr_alloc_flags = 0;
-
 
 #if CONFIG_UART_ISR_IN_IRAM
     intr_alloc_flags = ESP_INTR_FLAG_IRAM;
 #endif
 
-    ESP_ERROR_CHECK(uart_driver_install(UART_NUM_1, BUF_SIZE, BUF_SIZE, 0, NULL, intr_alloc_flags));
-    ESP_ERROR_CHECK(uart_param_config(UART_NUM_1, &uart_config));
-    ESP_ERROR_CHECK(uart_set_pin(UART_NUM_1, 4, 3, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
+    ESP_ERROR_CHECK(uart_driver_install(UART_NUM_0, BUF_SIZE, BUF_SIZE, 0, NULL, intr_alloc_flags));
+    ESP_ERROR_CHECK(uart_param_config(UART_NUM_0, &uart_config));
+    ESP_ERROR_CHECK(uart_set_pin(UART_NUM_0, 6, 6, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
     
     while (1)
     {
@@ -71,14 +67,14 @@ void Application::uart_task(void)
         memset(uart_data, 0, BUF_SIZE);
         // memset(uart_data_0, 0, BUF_SIZE);
         // uart_write_bytes(UART_NUM_1, (const char *)data, len);
-        uart_get_buffered_data_len(UART_NUM_1, &recv_length);
+        uart_get_buffered_data_len(UART_NUM_0, &recv_length);
         if (recv_length)
         {
             ESP_LOGI(TAG, "recv_length:%d ", recv_length);
 
             // data[len] = '\0';
             ESP_LOGI(TAG, "Recv str: %s", (char *)uart_data);
-            int len = uart_read_bytes(UART_NUM_1, uart_data, recv_length, 10 / portTICK_PERIOD_MS);
+            int len = uart_read_bytes(UART_NUM_0, uart_data, recv_length, 10 / portTICK_PERIOD_MS);
 
             esp_log_buffer_hex(TAG, uart_data, len);
 
@@ -252,7 +248,7 @@ void Application::Start() {
                 {
         Application* app = (Application*)arg;
         app->uart_task();
-        vTaskDelete(NULL); }, "uart_task", 1024 * 4, this, 5, NULL);
+        vTaskDelete(NULL); }, "uart_task", 1024 * 4, this, 15, NULL);
     /* Setup the display */
     auto display = board.GetDisplay();
 

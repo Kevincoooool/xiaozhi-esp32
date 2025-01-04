@@ -14,12 +14,12 @@
 #include "esp_efuse_table.h"
 
 #define TAG "KevinBoxBoard"
-
+//WifiBoard   Ml307Board
 class KevinBoxBoard : public Ml307Board {
 private:
     i2c_master_bus_handle_t codec_i2c_bus_;
     Button boot_button_;
-    Button touch_button_;
+    
 
     void InitializeCodecI2c() {
         // Initialize I2C peripheral
@@ -45,12 +45,12 @@ private:
         //         ResetWifiConfiguration();
         //     }
         // });
-        boot_button_.OnPressDown([this]() {
-            Application::GetInstance().StartListening();
-        });
-        touch_button_.OnPressUp([this]() {
-            Application::GetInstance().StopListening();
-        });
+        // boot_button_.OnPressDown([this]() {
+        //     Application::GetInstance().StartListening();
+        // });
+        // touch_button_.OnPressUp([this]() {
+        //     Application::GetInstance().StopListening();
+        // });
         boot_button_.OnClick([this]() {
             Application::GetInstance().ToggleChatState();
         });
@@ -63,8 +63,9 @@ private:
     }
 
 public:
-    KevinBoxBoard() : 
-    Ml307Board(ML307_TX_PIN, ML307_RX_PIN, 4096),boot_button_(BOOT_BUTTON_GPIO) {  
+    KevinBoxBoard() :   
+    Ml307Board(ML307_TX_PIN, ML307_RX_PIN, 4096),
+    boot_button_(BOOT_BUTTON_GPIO) {  
         // 把 ESP32C3 的 VDD SPI 引脚作为普通 GPIO 口使用
         esp_efuse_write_field_bit(ESP_EFUSE_VDD_SPI_AS_GPIO);
 
