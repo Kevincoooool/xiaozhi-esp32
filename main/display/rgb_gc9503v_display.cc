@@ -431,7 +431,7 @@ void RGB_GC9503V_Display::SetupUI() {
 
     /* Status bar */
     status_bar_ = lv_obj_create(lv_scr_act());
-    lv_obj_set_size(status_bar_, LV_HOR_RES, 50);
+    lv_obj_set_size(status_bar_, LV_HOR_RES, 80);
     lv_obj_set_style_radius(status_bar_, 0, 0);
     lv_obj_set_style_bg_color(status_bar_, lv_color_hex(0x000000), 0);
     
