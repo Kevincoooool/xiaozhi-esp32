@@ -8,6 +8,5 @@ set(PROJECT_VER "0.9.8")
 
 add_compile_options(-Wno-error=format= -Wno-format)
 
-
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(xiaozhi)

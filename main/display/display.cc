@@ -8,6 +8,7 @@
 #include "application.h"
 #include "font_awesome_symbols.h"
 #include "audio_codec.h"
+#include <driver/ledc.h>
 
 #define TAG "Display"
 
@@ -64,12 +65,22 @@ void Display::SetStatus(const std::string &status) {
     DisplayLockGuard lock(this);
     lv_label_set_text(status_label_, status.c_str());
 }
-void Display::SetReply(const std::string &text) {
-    if (reply_label_ == nullptr) {
+
+void Display::SetBacklight(uint8_t brightness) {
+    if (backlight_pin_ == GPIO_NUM_NC) {
         return;
     }
-    DisplayLockGuard lock(this);
-    lv_label_set_text(reply_label_, text.c_str());
+
+    if (brightness > 100)
+    {
+        brightness = 100;
+    }
+
+    ESP_LOGI(TAG, "Setting LCD backlight: %d%%", brightness);
+    // LEDC resolution set to 10bits, thus: 100% = 1023
+    uint32_t duty_cycle = (1023 * brightness) / 100;
+    ESP_ERROR_CHECK(ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty_cycle));
+    ESP_ERROR_CHECK(ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0));
 }
 
 void Display::ShowNotification(const std::string &notification, int duration_ms) {

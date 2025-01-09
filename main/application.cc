@@ -360,7 +360,6 @@ void Application::Start() {
                 if (text != NULL) {
                     ESP_LOGI(TAG, "<< %s", text->valuestring);
                     display->SetChatMessage("assistant", text->valuestring);
-                    display->SetReply(text->valuestring);
                 }
             }
         } else if (strcmp(type->valuestring, "stt") == 0) {

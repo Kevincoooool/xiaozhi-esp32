@@ -5,18 +5,20 @@
 #include <esp_timer.h>
 
 #include <string>
+#include <driver/gpio.h>
 
 
 class Display {
 public:
     Display();
     virtual ~Display();
-    virtual void SetReply(const std::string &text);
     virtual void SetStatus(const std::string &status);
     virtual void ShowNotification(const std::string &notification, int duration_ms = 3000);
     virtual void SetEmotion(const std::string &emotion);
     virtual void SetChatMessage(const std::string &role, const std::string &content);
     virtual void SetIcon(const char* icon);
+    virtual void SetBacklight(uint8_t brightness) ;
+
 
     int width() const { return width_; }
     int height() const { return height_; }
@@ -26,7 +28,7 @@ protected:
     int height_ = 0;
 
     lv_disp_t *disp_ = nullptr;
-
+    gpio_num_t backlight_pin_ = GPIO_NUM_48;
     lv_obj_t *emotion_label_ = nullptr;
     lv_obj_t *network_label_ = nullptr;
     lv_obj_t *status_label_ = nullptr;

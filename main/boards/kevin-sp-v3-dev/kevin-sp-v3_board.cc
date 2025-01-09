@@ -2,14 +2,14 @@
 #include "ml307_board.h"
 
 #include "audio_codecs/no_audio_codec.h"
-#include "display/st7789_display.h"
+#include "display/lcd_display.h"
 #include "system_reset.h"
 #include "application.h"
 #include "button.h"
-#include "led.h"
+
 #include "config.h"
 #include "iot/thing_manager.h"
-
+#include "led/single_led.h"
 #include <esp_log.h>
 #include <driver/i2c_master.h>
 #include <esp_lcd_panel_vendor.h>
@@ -20,7 +20,7 @@ class KEVIN_SP_V3Board : public WifiBoard {
 private:
     i2c_master_bus_handle_t display_i2c_bus_;
     Button boot_button_;
-    St7789Display* display_;
+    LcdDisplay* display_;
 
     void InitializeSpi()
     {
@@ -76,7 +76,7 @@ private:
         ESP_ERROR_CHECK(esp_lcd_panel_mirror(panel, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y));
         ESP_ERROR_CHECK(esp_lcd_panel_invert_color(panel, true));
 
-        display_ = new St7789Display(panel_io, panel, DISPLAY_BACKLIGHT_PIN, DISPLAY_BACKLIGHT_OUTPUT_INVERT,
+        display_ = new LcdDisplay(panel_io, panel, DISPLAY_BACKLIGHT_PIN, DISPLAY_BACKLIGHT_OUTPUT_INVERT,
                                      DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY);
     }
     // 物联网初始化，添加对 AI 可见设备
@@ -84,6 +84,7 @@ private:
         auto& thing_manager = iot::ThingManager::GetInstance();
         thing_manager.AddThing(iot::CreateThing("Speaker"));
         thing_manager.AddThing(iot::CreateThing("Lamp"));
+        thing_manager.AddThing(iot::CreateThing("Backlight"));
     }
 
 public:
@@ -100,9 +101,8 @@ public:
     }
     
 
-    virtual Led *GetBuiltinLed() override
-    {
-        static Led led(BUILTIN_LED_GPIO);
+    virtual Led* GetLed() override {
+        static SingleLed led(BUILTIN_LED_GPIO);
         return &led;
     }
 
