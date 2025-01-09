@@ -552,7 +552,7 @@ void Application::SetDeviceState(DeviceState state) {
         case kDeviceStateIdle:
             display->SetStatus("待命");
             display->SetEmotion("neutral");
-            display->SetChatMessage("", "");
+            // display->SetChatMessage("", "");
 #ifdef CONFIG_IDF_TARGET_ESP32S3
             audio_processor_.Stop();
 #endif
