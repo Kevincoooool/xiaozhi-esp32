@@ -84,7 +84,7 @@ void LcdDisplay::LvglTask() {
         vTaskDelay(pdMS_TO_TICKS(task_delay_ms));
     }
 }
-
+extern "C" void emoji_font_init();
 
 LcdDisplay::LcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_t panel,
                            gpio_num_t backlight_pin, bool backlight_output_invert,
@@ -99,7 +99,7 @@ LcdDisplay::LcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_
 
     
     InitializeBacklight(backlight_pin);
-
+    emoji_font_init();
     // draw white
     // std::vector<uint16_t> buffer(width_, 0xFFFF);
     // for (int y = 0; y < height_; y++)
@@ -270,7 +270,7 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_text_font(emotion_label_, &font_awesome_30_1, 0);
     lv_label_set_text(emotion_label_, FONT_AWESOME_AI_CHIP);
     // lv_obj_center(emotion_label_);
-    lv_obj_set_style_text_color(emotion_label_, lv_palette_main(LV_PALETTE_GREEN), 0);
+    // lv_obj_set_style_text_color(emotion_label_, lv_palette_main(LV_PALETTE_GREEN), 0);
     // lv_obj_set_style_align(emotion_label_, LV_ALIGN_CENTER, 0);
     lv_obj_set_align(emotion_label_, LV_ALIGN_TOP_MID);
     lv_obj_set_y(emotion_label_, 50);
@@ -334,6 +334,7 @@ void LcdDisplay::SetupUI() {
 
 
 }
+
 
 void LcdDisplay::SetChatMessage(const std::string &role, const std::string &content) {
     if (chat_message_label_ == nullptr) {
