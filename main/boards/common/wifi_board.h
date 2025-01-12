@@ -7,10 +7,11 @@ class WifiBoard : public Board {
 protected:
     bool wifi_config_mode_ = false;
 
+    WifiBoard();
+    void EnterWifiConfigMode();
     virtual std::string GetBoardJson() override;
 
 public:
-    virtual void Initialize() override;
     virtual void StartNetwork() override;
     virtual Http* CreateHttp() override;
     virtual WebSocket* CreateWebSocket() override;

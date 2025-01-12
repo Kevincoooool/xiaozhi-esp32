@@ -41,7 +41,7 @@ protected:
     esp_timer_handle_t update_timer_ = nullptr;
 
     friend class DisplayLockGuard;
-    virtual void Lock() = 0;
+    virtual bool Lock(int timeout_ms = 0) = 0;
     virtual void Unlock() = 0;
 
     virtual void Update();

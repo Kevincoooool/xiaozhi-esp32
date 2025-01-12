@@ -1,14 +1,28 @@
 #include "board.h"
 #include "system_info.h"
+#include "display/no_display.h"
 
 #include <esp_log.h>
 #include <esp_ota_ops.h>
 #include <esp_chip_info.h>
 
-// static const char *TAG = "Board";
+#define TAG "Board"
+
+Board::Board() {
+}
 
 bool Board::GetBatteryLevel(int &level, bool& charging) {
     return false;
+}
+
+Display* Board::GetDisplay() {
+    static NoDisplay display;
+    return &display;
+}
+
+Led* Board::GetLed() {
+    static NoLed led;
+    return &led;
 }
 
 std::string Board::GetJson() {

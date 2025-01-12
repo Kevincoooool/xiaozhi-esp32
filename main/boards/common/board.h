@@ -7,7 +7,7 @@
 #include <udp.h>
 #include <string>
 
-#include "led.h"
+#include "led/led.h"
 
 void* create_board();
 class AudioCodec;
@@ -19,7 +19,7 @@ private:
     virtual std::string GetBoardJson() = 0;
 
 protected:
-    Board() = default;
+    Board();
 
 public:
     static Board& GetInstance() {
@@ -30,12 +30,11 @@ public:
         return *instance;
     }
 
-    virtual void Initialize() = 0;
     virtual void StartNetwork() = 0;
     virtual ~Board() = default;
-    virtual Led* GetBuiltinLed() = 0;
+    virtual Led* GetLed();
     virtual AudioCodec* GetAudioCodec() = 0;
-    virtual Display* GetDisplay() = 0;
+    virtual Display* GetDisplay();
     virtual Http* CreateHttp() = 0;
     virtual WebSocket* CreateWebSocket() = 0;
     virtual Mqtt* CreateMqtt() = 0;

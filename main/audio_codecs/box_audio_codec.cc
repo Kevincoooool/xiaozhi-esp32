@@ -28,7 +28,7 @@ BoxAudioCodec::BoxAudioCodec(void* i2c_master_handle, int input_sample_rate, int
 
     // Output
     audio_codec_i2c_cfg_t i2c_cfg = {
-        .port = I2C_NUM_1,
+        .port = (i2c_port_t)1,
         .addr = es8311_addr,
         .bus_handle = i2c_master_handle,
     };

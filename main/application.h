@@ -4,32 +4,38 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/event_groups.h>
 #include <freertos/task.h>
-#include <opus.h>
+
+#include <string>
 #include <mutex>
 #include <list>
-#include <condition_variable>
 
-#include "opus_encoder.h"
-#include "opus_resampler.h"
+#include <opus_encoder.h>
+#include <opus_decoder.h>
+#include <opus_resampler.h>
 
 #include "protocol.h"
-#include "display.h"
-#include "board.h"
 #include "ota.h"
+#include "background_task.h"
 
-#ifdef CONFIG_USE_AFE_SR
+#if CONFIG_IDF_TARGET_ESP32S3
 #include "wake_word_detect.h"
 #include "audio_processor.h"
 #endif
 
+#define SCHEDULE_EVENT (1 << 0)
+#define AUDIO_INPUT_READY_EVENT (1 << 1)
+#define AUDIO_OUTPUT_READY_EVENT (1 << 2)
 
-enum ChatState {
-    kChatStateUnknown,
-    kChatStateIdle,
-    kChatStateConnecting,
-    kChatStateListening,
-    kChatStateSpeaking,
-    kChatStateUpgrading
+enum DeviceState {
+    kDeviceStateUnknown,
+    kDeviceStateStarting,
+    kDeviceStateWifiConfiguring,
+    kDeviceStateIdle,
+    kDeviceStateConnecting,
+    kDeviceStateListening,
+    kDeviceStateSpeaking,
+    kDeviceStateUpgrading,
+    kDeviceStateFatalError
 };
 
 #define OPUS_FRAME_DURATION_MS 60
@@ -45,42 +51,43 @@ public:
     Application& operator=(const Application&) = delete;
 
     void Start();
-    ChatState GetChatState() const { return chat_state_; }
+    DeviceState GetDeviceState() const { return device_state_; }
+    bool IsVoiceDetected() const { return voice_detected_; }
     void Schedule(std::function<void()> callback);
-    void SetChatState(ChatState state);
-    void Alert(const std::string&& title, const std::string&& message);
+    void SetDeviceState(DeviceState state);
+    void Alert(const std::string& title, const std::string& message);
     void AbortSpeaking(AbortReason reason);
     void ToggleChatState();
     void StartListening();
     void StopListening();
+    void UpdateIotStates();
 
 private:
     Application();
     ~Application();
 
-#ifdef CONFIG_USE_AFE_SR
+#if CONFIG_IDF_TARGET_ESP32S3
     WakeWordDetect wake_word_detect_;
     AudioProcessor audio_processor_;
 #endif
     Ota ota_;
     std::mutex mutex_;
-    std::condition_variable_any cv_;
     std::list<std::function<void()>> main_tasks_;
-    Protocol* protocol_ = nullptr;
+    std::unique_ptr<Protocol> protocol_;
     EventGroupHandle_t event_group_;
-    volatile ChatState chat_state_ = kChatStateUnknown;
+    volatile DeviceState device_state_ = kDeviceStateUnknown;
     bool keep_listening_ = false;
-    bool skip_to_end_ = false;
+    bool aborted_ = false;
+    bool voice_detected_ = false;
+    std::string last_iot_states_;
 
     // Audio encode / decode
-    TaskHandle_t audio_encode_task_ = nullptr;
-    StaticTask_t audio_encode_task_buffer_;
-    StackType_t* audio_encode_task_stack_ = nullptr;
-    std::list<std::vector<int16_t>> audio_encode_queue_;
-    std::list<std::string> audio_decode_queue_;
+    BackgroundTask background_task_;
+    std::chrono::steady_clock::time_point last_output_time_;
+    std::list<std::vector<uint8_t>> audio_decode_queue_;
 
-    OpusEncoder opus_encoder_;
-    OpusDecoder* opus_decoder_ = nullptr;
+    std::unique_ptr<OpusEncoderWrapper> opus_encoder_;
+    std::unique_ptr<OpusDecoderWrapper> opus_decoder_;
 
     int opus_decode_sample_rate_ = -1;
     OpusResampler input_resampler_;
@@ -88,10 +95,12 @@ private:
     OpusResampler output_resampler_;
 
     void MainLoop();
+    void InputAudio();
+    void OutputAudio();
+    void ResetDecoder();
     void SetDecodeSampleRate(int sample_rate);
     void CheckNewVersion();
 
-    void AudioEncodeTask();
     void PlayLocalFile(const char* data, size_t size);
 };
 

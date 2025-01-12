@@ -35,7 +35,7 @@ Ssd1306Display::Ssd1306Display(void* i2c_master_handle, int width, int height, b
             .dc_low_on_data = 0,
             .disable_control_phase = 0,
         },
-        .scl_speed_hz = 400 * 1000,
+        .scl_speed_hz = 100 * 1000,
     };
 
     ESP_ERROR_CHECK(esp_lcd_new_panel_io_i2c_v2((i2c_master_bus_t*)i2c_master_handle, &io_config, &panel_io_));
@@ -126,8 +126,8 @@ Ssd1306Display::~Ssd1306Display() {
     lvgl_port_deinit();
 }
 
-void Ssd1306Display::Lock() {
-    lvgl_port_lock(0);
+bool Ssd1306Display::Lock(int timeout_ms) {
+    return lvgl_port_lock(timeout_ms);
 }
 
 void Ssd1306Display::Unlock() {

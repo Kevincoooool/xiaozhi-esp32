@@ -1,11 +1,11 @@
 #include "wifi_board.h"
 #include "audio_codecs/box_audio_codec.h"
-#include "display/st7789_display.h"
+#include "display/lcd_display.h"
 #include "application.h"
 #include "button.h"
-#include "led.h"
 #include "config.h"
 #include "i2c_device.h"
+#include "iot/thing_manager.h"
 
 #include <esp_log.h>
 #include <esp_lcd_panel_vendor.h>
@@ -36,13 +36,13 @@ private:
     i2c_master_bus_handle_t i2c_bus_;
     i2c_master_dev_handle_t pca9557_handle_;
     Button boot_button_;
-    St7789Display* display_;
+    LcdDisplay* display_;
     Pca9557* pca9557_;
 
     void InitializeI2c() {
         // Initialize I2C peripheral
         i2c_master_bus_config_t i2c_bus_cfg = {
-            .i2c_port = I2C_NUM_1,
+            .i2c_port = (i2c_port_t)1,
             .sda_io_num = AUDIO_CODEC_I2C_SDA_PIN,
             .scl_io_num = AUDIO_CODEC_I2C_SCL_PIN,
             .clk_source = I2C_CLK_SRC_DEFAULT,
@@ -73,10 +73,15 @@ private:
     void InitializeButtons() {
         boot_button_.OnClick([this]() {
             auto& app = Application::GetInstance();
-            if (app.GetChatState() == kChatStateUnknown && !WifiStation::GetInstance().IsConnected()) {
+            if (app.GetDeviceState() == kDeviceStateStarting && !WifiStation::GetInstance().IsConnected()) {
                 ResetWifiConfiguration();
             }
-            app.ToggleChatState();
+        });
+        boot_button_.OnPressDown([this]() {
+            Application::GetInstance().StartListening();
+        });
+        boot_button_.OnPressUp([this]() {
+            Application::GetInstance().StopListening();
         });
     }
 
@@ -110,26 +115,23 @@ private:
         esp_lcd_panel_invert_color(panel, true);
         esp_lcd_panel_swap_xy(panel, DISPLAY_SWAP_XY);
         esp_lcd_panel_mirror(panel, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y);
-        display_ = new St7789Display(panel_io, panel, DISPLAY_BACKLIGHT_PIN, DISPLAY_BACKLIGHT_OUTPUT_INVERT,
-                                    DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY);
+        display_ = new LcdDisplay(panel_io, panel, DISPLAY_BACKLIGHT_PIN, DISPLAY_BACKLIGHT_OUTPUT_INVERT,
+                                    DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY);
+    }
+
+    // 物联网初始化，添加对 AI 可见设备
+    void InitializeIot() {
+        auto& thing_manager = iot::ThingManager::GetInstance();
+        thing_manager.AddThing(iot::CreateThing("Speaker"));
     }
 
 public:
     LichuangDevBoard() : boot_button_(BOOT_BUTTON_GPIO) {
-    }
-
-    virtual void Initialize() override {
-        ESP_LOGI(TAG, "Initializing LichuangDevBoard");
         InitializeI2c();
         InitializeSpi();
         InitializeSt7789Display();
         InitializeButtons();
-        WifiBoard::Initialize();
-    }
-
-    virtual Led* GetBuiltinLed() override {
-        static Led led(GPIO_NUM_NC);
-        return &led;
+        InitializeIot();
     }
 
     virtual AudioCodec* GetAudioCodec() override {
