@@ -84,7 +84,7 @@ void LcdDisplay::LvglTask() {
         vTaskDelay(pdMS_TO_TICKS(task_delay_ms));
     }
 }
-
+extern "C" void emoji_font_init();
 
 LcdDisplay::LcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_t panel,
                            gpio_num_t backlight_pin, bool backlight_output_invert,
@@ -99,7 +99,7 @@ LcdDisplay::LcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_
 
     
     InitializeBacklight(backlight_pin);
-
+    emoji_font_init();
     // draw white
     // std::vector<uint16_t> buffer(width_, 0xFFFF);
     // for (int y = 0; y < height_; y++)
@@ -116,12 +116,12 @@ LcdDisplay::LcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_
     // alloc draw buffers used by LVGL
     static lv_disp_draw_buf_t disp_buf; // contains internal graphic buffer(s) called draw buffer(s)
     // it's recommended to choose the size of the draw buffer(s) to be at least 1/10 screen sized
-    lv_color_t *buf1 = (lv_color_t *)heap_caps_malloc(width_ * 10 * sizeof(lv_color_t), MALLOC_CAP_DMA);
+    lv_color_t *buf1 = (lv_color_t *)heap_caps_malloc(width_ * 20 * sizeof(lv_color_t), MALLOC_CAP_DMA);
     assert(buf1);
-    lv_color_t *buf2 = (lv_color_t *)heap_caps_malloc(width_ * 10 * sizeof(lv_color_t), MALLOC_CAP_DMA);
+    lv_color_t *buf2 = (lv_color_t *)heap_caps_malloc(width_ * 20 * sizeof(lv_color_t), MALLOC_CAP_DMA);
     assert(buf2);
     // initialize LVGL draw buffers
-    lv_disp_draw_buf_init(&disp_buf, buf1, buf2, width_ * 10);
+    lv_disp_draw_buf_init(&disp_buf, buf1, buf2, width_ * 20);
 
     ESP_LOGI(TAG, "Register display driver to LVGL");
     lv_disp_drv_init(&disp_drv);
@@ -222,22 +222,22 @@ void LcdDisplay::InitializeBacklight(gpio_num_t backlight_pin) {
     ESP_ERROR_CHECK(ledc_channel_config(&backlight_channel));
 }
 
-void LcdDisplay::SetBacklight(uint8_t brightness) {
-    if (backlight_pin_ == GPIO_NUM_NC) {
-        return;
-    }
+// void LcdDisplay::SetBacklight(uint8_t brightness) {
+//     if (backlight_pin_ == GPIO_NUM_NC) {
+//         return;
+//     }
 
-    if (brightness > 100)
-    {
-        brightness = 100;
-    }
+//     if (brightness > 100)
+//     {
+//         brightness = 100;
+//     }
 
-    ESP_LOGI(TAG, "Setting LCD backlight: %d%%", brightness);
-    // LEDC resolution set to 10bits, thus: 100% = 1023
-    uint32_t duty_cycle = (1023 * brightness) / 100;
-    ESP_ERROR_CHECK(ledc_set_duty(LEDC_LOW_SPEED_MODE, LCD_LEDC_CH, duty_cycle));
-    ESP_ERROR_CHECK(ledc_update_duty(LEDC_LOW_SPEED_MODE, LCD_LEDC_CH));
-}
+//     ESP_LOGI(TAG, "Setting LCD backlight: %d%%", brightness);
+//     // LEDC resolution set to 10bits, thus: 100% = 1023
+//     uint32_t duty_cycle = (1023 * brightness) / 100;
+//     ESP_ERROR_CHECK(ledc_set_duty(LEDC_LOW_SPEED_MODE, LCD_LEDC_CH, duty_cycle));
+//     ESP_ERROR_CHECK(ledc_update_duty(LEDC_LOW_SPEED_MODE, LCD_LEDC_CH));
+// }
 
 bool LcdDisplay::Lock(int timeout_ms) {
     // Convert timeout in milliseconds to FreeRTOS ticks
@@ -257,16 +257,8 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_text_font(screen, &font_puhui_14_1, 0);
     lv_obj_set_style_text_color(screen, lv_color_black(), 0);
 
-    /* Container */
-    // container_ = lv_obj_create(lv_scr_act());
-    // lv_obj_set_size(container_, 240, 280);
-    // lv_obj_set_flex_flow(container_, LV_FLEX_FLOW_COLUMN);
-    // lv_obj_set_style_pad_all(container_, 0, 0);
-    // lv_obj_set_style_border_width(container_, 0, 0);
-    // lv_obj_set_style_pad_row(container_, 0, 0);
     lv_obj_set_style_bg_color(lv_scr_act(), lv_color_hex(0x000000), 0);
 
-    /* Status bar */
     status_bar_ = lv_obj_create(lv_scr_act());
     lv_obj_set_size(status_bar_, LV_HOR_RES - 40, 40);
     lv_obj_set_style_radius(status_bar_, 0, 0);
@@ -274,20 +266,26 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_align(status_bar_, LV_ALIGN_TOP_MID);
     lv_obj_set_style_bg_color(status_bar_, lv_color_hex(0x000000), 0);
 
-    /* Content */
-    // content_ = lv_obj_create(lv_scr_act());
-    // lv_obj_set_scrollbar_mode(content_, LV_SCROLLBAR_MODE_OFF);
-    // lv_obj_set_style_radius(content_, 0, 0);
-    // lv_obj_set_width(content_, LV_HOR_RES);
-    // lv_obj_set_flex_grow(content_, 1);
-
     emotion_label_ = lv_label_create(lv_scr_act());
     lv_obj_set_style_text_font(emotion_label_, &font_awesome_30_1, 0);
     lv_label_set_text(emotion_label_, FONT_AWESOME_AI_CHIP);
     // lv_obj_center(emotion_label_);
-    lv_obj_set_style_text_color(emotion_label_, lv_palette_main(LV_PALETTE_GREEN), 0);
-    lv_obj_set_style_align(emotion_label_, LV_ALIGN_CENTER, 0);
-    lv_obj_set_y(emotion_label_, -50);
+    // lv_obj_set_style_text_color(emotion_label_, lv_palette_main(LV_PALETTE_GREEN), 0);
+    // lv_obj_set_style_align(emotion_label_, LV_ALIGN_CENTER, 0);
+    lv_obj_set_align(emotion_label_, LV_ALIGN_TOP_MID);
+    lv_obj_set_y(emotion_label_, 50);
+
+    chat_message_label_ = lv_label_create(lv_scr_act());
+    lv_label_set_text(chat_message_label_, "");
+    lv_obj_set_width(chat_message_label_, LV_HOR_RES * 0.8); // 限制宽度为屏幕宽度的 80%
+    lv_label_set_long_mode(chat_message_label_, LV_LABEL_LONG_WRAP); // 设置为自动换行模式
+    lv_obj_set_style_text_align(chat_message_label_, LV_TEXT_ALIGN_CENTER, 0); // 设置文本居中对齐
+    lv_obj_set_style_text_font(chat_message_label_, &font_dingding, 0);
+    lv_label_set_text(chat_message_label_, "XiaoZhi AI\n酷世DIY\nKorvo 2V3开发板");
+    lv_obj_set_style_text_color(chat_message_label_, lv_palette_main(LV_PALETTE_GREEN), 0);
+    lv_obj_set_align(chat_message_label_, LV_ALIGN_BOTTOM_MID);
+    lv_obj_set_y(chat_message_label_, -50);
+
     /* Status bar */
     lv_obj_set_flex_flow(status_bar_, LV_FLEX_FLOW_ROW_WRAP);
     lv_obj_set_style_pad_all(status_bar_, 0, 0);
@@ -309,7 +307,7 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_flex_grow(notification_label_, 1);
     lv_obj_set_style_text_align(notification_label_, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_text(notification_label_, "通知");
-    lv_label_set_long_mode(notification_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    // lv_label_set_long_mode(notification_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
 
     lv_obj_add_flag(notification_label_, LV_OBJ_FLAG_HIDDEN);
     lv_obj_set_style_text_font(notification_label_, &font_dingding, 0);
@@ -323,7 +321,7 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_text_align(status_label_, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_font(status_label_, &font_dingding, 0);
     lv_obj_set_style_text_color(status_label_, lv_palette_main(LV_PALETTE_GREEN), 0);
-    lv_label_set_long_mode(status_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    // lv_label_set_long_mode(status_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
 
     battery_label_ = lv_label_create(status_bar_);
     lv_label_set_text(battery_label_, "");
@@ -332,16 +330,16 @@ void LcdDisplay::SetupUI() {
     // lv_obj_set_y(battery_label_, 30);
     lv_obj_set_align(battery_label_, LV_ALIGN_TOP_RIGHT);
 
-    reply_label_ = lv_label_create(lv_scr_act());
-    lv_obj_set_width(reply_label_, LV_HOR_RES);
-    lv_obj_set_height(reply_label_, 150);
-    lv_obj_set_flex_grow(reply_label_, 2);
-    // lv_label_set_long_mode(reply_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
-    lv_label_set_text(reply_label_, "XiaoZhi AI\nESP32S3 Korvo 2V3\n开发板\n酷世DIY");
-    lv_obj_set_style_text_align(reply_label_, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_style_text_font(reply_label_, &font_dingding, 0);
-    lv_obj_set_style_text_color(reply_label_, lv_palette_main(LV_PALETTE_GREEN), 0);
-    lv_obj_set_align(reply_label_, LV_ALIGN_BOTTOM_MID);
+    // reply_label_ = lv_label_create(lv_scr_act());
+    // lv_obj_set_width(reply_label_, LV_HOR_RES);
+    // lv_obj_set_height(reply_label_, 150);
+    // lv_obj_set_flex_grow(reply_label_, 2);
+    // // lv_label_set_long_mode(reply_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    // lv_label_set_text(reply_label_, "XiaoZhi AI\nESP32S3 Korvo 2V3\n开发板\n酷世DIY");
+    // lv_obj_set_style_text_align(reply_label_, LV_TEXT_ALIGN_CENTER, 0);
+    // lv_obj_set_style_text_font(reply_label_, &font_dingding, 0);
+    // lv_obj_set_style_text_color(reply_label_, lv_palette_main(LV_PALETTE_GREEN), 0);
+    // lv_obj_set_align(reply_label_, LV_ALIGN_BOTTOM_MID);
     // lv_obj_set_y(reply_label_, -50);
 
     mute_label_ = lv_label_create(status_bar_);
@@ -350,6 +348,7 @@ void LcdDisplay::SetupUI() {
 
 
 }
+
 
 void LcdDisplay::SetChatMessage(const std::string &role, const std::string &content) {
     if (chat_message_label_ == nullptr) {

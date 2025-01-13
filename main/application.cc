@@ -328,6 +328,8 @@ void Application::Start() {
     protocol_->OnAudioChannelClosed([this, &board]() {
         board.SetPowerSaveMode(true);
         Schedule([this]() {
+            auto display = Board::GetInstance().GetDisplay();
+            display->SetChatMessage("", "");
             SetDeviceState(kDeviceStateIdle);
         });
     });
@@ -360,7 +362,6 @@ void Application::Start() {
                 if (text != NULL) {
                     ESP_LOGI(TAG, "<< %s", text->valuestring);
                     display->SetChatMessage("assistant", text->valuestring);
-                    display->SetReply(text->valuestring);
                 }
             }
         } else if (strcmp(type->valuestring, "stt") == 0) {
@@ -553,7 +554,6 @@ void Application::SetDeviceState(DeviceState state) {
         case kDeviceStateIdle:
             display->SetStatus("待命");
             display->SetEmotion("neutral");
-            display->SetChatMessage("", "");
 #ifdef CONFIG_IDF_TARGET_ESP32S3
             audio_processor_.Stop();
 #endif

@@ -8,6 +8,7 @@
 #include "application.h"
 #include "font_awesome_symbols.h"
 #include "audio_codec.h"
+#include <driver/ledc.h>
 
 #define TAG "Display"
 
@@ -63,13 +64,25 @@ void Display::SetStatus(const std::string &status) {
     }
     DisplayLockGuard lock(this);
     lv_label_set_text(status_label_, status.c_str());
+    lv_obj_clear_flag(status_label_, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(notification_label_, LV_OBJ_FLAG_HIDDEN);
 }
-void Display::SetReply(const std::string &text) {
-    if (reply_label_ == nullptr) {
+
+void Display::SetBacklight(uint8_t brightness) {
+    if (backlight_pin_ == GPIO_NUM_NC) {
         return;
     }
-    DisplayLockGuard lock(this);
-    lv_label_set_text(reply_label_, text.c_str());
+
+    if (brightness > 100)
+    {
+        brightness = 100;
+    }
+
+    ESP_LOGI(TAG, "Setting LCD backlight: %d%%", brightness);
+    // LEDC resolution set to 10bits, thus: 100% = 1023
+    uint32_t duty_cycle = (1023 * brightness) / 100;
+    ESP_ERROR_CHECK(ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty_cycle));
+    ESP_ERROR_CHECK(ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0));
 }
 
 void Display::ShowNotification(const std::string &notification, int duration_ms) {
@@ -138,7 +151,7 @@ void Display::Update() {
     }
 }
 
-
+extern lv_font_t *imgfont;
 void Display::SetEmotion(const std::string &emotion) {
     if (emotion_label_ == nullptr) {
         return;
@@ -150,27 +163,27 @@ void Display::SetEmotion(const std::string &emotion) {
     };
 
     static const std::vector<Emotion> emotions = {
-        {FONT_AWESOME_EMOJI_NEUTRAL, "neutral"},
-        {FONT_AWESOME_EMOJI_HAPPY, "happy"},
-        {FONT_AWESOME_EMOJI_LAUGHING, "laughing"},
-        {FONT_AWESOME_EMOJI_FUNNY, "funny"},
-        {FONT_AWESOME_EMOJI_SAD, "sad"},
-        {FONT_AWESOME_EMOJI_ANGRY, "angry"},
-        {FONT_AWESOME_EMOJI_CRYING, "crying"},
-        {FONT_AWESOME_EMOJI_LOVING, "loving"},
-        {FONT_AWESOME_EMOJI_EMBARRASSED, "embarrassed"},
-        {FONT_AWESOME_EMOJI_SURPRISED, "surprised"},
-        {FONT_AWESOME_EMOJI_SHOCKED, "shocked"},
-        {FONT_AWESOME_EMOJI_THINKING, "thinking"},
-        {FONT_AWESOME_EMOJI_WINKING, "winking"},
-        {FONT_AWESOME_EMOJI_COOL, "cool"},
-        {FONT_AWESOME_EMOJI_RELAXED, "relaxed"},
-        {FONT_AWESOME_EMOJI_DELICIOUS, "delicious"},
-        {FONT_AWESOME_EMOJI_KISSY, "kissy"},
-        {FONT_AWESOME_EMOJI_CONFIDENT, "confident"},
-        {FONT_AWESOME_EMOJI_SLEEPY, "sleepy"},
-        {FONT_AWESOME_EMOJI_SILLY, "silly"},
-        {FONT_AWESOME_EMOJI_CONFUSED, "confused"}
+        {"😶", "neutral"},
+        {"😊", "happy"},
+        {"😄", "laughing"},
+        {"😆", "funny"},
+        {"😢", "sad"},
+        {"😠", "angry"},
+        {"😭", "crying"},
+        {"😍", "loving"},
+        {"😳", "embarrassed"},
+        {"😮", "surprised"},
+        {"😲", "shocked"},
+        {"🤔", "thinking"},
+        {"😉", "winking"},
+        {"😏", "cool"},
+        {"😌", "relaxed"},
+        {"😋", "delicious"},
+        {"😘", "kissy"},
+        {"😌", "confident"},
+        {"😪", "sleepy"},
+        {"😨", "silly"},
+        {"😲", "confused"}
     };
 
     DisplayLockGuard lock(this);
@@ -178,14 +191,65 @@ void Display::SetEmotion(const std::string &emotion) {
     // 查找匹配的表情
     auto it = std::find_if(emotions.begin(), emotions.end(),
         [&emotion](const Emotion& e) { return e.text == emotion; });
-    
+
+ 
+    lv_obj_set_style_text_font(emotion_label_, imgfont, 0);
+
     // 如果找到匹配的表情就显示对应图标，否则显示默认的neutral表情
     if (it != emotions.end()) {
         lv_label_set_text(emotion_label_, it->icon);
     } else {
-        lv_label_set_text(emotion_label_, FONT_AWESOME_EMOJI_NEUTRAL);
+        lv_label_set_text(emotion_label_, "😶");
     }
 }
+
+// void Display::SetEmotion(const std::string &emotion) {
+//     if (emotion_label_ == nullptr) {
+//         return;
+//     }
+
+//     struct Emotion {
+//         const char* icon;
+//         const char* text;
+//     };
+
+//     static const std::vector<Emotion> emotions = {
+//         {FONT_AWESOME_EMOJI_NEUTRAL, "neutral"},
+//         {FONT_AWESOME_EMOJI_HAPPY, "happy"},
+//         {FONT_AWESOME_EMOJI_LAUGHING, "laughing"},
+//         {FONT_AWESOME_EMOJI_FUNNY, "funny"},
+//         {FONT_AWESOME_EMOJI_SAD, "sad"},
+//         {FONT_AWESOME_EMOJI_ANGRY, "angry"},
+//         {FONT_AWESOME_EMOJI_CRYING, "crying"},
+//         {FONT_AWESOME_EMOJI_LOVING, "loving"},
+//         {FONT_AWESOME_EMOJI_EMBARRASSED, "embarrassed"},
+//         {FONT_AWESOME_EMOJI_SURPRISED, "surprised"},
+//         {FONT_AWESOME_EMOJI_SHOCKED, "shocked"},
+//         {FONT_AWESOME_EMOJI_THINKING, "thinking"},
+//         {FONT_AWESOME_EMOJI_WINKING, "winking"},
+//         {FONT_AWESOME_EMOJI_COOL, "cool"},
+//         {FONT_AWESOME_EMOJI_RELAXED, "relaxed"},
+//         {FONT_AWESOME_EMOJI_DELICIOUS, "delicious"},
+//         {FONT_AWESOME_EMOJI_KISSY, "kissy"},
+//         {FONT_AWESOME_EMOJI_CONFIDENT, "confident"},
+//         {FONT_AWESOME_EMOJI_SLEEPY, "sleepy"},
+//         {FONT_AWESOME_EMOJI_SILLY, "silly"},
+//         {FONT_AWESOME_EMOJI_CONFUSED, "confused"}
+//     };
+
+//     DisplayLockGuard lock(this);
+    
+//     // 查找匹配的表情
+//     auto it = std::find_if(emotions.begin(), emotions.end(),
+//         [&emotion](const Emotion& e) { return e.text == emotion; });
+    
+//     // 如果找到匹配的表情就显示对应图标，否则显示默认的neutral表情
+//     if (it != emotions.end()) {
+//         lv_label_set_text(emotion_label_, it->icon);
+//     } else {
+//         lv_label_set_text(emotion_label_, FONT_AWESOME_EMOJI_NEUTRAL);
+//     }
+// }
 
 void Display::SetIcon(const char* icon) {
     if (emotion_label_ == nullptr) {
