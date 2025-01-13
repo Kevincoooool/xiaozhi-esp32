@@ -31,7 +31,7 @@ protected:
     lv_obj_t* chat_message_label_ = nullptr;
 
     void InitializeBacklight(gpio_num_t backlight_pin);
-    void SetBacklight(uint8_t brightness);
+    // void SetBacklight(uint8_t brightness);
     void LvglTask();
 
     virtual void SetupUI();
@@ -43,7 +43,7 @@ public:
                   gpio_num_t backlight_pin, bool backlight_output_invert,
                   int width, int height,  int offset_x, int offset_y, bool mirror_x, bool mirror_y, bool swap_xy);
     ~LcdDisplay();
-
+    // void SetBacklight(uint8_t brightness);
     void SetChatMessage(const std::string &role, const std::string &content) override;
 };
 
