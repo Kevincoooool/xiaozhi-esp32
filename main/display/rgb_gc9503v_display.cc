@@ -18,7 +18,7 @@
 #define RGB_GC9503V_LVGL_TICK_PERIOD_MS 2
 #define RGB_GC9503V_LVGL_TASK_MAX_DELAY_MS 20
 #define RGB_GC9503V_LVGL_TASK_MIN_DELAY_MS 1
-#define RGB_GC9503V_LVGL_TASK_STACK_SIZE (4 * 1024)
+#define RGB_GC9503V_LVGL_TASK_STACK_SIZE (10 * 1024)
 #define RGB_GC9503V_LVGL_TASK_PRIORITY 10
 #define EXAMPLE_LCD_PIXEL_CLOCK_HZ (16 * 1000 * 1000)
 #define EXAMPLE_LCD_BK_LIGHT_ON_LEVEL 1
@@ -168,6 +168,7 @@ void RGB_GC9503V_Display::LvglTask() {
         vTaskDelay(pdMS_TO_TICKS(task_delay_ms));
     }
 }
+extern "C" void emoji_font_init();
 
 
 RGB_GC9503V_Display::RGB_GC9503V_Display(gpio_num_t backlight_pin, bool backlight_output_invert,
@@ -182,7 +183,7 @@ RGB_GC9503V_Display::RGB_GC9503V_Display(gpio_num_t backlight_pin, bool backligh
     static lv_disp_draw_buf_t disp_buf; // contains internal graphic buffer(s) called draw buffer(s)
 
     InitializeBacklight(backlight_pin);
-
+    emoji_font_init();
 
     ESP_LOGI(TAG, "Install 3-wire SPI panel IO");
     spi_line_config_t line_config = {
@@ -384,23 +385,23 @@ void RGB_GC9503V_Display::InitializeBacklight(gpio_num_t backlight_pin) {
     ESP_ERROR_CHECK(gpio_config(&bk_gpio_config));
 }
 
-void RGB_GC9503V_Display::SetBacklight(uint8_t brightness) {
-    if (backlight_pin_ == GPIO_NUM_NC) {
-        return;
-    }
+// void RGB_GC9503V_Display::SetBacklight(uint8_t brightness) {
+//     if (backlight_pin_ == GPIO_NUM_NC) {
+//         return;
+//     }
 
-    if (brightness > 100) {
-        brightness = 100;
-    }
+//     if (brightness > 100) {
+//         brightness = 100;
+//     }
 
-    // ESP_LOGI(TAG, "Setting LCD backlight: %d%%", brightness);
-    // // LEDC resolution set to 10bits, thus: 100% = 1023
-    // uint32_t duty_cycle = (1023 * brightness) / 100;
-    // ESP_ERROR_CHECK(ledc_set_duty(LEDC_LOW_SPEED_MODE, LCD_LEDC_CH, duty_cycle));
-    // ESP_ERROR_CHECK(ledc_update_duty(LEDC_LOW_SPEED_MODE, LCD_LEDC_CH));
-    gpio_set_level(EXAMPLE_PIN_NUM_BK_LIGHT, EXAMPLE_LCD_BK_LIGHT_ON_LEVEL);
+//     // ESP_LOGI(TAG, "Setting LCD backlight: %d%%", brightness);
+//     // // LEDC resolution set to 10bits, thus: 100% = 1023
+//     // uint32_t duty_cycle = (1023 * brightness) / 100;
+//     // ESP_ERROR_CHECK(ledc_set_duty(LEDC_LOW_SPEED_MODE, LCD_LEDC_CH, duty_cycle));
+//     // ESP_ERROR_CHECK(ledc_update_duty(LEDC_LOW_SPEED_MODE, LCD_LEDC_CH));
+//     gpio_set_level(EXAMPLE_PIN_NUM_BK_LIGHT, EXAMPLE_LCD_BK_LIGHT_ON_LEVEL);
 
-}
+// }
 
 bool RGB_GC9503V_Display::Lock(int timeout_ms) {
     // Convert timeout in milliseconds to FreeRTOS ticks
@@ -495,4 +496,10 @@ void RGB_GC9503V_Display::SetupUI() {
     battery_label_ = lv_label_create(status_bar_);
     lv_label_set_text(battery_label_, "");
     lv_obj_set_style_text_font(battery_label_, &font_awesome_14_1, 0);
+}
+void RGB_GC9503V_Display::SetChatMessage(const std::string &role, const std::string &content) {
+    if (reply_label_ == nullptr) {
+        return;
+    }
+    lv_label_set_text(reply_label_, content.c_str());
 }

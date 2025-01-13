@@ -17,7 +17,7 @@ class Yuying_313lcd : public WifiBoard {
 private:
     i2c_master_bus_handle_t codec_i2c_bus_;
     Button boot_button_;
-        RGB_GC9503V_Display* display_;
+    RGB_GC9503V_Display* display_;
 
     void InitializeRGB_GC9503V_Display() {
        

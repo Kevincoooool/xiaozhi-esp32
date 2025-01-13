@@ -1,5 +1,5 @@
-#ifndef ST7789_DISPLAY_H
-#define ST7789_DISPLAY_H
+#ifndef GC9503_DISPLAY_H
+#define GC9503_DISPLAY_H
 
 #include "display.h"
 
@@ -11,7 +11,7 @@
 #include <esp_timer.h>
 
 class RGB_GC9503V_Display : public Display {
-private:
+protected:
     esp_lcd_panel_io_handle_t panel_io_ = nullptr;
     esp_lcd_panel_handle_t panel_ = nullptr;
     gpio_num_t backlight_pin_ = GPIO_NUM_4;
@@ -28,19 +28,22 @@ private:
     lv_obj_t* content_ = nullptr;
     lv_obj_t* container_ = nullptr;
     lv_obj_t* side_bar_ = nullptr;
+    lv_obj_t* chat_message_label_ = nullptr;
 
     void InitializeBacklight(gpio_num_t backlight_pin);
-    void SetBacklight(uint8_t brightness);
-    void SetupUI();
+    // void SetBacklight(uint8_t brightness);
     void LvglTask();
 
+    virtual void SetupUI();
     virtual bool Lock(int timeout_ms = 0) override;
     virtual void Unlock() override;
 
 public:
-    RGB_GC9503V_Display( gpio_num_t backlight_pin, bool backlight_output_invert,
+    RGB_GC9503V_Display(gpio_num_t backlight_pin, bool backlight_output_invert,
                   int width, int height,  int offset_x, int offset_y, bool mirror_x, bool mirror_y, bool swap_xy);
     ~RGB_GC9503V_Display();
+    // void SetBacklight(uint8_t brightness);
+    void SetChatMessage(const std::string &role, const std::string &content) override;
 };
 
-#endif // ST7789_DISPLAY_H
+#endif // LCD_DISPLAY_H
