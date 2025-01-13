@@ -485,7 +485,7 @@ void RGB_GC9503V_Display::SetupUI() {
     // lv_obj_set_height(reply_label_, 500);
     // lv_obj_set_flex_grow(reply_label_, 2);
     // lv_label_set_long_mode(reply_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
-    lv_label_set_text(reply_label_, "XiaoZhi AI\n 鱼鹰科技\nKevincoooool\n3.13 RGB LCD开发板");
+    lv_label_set_text(reply_label_, "XiaoZhi AI");
     lv_obj_set_style_text_align(reply_label_, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_font(reply_label_, &font_dingding, 0);
     lv_obj_set_style_text_color(reply_label_, lv_palette_main(LV_PALETTE_GREEN), 0);

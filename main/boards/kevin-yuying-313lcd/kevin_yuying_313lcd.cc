@@ -3,7 +3,7 @@
 #include "display/rgb_gc9503v_display.h"
 #include "application.h"
 #include "button.h"
-#include "led.h"
+
 #include "config.h"
 #include "iot/thing_manager.h"
 
@@ -44,7 +44,7 @@ private:
     void InitializeButtons() {
         boot_button_.OnClick([this]() {
             auto& app = Application::GetInstance();
-            if (app.GetChatState() == kChatStateUnknown && !WifiStation::GetInstance().IsConnected()) {
+            if (app.GetDeviceState() == kDeviceStateStarting && !WifiStation::GetInstance().IsConnected()) {
                 ResetWifiConfiguration();
             }
         });
@@ -70,10 +70,10 @@ public:
         InitializeRGB_GC9503V_Display();
     }
 
-    virtual Led* GetBuiltinLed() override {
-        static Led led(BUILTIN_LED_GPIO);
-        return &led;
-    }
+    // virtual Led* GetBuiltinLed() override {
+    //     static Led led(BUILTIN_LED_GPIO);
+    //     return &led;
+    // }
 
     virtual AudioCodec* GetAudioCodec() override {
         static Es8311AudioCodec audio_codec(codec_i2c_bus_, I2C_NUM_0, AUDIO_INPUT_SAMPLE_RATE, AUDIO_OUTPUT_SAMPLE_RATE,
