@@ -15,7 +15,7 @@ NoAudioCodec::~NoAudioCodec() {
 }
 
 
-NoAudioCodec::NoAudioCodec(int input_sample_rate, int output_sample_rate, gpio_num_t bclk, gpio_num_t ws, gpio_num_t dout, gpio_num_t din) {
+NoAudioCodecDuplex::NoAudioCodecDuplex(int input_sample_rate, int output_sample_rate, gpio_num_t bclk, gpio_num_t ws, gpio_num_t dout, gpio_num_t din) {
     duplex_ = true;
     input_sample_rate_ = input_sample_rate;
     output_sample_rate_ = output_sample_rate;
@@ -23,8 +23,8 @@ NoAudioCodec::NoAudioCodec(int input_sample_rate, int output_sample_rate, gpio_n
     i2s_chan_config_t chan_cfg = {
         .id = I2S_NUM_0,
         .role = I2S_ROLE_MASTER,
-        .dma_desc_num = 2,
-        .dma_frame_num = 240 * 3,
+        .dma_desc_num = 6,
+        .dma_frame_num = 240,
         .auto_clear_after_cb = false,
         .auto_clear_before_cb = false,
         .intr_priority = 0,
@@ -68,7 +68,7 @@ NoAudioCodec::NoAudioCodec(int input_sample_rate, int output_sample_rate, gpio_n
     ESP_LOGI(TAG, "Duplex channels created");
 }
 
-NoAudioCodec::NoAudioCodec(int input_sample_rate, int output_sample_rate, gpio_num_t spk_bclk, gpio_num_t spk_ws, gpio_num_t spk_dout, gpio_num_t mic_sck, gpio_num_t mic_ws, gpio_num_t mic_din) {
+NoAudioCodecSimplex::NoAudioCodecSimplex(int input_sample_rate, int output_sample_rate, gpio_num_t spk_bclk, gpio_num_t spk_ws, gpio_num_t spk_dout, gpio_num_t mic_sck, gpio_num_t mic_ws, gpio_num_t mic_din) {
     duplex_ = false;
     input_sample_rate_ = input_sample_rate;
     output_sample_rate_ = output_sample_rate;
@@ -131,7 +131,7 @@ NoAudioCodec::NoAudioCodec(int input_sample_rate, int output_sample_rate, gpio_n
     ESP_LOGI(TAG, "Simplex channels created");
 }
 
-NoAudioCodec::NoAudioCodec(int input_sample_rate, int output_sample_rate, gpio_num_t spk_bclk, gpio_num_t spk_ws, gpio_num_t spk_dout, gpio_num_t mic_sck, gpio_num_t mic_din) {
+NoAudioCodecSimplexPdm::NoAudioCodecSimplexPdm(int input_sample_rate, int output_sample_rate, gpio_num_t spk_bclk, gpio_num_t spk_ws, gpio_num_t spk_dout, gpio_num_t mic_sck, gpio_num_t mic_din) {
     duplex_ = false;
     input_sample_rate_ = input_sample_rate;
     output_sample_rate_ = output_sample_rate;

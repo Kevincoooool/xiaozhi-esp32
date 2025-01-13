@@ -1,14 +1,16 @@
-#include "box_audio_codec.h"
+#include "cores3_audio_codec.h"
 
 #include <esp_log.h>
 #include <driver/i2c.h>
+#include <driver/i2c_master.h>
 #include <driver/i2s_tdm.h>
 
-static const char TAG[] = "BoxAudioCodec";
 
-BoxAudioCodec::BoxAudioCodec(void* i2c_master_handle, int input_sample_rate, int output_sample_rate,
+static const char TAG[] = "CoreS3AudioCodec";
+
+CoreS3AudioCodec::CoreS3AudioCodec(void* i2c_master_handle, int input_sample_rate, int output_sample_rate,
     gpio_num_t mclk, gpio_num_t bclk, gpio_num_t ws, gpio_num_t dout, gpio_num_t din,
-    gpio_num_t pa_pin, uint8_t es8311_addr, uint8_t es7210_addr, bool input_reference) {
+    uint8_t aw88298_addr, uint8_t es7210_addr, bool input_reference) {
     duplex_ = true; // 是否双工
     input_reference_ = input_reference; // 是否使用参考输入，实现回声消除
     input_channels_ = input_reference_ ? 2 : 1; // 输入通道数
@@ -26,10 +28,10 @@ BoxAudioCodec::BoxAudioCodec(void* i2c_master_handle, int input_sample_rate, int
     data_if_ = audio_codec_new_i2s_data(&i2s_cfg);
     assert(data_if_ != NULL);
 
-    // Output
+    // Audio Output(Speaker)
     audio_codec_i2c_cfg_t i2c_cfg = {
         .port = (i2c_port_t)1,
-        .addr = es8311_addr,
+        .addr = aw88298_addr,
         .bus_handle = i2c_master_handle,
     };
     out_ctrl_if_ = audio_codec_new_i2c_ctrl(&i2c_cfg);
@@ -38,15 +40,14 @@ BoxAudioCodec::BoxAudioCodec(void* i2c_master_handle, int input_sample_rate, int
     gpio_if_ = audio_codec_new_gpio();
     assert(gpio_if_ != NULL);
 
-    es8311_codec_cfg_t es8311_cfg = {};
-    es8311_cfg.ctrl_if = out_ctrl_if_;
-    es8311_cfg.gpio_if = gpio_if_;
-    es8311_cfg.codec_mode = ESP_CODEC_DEV_WORK_MODE_DAC;
-    es8311_cfg.pa_pin = pa_pin;
-    es8311_cfg.use_mclk = true;
-    es8311_cfg.hw_gain.pa_voltage = 5.0;
-    es8311_cfg.hw_gain.codec_dac_voltage = 3.3;
-    out_codec_if_ = es8311_codec_new(&es8311_cfg);
+    aw88298_codec_cfg_t aw88298_cfg = {};
+    aw88298_cfg.ctrl_if = out_ctrl_if_;
+    aw88298_cfg.gpio_if = gpio_if_;
+    aw88298_cfg.reset_pin = GPIO_NUM_NC;
+    aw88298_cfg.hw_gain.pa_voltage = 5.0;
+    aw88298_cfg.hw_gain.codec_dac_voltage = 3.3;
+    aw88298_cfg.hw_gain.pa_gain = 1;
+    out_codec_if_ = aw88298_codec_new(&aw88298_cfg);
     assert(out_codec_if_ != NULL);
 
     esp_codec_dev_cfg_t dev_cfg = {
@@ -57,14 +58,14 @@ BoxAudioCodec::BoxAudioCodec(void* i2c_master_handle, int input_sample_rate, int
     output_dev_ = esp_codec_dev_new(&dev_cfg);
     assert(output_dev_ != NULL);
 
-    // Input
+    // Audio Input(Microphone)
     i2c_cfg.addr = es7210_addr;
     in_ctrl_if_ = audio_codec_new_i2c_ctrl(&i2c_cfg);
     assert(in_ctrl_if_ != NULL);
 
     es7210_codec_cfg_t es7210_cfg = {};
     es7210_cfg.ctrl_if = in_ctrl_if_;
-    es7210_cfg.mic_selected = ES7120_SEL_MIC1 | ES7120_SEL_MIC2 | ES7120_SEL_MIC3 | ES7120_SEL_MIC4;
+    es7210_cfg.mic_selected = ES7120_SEL_MIC1 | ES7120_SEL_MIC2 | ES7120_SEL_MIC3;
     in_codec_if_ = es7210_codec_new(&es7210_cfg);
     assert(in_codec_if_ != NULL);
 
@@ -73,10 +74,10 @@ BoxAudioCodec::BoxAudioCodec(void* i2c_master_handle, int input_sample_rate, int
     input_dev_ = esp_codec_dev_new(&dev_cfg);
     assert(input_dev_ != NULL);
 
-    ESP_LOGI(TAG, "BoxAudioDevice initialized");
+    ESP_LOGI(TAG, "CoreS3AudioCodec initialized");
 }
 
-BoxAudioCodec::~BoxAudioCodec() {
+CoreS3AudioCodec::~CoreS3AudioCodec() {
     ESP_ERROR_CHECK(esp_codec_dev_close(output_dev_));
     esp_codec_dev_delete(output_dev_);
     ESP_ERROR_CHECK(esp_codec_dev_close(input_dev_));
@@ -90,8 +91,10 @@ BoxAudioCodec::~BoxAudioCodec() {
     audio_codec_delete_data_if(data_if_);
 }
 
-void BoxAudioCodec::CreateDuplexChannels(gpio_num_t mclk, gpio_num_t bclk, gpio_num_t ws, gpio_num_t dout, gpio_num_t din) {
+void CoreS3AudioCodec::CreateDuplexChannels(gpio_num_t mclk, gpio_num_t bclk, gpio_num_t ws, gpio_num_t dout, gpio_num_t din) {
     assert(input_sample_rate_ == output_sample_rate_);
+
+    ESP_LOGI(TAG, "Audio IOs: mclk: %d, bclk: %d, ws: %d, dout: %d, din: %d", mclk, bclk, ws, dout, din);
 
     i2s_chan_config_t chan_cfg = {
         .id = I2S_NUM_0,
@@ -178,19 +181,19 @@ void BoxAudioCodec::CreateDuplexChannels(gpio_num_t mclk, gpio_num_t bclk, gpio_
     ESP_LOGI(TAG, "Duplex channels created");
 }
 
-void BoxAudioCodec::SetOutputVolume(int volume) {
+void CoreS3AudioCodec::SetOutputVolume(int volume) {
     ESP_ERROR_CHECK(esp_codec_dev_set_out_vol(output_dev_, volume));
     AudioCodec::SetOutputVolume(volume);
 }
 
-void BoxAudioCodec::EnableInput(bool enable) {
+void CoreS3AudioCodec::EnableInput(bool enable) {
     if (enable == input_enabled_) {
         return;
     }
     if (enable) {
         esp_codec_dev_sample_info_t fs = {
             .bits_per_sample = 16,
-            .channel = 4,
+            .channel = 2,
             .channel_mask = ESP_CODEC_DEV_MAKE_CHANNEL_MASK(0),
             .sample_rate = (uint32_t)output_sample_rate_,
             .mclk_multiple = 0,
@@ -206,7 +209,7 @@ void BoxAudioCodec::EnableInput(bool enable) {
     AudioCodec::EnableInput(enable);
 }
 
-void BoxAudioCodec::EnableOutput(bool enable) {
+void CoreS3AudioCodec::EnableOutput(bool enable) {
     if (enable == output_enabled_) {
         return;
     }
@@ -227,14 +230,14 @@ void BoxAudioCodec::EnableOutput(bool enable) {
     AudioCodec::EnableOutput(enable);
 }
 
-int BoxAudioCodec::Read(int16_t* dest, int samples) {
+int CoreS3AudioCodec::Read(int16_t* dest, int samples) {
     if (input_enabled_) {
         ESP_ERROR_CHECK_WITHOUT_ABORT(esp_codec_dev_read(input_dev_, (void*)dest, samples * sizeof(int16_t)));
     }
     return samples;
 }
 
-int BoxAudioCodec::Write(const int16_t* data, int samples) {
+int CoreS3AudioCodec::Write(const int16_t* data, int samples) {
     if (output_enabled_) {
         ESP_ERROR_CHECK_WITHOUT_ABORT(esp_codec_dev_write(output_dev_, (void*)data, samples * sizeof(int16_t)));
     }
