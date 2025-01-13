@@ -80,9 +80,9 @@ void Display::SetBacklight(uint8_t brightness) {
 
     ESP_LOGI(TAG, "Setting LCD backlight: %d%%", brightness);
     // LEDC resolution set to 10bits, thus: 100% = 1023
-    uint32_t duty_cycle = (1023 * brightness) / 100;
-    ESP_ERROR_CHECK(ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty_cycle));
-    ESP_ERROR_CHECK(ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0));
+    // uint32_t duty_cycle = (1023 * brightness) / 100;
+    // ESP_ERROR_CHECK(ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty_cycle));
+    // ESP_ERROR_CHECK(ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0));
 }
 
 void Display::ShowNotification(const std::string &notification, int duration_ms) {
