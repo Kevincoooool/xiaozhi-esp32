@@ -2,6 +2,7 @@ set(SOURCES "audio_codecs/audio_codec.cc"
             "audio_codecs/no_audio_codec.cc"
             "audio_codecs/box_audio_codec.cc"
             "audio_codecs/es8311_audio_codec.cc"
+            "audio_codecs/es8388_audio_codec.cc"
             "audio_codecs/cores3_audio_codec.cc"
             "led/single_led.cc"
             "led/circular_strip.cc"
@@ -63,11 +64,17 @@ elseif(CONFIG_BOARD_TYPE_XMINI_C3)
     set(BOARD_TYPE "xmini-c3")
 elseif(CONFIG_BOARD_TYPE_ESP32S3_KORVO2_V3)
     set(BOARD_TYPE "esp32s3-korvo2-v3")
+elseif(CONFIG_BOARD_TYPE_ESP32_LYRAT)
+    set(BOARD_TYPE "esp32-lyrat")
+
 endif()
 file(GLOB BOARD_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/boards/${BOARD_TYPE}/*.cc)
 list(APPEND SOURCES ${BOARD_SOURCES})
 
 if(CONFIG_IDF_TARGET_ESP32S3)
+    list(APPEND SOURCES "audio_processing/audio_processor.cc" "audio_processing/wake_word_detect.cc")
+endif()
+if(CONFIG_IDF_TARGET_ESP32)
     list(APPEND SOURCES "audio_processing/audio_processor.cc" "audio_processing/wake_word_detect.cc")
 endif()
 

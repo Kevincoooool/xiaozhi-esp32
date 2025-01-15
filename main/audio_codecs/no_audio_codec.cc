@@ -35,7 +35,9 @@ NoAudioCodecDuplex::NoAudioCodecDuplex(int input_sample_rate, int output_sample_
         .clk_cfg = {
             .sample_rate_hz = (uint32_t)output_sample_rate_,
             .clk_src = I2S_CLK_SRC_DEFAULT,
+            #if CONFIG_IDF_TARGET_ESP32S3
             .ext_clk_freq_hz = 0,
+            #endif
             .mclk_multiple = I2S_MCLK_MULTIPLE_256
         },
         .slot_cfg = {
@@ -46,9 +48,11 @@ NoAudioCodecDuplex::NoAudioCodecDuplex(int input_sample_rate, int output_sample_
             .ws_width = I2S_DATA_BIT_WIDTH_32BIT,
             .ws_pol = false,
             .bit_shift = true,
+            #if CONFIG_IDF_TARGET_ESP32S3
             .left_align = true,
             .big_endian = false,
             .bit_order_lsb = false
+            #endif
         },
         .gpio_cfg = {
             .mclk = I2S_GPIO_UNUSED,
@@ -89,7 +93,9 @@ NoAudioCodecSimplex::NoAudioCodecSimplex(int input_sample_rate, int output_sampl
         .clk_cfg = {
             .sample_rate_hz = (uint32_t)output_sample_rate_,
             .clk_src = I2S_CLK_SRC_DEFAULT,
+            #if CONFIG_IDF_TARGET_ESP32S3
             .ext_clk_freq_hz = 0,
+            #endif
             .mclk_multiple = I2S_MCLK_MULTIPLE_256
         },
         .slot_cfg = {
@@ -100,9 +106,11 @@ NoAudioCodecSimplex::NoAudioCodecSimplex(int input_sample_rate, int output_sampl
             .ws_width = I2S_DATA_BIT_WIDTH_32BIT,
             .ws_pol = false,
             .bit_shift = true,
+            #if CONFIG_IDF_TARGET_ESP32S3
             .left_align = true,
             .big_endian = false,
             .bit_order_lsb = false
+            #endif
         },
         .gpio_cfg = {
             .mclk = I2S_GPIO_UNUSED,
@@ -150,7 +158,9 @@ NoAudioCodecSimplexPdm::NoAudioCodecSimplexPdm(int input_sample_rate, int output
         .clk_cfg = {
             .sample_rate_hz = (uint32_t)output_sample_rate_,
             .clk_src = I2S_CLK_SRC_DEFAULT,
+            #if CONFIG_IDF_TARGET_ESP32S3
             .ext_clk_freq_hz = 0,
+            #endif
             .mclk_multiple = I2S_MCLK_MULTIPLE_256
         },
         .slot_cfg = I2S_STD_MSB_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_32BIT, I2S_SLOT_MODE_MONO),

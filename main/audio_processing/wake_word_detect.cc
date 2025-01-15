@@ -42,11 +42,13 @@ void WakeWordDetect::Initialize(int channels, bool reference) {
             wakenet_model_ = models->model_name[i];
             auto words = esp_srmodel_get_wake_words(models, wakenet_model_);
             // split by ";" to get all wake words
+            if(words!=NULL)
+            {
             std::stringstream ss(words);
             std::string word;
             while (std::getline(ss, word, ';')) {
                 wake_words_.push_back(word);
-            }
+            }}
         }
     }
 
@@ -79,7 +81,9 @@ void WakeWordDetect::Initialize(int channels, bool reference) {
         .debug_hook = {{ AFE_DEBUG_HOOK_MASE_TASK_IN, NULL }, { AFE_DEBUG_HOOK_FETCH_TASK_IN, NULL }},
         .afe_ns_mode = NS_MODE_SSP,
         .afe_ns_model_name = NULL,
+        #if CONFIG_IDF_TARGET_ESP32S3
         .fixed_first_channel = true,
+        #endif
     };
 
     afe_detection_data_ = esp_afe_sr_v1.create_from_config(&afe_config);

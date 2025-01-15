@@ -249,7 +249,7 @@ void Application::Start() {
         vTaskDelete(NULL);
     }, "check_new_version", 4096 * 2, this, 1, nullptr);
 
-#if CONFIG_IDF_TARGET_ESP32S3
+#if CONFIG_IDF_TARGET_ESP32S3 || CONFIG_IDF_TARGET_ESP32
     audio_processor_.Initialize(codec->input_channels(), codec->input_reference());
     audio_processor_.OnOutput([this](std::vector<int16_t>&& data) {
         background_task_->Schedule([this, data = std::move(data)]() mutable {
@@ -523,7 +523,7 @@ void Application::InputAudio() {
         }
     }
     
-#if CONFIG_IDF_TARGET_ESP32S3
+#if CONFIG_IDF_TARGET_ESP32S3 || CONFIG_IDF_TARGET_ESP32
     if (audio_processor_.IsRunning()) {
         audio_processor_.Input(data);
     }
@@ -579,7 +579,7 @@ void Application::SetDeviceState(DeviceState state) {
             display->SetEmotion("neutral");
             ResetDecoder();
             opus_encoder_->ResetState();
-#if CONFIG_IDF_TARGET_ESP32S3
+#if CONFIG_IDF_TARGET_ESP32S3 || CONFIG_IDF_TARGET_ESP32
             audio_processor_.Start();
 #endif
             UpdateIotStates();
@@ -587,7 +587,7 @@ void Application::SetDeviceState(DeviceState state) {
         case kDeviceStateSpeaking:
             display->SetStatus("说话中...");
             ResetDecoder();
-#if CONFIG_IDF_TARGET_ESP32S3
+#if CONFIG_IDF_TARGET_ESP32S3 || CONFIG_IDF_TARGET_ESP32
             audio_processor_.Stop();
 #endif
             break;

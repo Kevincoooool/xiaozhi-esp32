@@ -111,7 +111,9 @@ void CoreS3AudioCodec::CreateDuplexChannels(gpio_num_t mclk, gpio_num_t bclk, gp
         .clk_cfg = {
             .sample_rate_hz = (uint32_t)output_sample_rate_,
             .clk_src = I2S_CLK_SRC_DEFAULT,
+            #if CONFIG_IDF_TARGET_ESP32S3
             .ext_clk_freq_hz = 0,
+            #endif
             .mclk_multiple = I2S_MCLK_MULTIPLE_256
         },
         .slot_cfg = {
@@ -122,9 +124,11 @@ void CoreS3AudioCodec::CreateDuplexChannels(gpio_num_t mclk, gpio_num_t bclk, gp
             .ws_width = I2S_DATA_BIT_WIDTH_16BIT,
             .ws_pol = false,
             .bit_shift = true,
+            #if CONFIG_IDF_TARGET_ESP32S3
             .left_align = true,
             .big_endian = false,
             .bit_order_lsb = false
+            #endif
         },
         .gpio_cfg = {
             .mclk = mclk,
@@ -139,12 +143,14 @@ void CoreS3AudioCodec::CreateDuplexChannels(gpio_num_t mclk, gpio_num_t bclk, gp
             }
         }
     };
-
+#if CONFIG_IDF_TARGET_ESP32S3
     i2s_tdm_config_t tdm_cfg = {
         .clk_cfg = {
             .sample_rate_hz = (uint32_t)input_sample_rate_,
             .clk_src = I2S_CLK_SRC_DEFAULT,
+            #if CONFIG_IDF_TARGET_ESP32S3
             .ext_clk_freq_hz = 0,
+            #endif
             .mclk_multiple = I2S_MCLK_MULTIPLE_256,
             .bclk_div = 8,
         },
@@ -156,9 +162,11 @@ void CoreS3AudioCodec::CreateDuplexChannels(gpio_num_t mclk, gpio_num_t bclk, gp
             .ws_width = I2S_TDM_AUTO_WS_WIDTH,
             .ws_pol = false,
             .bit_shift = true,
-            .left_align = false,
+            #if CONFIG_IDF_TARGET_ESP32S3
+            .left_align = true,
             .big_endian = false,
-            .bit_order_lsb = false,
+            .bit_order_lsb = false
+            #endif
             .skip_mask = false,
             .total_slot = I2S_TDM_AUTO_SLOT_NUM
         },
@@ -175,9 +183,10 @@ void CoreS3AudioCodec::CreateDuplexChannels(gpio_num_t mclk, gpio_num_t bclk, gp
             }
         }
     };
-
+ESP_ERROR_CHECK(i2s_channel_init_tdm_mode(rx_handle_, &tdm_cfg));
+#endif
     ESP_ERROR_CHECK(i2s_channel_init_std_mode(tx_handle_, &std_cfg));
-    ESP_ERROR_CHECK(i2s_channel_init_tdm_mode(rx_handle_, &tdm_cfg));
+    
     ESP_LOGI(TAG, "Duplex channels created");
 }
 

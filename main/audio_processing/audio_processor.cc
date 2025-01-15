@@ -44,7 +44,9 @@ void AudioProcessor::Initialize(int channels, bool reference) {
         .debug_hook = {{ AFE_DEBUG_HOOK_MASE_TASK_IN, NULL }, { AFE_DEBUG_HOOK_FETCH_TASK_IN, NULL }},
         .afe_ns_mode = NS_MODE_SSP,
         .afe_ns_model_name = NULL,
+        #if CONFIG_IDF_TARGET_ESP32S3
         .fixed_first_channel = true,
+        #endif
     };
 
     afe_communication_data_ = esp_afe_vc_v1.create_from_config(&afe_config);
