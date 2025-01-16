@@ -5,7 +5,13 @@
 #include <esp_err.h>
 #include <driver/ledc.h>
 #include <vector>
-
+#include "esp_jpeg_common.h"
+#include "esp_jpeg_dec.h"
+#include "esp_jpeg_enc.h"
+#include "avi_player.h"
+#include "esp_vfs.h"
+#include "esp_spiffs.h"
+#include "esp_vfs_fat.h"
 #define TAG "LcdDisplay"
 #define LCD_LEDC_CH LEDC_CHANNEL_0
 
@@ -20,6 +26,225 @@ LV_FONT_DECLARE(font_awesome_30_1);
 LV_FONT_DECLARE(font_awesome_14_1);
 LV_FONT_DECLARE(font_dingding);
 static lv_disp_drv_t disp_drv;
+
+
+
+// lv_img_dsc_t img_dsc = {
+//     .header.always_zero = 0,
+//     .header.w = 240,
+//     .header.h = 240,
+//     .data_size = 240 * 240 * 2,
+//     .header.cf = LV_IMG_CF_TRUE_COLOR,
+//     .data = NULL,
+// };
+uint8_t *img_rgb565 = NULL; // MALLOC_CAP_SPIRAM
+uint8_t *pbuffer = NULL;    // MALLOC_CAP_SPIRAM  MALLOC_CAP_DMA
+size_t rgb_width = 0;
+size_t rgb_height = 0;
+
+static jpeg_pixel_format_t j_type = JPEG_PIXEL_FORMAT_RGB565_BE;
+static jpeg_rotate_t j_rotation = JPEG_ROTATE_0D;
+
+jpeg_error_t esp_jpeg_decode_one_picture(uint8_t *input_buf, int len, uint8_t **output_buf, int *out_len)
+{
+    uint8_t *out_buf = NULL;
+    jpeg_error_t ret = JPEG_ERR_OK;
+    jpeg_dec_io_t *jpeg_io = NULL;
+    jpeg_dec_header_info_t *out_info = NULL;
+    rgb_width = 0;
+    rgb_height = 0;
+    // Generate default configuration
+    jpeg_dec_config_t config = DEFAULT_JPEG_DEC_CONFIG();
+    config.output_type = j_type;
+    config.rotate = j_rotation;
+    // config.scale.width       = 0;
+    // config.scale.height      = 0;
+    // config.clipper.width     = 0;
+    // config.clipper.height    = 0;
+
+    // Create jpeg_dec handle
+    jpeg_dec_handle_t jpeg_dec = NULL;
+    ret = jpeg_dec_open(&config, &jpeg_dec);
+    if (ret != JPEG_ERR_OK)
+    {
+        return ret;
+    }
+
+    // Create io_callback handle
+    jpeg_io = (jpeg_dec_io_t*)calloc(1, sizeof(jpeg_dec_io_t));
+    if (jpeg_io == NULL)
+    {
+        ret = JPEG_ERR_NO_MEM;
+        goto jpeg_dec_failed;
+    }
+
+    // Create out_info handle
+    out_info =(jpeg_dec_header_info_t*) calloc(1, sizeof(jpeg_dec_header_info_t));
+    if (out_info == NULL)
+    {
+        ret = JPEG_ERR_NO_MEM;
+        goto jpeg_dec_failed;
+    }
+
+    // Set input buffer and buffer len to io_callback
+    jpeg_io->inbuf = input_buf;
+    jpeg_io->inbuf_len = len;
+
+    // Parse jpeg picture header and get picture for user and decoder
+    ret = jpeg_dec_parse_header(jpeg_dec, jpeg_io, out_info);
+    if (ret != JPEG_ERR_OK)
+    {
+        goto jpeg_dec_failed;
+    }
+    rgb_width = out_info->width;
+    rgb_height = out_info->height;
+    // ESP_LOGI(TAG, "img width:%d height:%d ", rgb_width, rgb_height);
+
+    *out_len = out_info->width * out_info->height * 3;
+    // Calloc out_put data buffer and update inbuf ptr and inbuf_len
+    if (config.output_type == JPEG_PIXEL_FORMAT_RGB565_LE || config.output_type == JPEG_PIXEL_FORMAT_RGB565_BE || config.output_type == JPEG_PIXEL_FORMAT_CbYCrY)
+    {
+        *out_len = out_info->width * out_info->height * 2;
+    }
+    else if (config.output_type == JPEG_PIXEL_FORMAT_RGB888)
+    {
+        *out_len = out_info->width * out_info->height * 3;
+    }
+    else
+    {
+        ret = JPEG_ERR_INVALID_PARAM;
+        goto jpeg_dec_failed;
+    }
+    out_buf = (uint8_t*)jpeg_calloc_align(*out_len, 16);
+    if (out_buf == NULL)
+    {
+        ret = JPEG_ERR_NO_MEM;
+        goto jpeg_dec_failed;
+    }
+    jpeg_io->outbuf = out_buf;
+    *output_buf = out_buf;
+
+    // Start decode jpeg
+    ret = jpeg_dec_process(jpeg_dec, jpeg_io);
+    if (ret != JPEG_ERR_OK)
+    {
+        goto jpeg_dec_failed;
+    }
+
+    // Decoder deinitialize
+jpeg_dec_failed:
+    jpeg_dec_close(jpeg_dec);
+    if (jpeg_io)
+    {
+        free(jpeg_io);
+    }
+    if (out_info)
+    {
+        free(out_info);
+    }
+    return ret;
+}
+
+// #define EXAMPLE_STD_BCLK_IO1 GPIO_NUM_41 // I2S bit clock io number
+// #define EXAMPLE_STD_WS_IO1 GPIO_NUM_42   // I2S word select io number
+// #define EXAMPLE_STD_DIN_IO1 GPIO_NUM_2   // I2S data in io number
+
+// #define EXAMPLE_STD_BCLK_IO2 GPIO_NUM_1 // I2S bit clock io number
+// #define EXAMPLE_STD_WS_IO2 GPIO_NUM_46  // I2S word select io number
+// #define EXAMPLE_STD_DOUT_IO2 GPIO_NUM_3 // I2S data out io number
+// #define AUDIO_I2S_SPK_GPIO_DOUT GPIO_NUM_3
+// #define AUDIO_I2S_SPK_GPIO_BCLK GPIO_NUM_46
+// #define AUDIO_I2S_SPK_GPIO_LRCK GPIO_NUM_1
+// #define EXAMPLE_BUFF_SIZE 2048
+
+// static i2s_chan_handle_t tx_handle_; // I2S tx channel handler
+// static i2s_chan_handle_t rx_handle_; // I2S rx channel handler
+
+// #define TAG "I2S_TEST"
+// static void i2s_example_init_std_duplex(void)
+// {
+//     // Create a new channel for speaker
+//     i2s_chan_config_t chan_cfg = {
+//         .id = I2S_NUM_0,
+//         .role = I2S_ROLE_MASTER,
+//         .dma_desc_num = 6,
+//         .dma_frame_num = 240,
+//         .auto_clear_after_cb = true,
+//         .auto_clear_before_cb = false,
+//         .intr_priority = 0,
+//     };
+//     ESP_ERROR_CHECK(i2s_new_channel(&chan_cfg, &tx_handle_, NULL));
+
+//     i2s_std_config_t std_cfg = {
+//         .clk_cfg = {
+//             .sample_rate_hz = (uint32_t)16000,
+//             .clk_src = I2S_CLK_SRC_DEFAULT,
+//             .ext_clk_freq_hz = 0,
+//             .mclk_multiple = I2S_MCLK_MULTIPLE_256},
+//         .slot_cfg = {.data_bit_width = I2S_DATA_BIT_WIDTH_32BIT, .slot_bit_width = I2S_SLOT_BIT_WIDTH_AUTO, .slot_mode = I2S_SLOT_MODE_MONO, .slot_mask = I2S_STD_SLOT_LEFT, .ws_width = I2S_DATA_BIT_WIDTH_32BIT, .ws_pol = false, .bit_shift = true, .left_align = true, .big_endian = false, .bit_order_lsb = false},
+//         .gpio_cfg = {.mclk = I2S_GPIO_UNUSED, .bclk = AUDIO_I2S_SPK_GPIO_BCLK, .ws = AUDIO_I2S_SPK_GPIO_LRCK, .dout = AUDIO_I2S_SPK_GPIO_DOUT, .din = I2S_GPIO_UNUSED, .invert_flags = {.mclk_inv = false, .bclk_inv = false, .ws_inv = false}}};
+//     ESP_ERROR_CHECK(i2s_channel_init_std_mode(tx_handle_, &std_cfg));
+
+//     ESP_ERROR_CHECK(i2s_channel_enable(tx_handle_));
+// }
+/*显示spiffs的所有文件名*/
+static void SPIFFS_Directory(char *path)
+{
+    DIR *dir = opendir(path);
+    assert(dir != NULL);
+    while (true)
+    {
+        struct dirent *pe = readdir(dir);
+        if (!pe)
+            break;
+        ESP_LOGI(__FUNCTION__, "d_name=%s d_ino=%d d_type=%x", pe->d_name, pe->d_ino, pe->d_type);
+    }
+    closedir(dir);
+}
+
+static bool end_play = false;
+int Rgbsize = 0;
+lv_obj_t* img_cam ;
+lv_img_dsc_t img_dsc;
+void video_write(frame_data_t *data, void *arg)
+{
+    // int free_sram = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+    // int min_free_sram = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
+    // int free_psram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+    // ESP_LOGI(TAG, "Free internal: %u minimal internal: %u free_psram: %u", free_sram, min_free_sram, free_psram);
+    // ESP_LOGI(TAG, "Video write: %d", data->data_bytes);
+    /* Set src of image with file name */
+    esp_jpeg_decode_one_picture(data->data, data->data_bytes, &img_rgb565, &Rgbsize); // 使用乐鑫adf的jpg解码 速度快三倍
+    // esp_lcd_panel_draw_bitmap(panel_handle, 0, 20, rgb_width + 1, rgb_height + 21, img_rgb565);
+    img_dsc.data = img_rgb565;
+    img_dsc.header.w = rgb_width;
+    img_dsc.header.h = rgb_height;
+    img_dsc.data_size = rgb_width * rgb_height * 2;
+	lv_img_set_src(img_cam, &img_dsc);
+    free(img_rgb565);
+}
+
+void audio_write(frame_data_t *data, void *arg)
+{
+    size_t bytes_write = 0;
+
+    // ESP_LOGI(TAG, "Audio write: %d", data->data_bytes);
+    // i2s_channel_write(tx_handle_, data->data, data->data_bytes, &bytes_write, 100);
+}
+
+void audio_set_clock(uint32_t rate, uint32_t bits_cfg, uint32_t ch, void *arg)
+{
+    ESP_LOGI(TAG, "Audio set clock, rate %" PRIu32 ", bits %" PRIu32 ", ch %" PRIu32 "", rate, bits_cfg, ch);
+}
+
+void avi_play_end(void *arg)
+{
+    ESP_LOGI(TAG, "Play end");
+    end_play = true;
+    // fclose("/spiffs/output.avi");
+    avi_player_play_from_file("/spiffs/output.avi");
+}
+
 static void lcd_lvgl_flush_cb(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t *color_map)
 {
     esp_lcd_panel_handle_t panel_handle = (esp_lcd_panel_handle_t)drv->user_data;
@@ -159,8 +384,66 @@ LcdDisplay::LcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_
     }, "LVGL", LCD_LVGL_TASK_STACK_SIZE, this, LCD_LVGL_TASK_PRIORITY, NULL);
 
     SetBacklight(100);
+        // lv_img_dsc_t img_dsc;
+    img_dsc.header.reserved = 0;
 
-    SetupUI();
+    img_dsc.header.always_zero = 0;
+    img_dsc.header.w = 240;
+    img_dsc.header.h = 240;
+    img_dsc.data_size = 240 * 240 * 2;
+    img_dsc.header.cf = LV_IMG_CF_TRUE_COLOR;
+    ESP_LOGI(TAG, "Initializing SPIFFS");
+    esp_vfs_spiffs_conf_t conf = {
+        .base_path = "/spiffs",
+        .partition_label = "storage",
+        .max_files = 2,
+        .format_if_mount_failed = true};
+    esp_err_t ret = esp_vfs_spiffs_register(&conf);
+    if (ret != ESP_OK)
+    {
+        if (ret == ESP_FAIL)
+            ESP_LOGE(TAG, "Failed to mount or format filesystem");
+        else if (ret == ESP_ERR_NOT_FOUND)
+            ESP_LOGE(TAG, "Failed to find SPIFFS partition");
+        else
+            ESP_LOGE(TAG, "Failed to initialize SPIFFS (%s)", esp_err_to_name(ret));
+        return;
+    }
+    /*显示spiffs里的文件列表*/
+    SPIFFS_Directory("/spiffs/");
+    img_rgb565 = (uint8_t*)heap_caps_malloc(800 * 480 * 2, MALLOC_CAP_8BIT | MALLOC_CAP_SPIRAM); // MALLOC_CAP_SPIRAM
+
+    // avi_player_config_t config = {
+    //     .buffer_size = 50 * 1024,
+    //     .audio_cb = audio_write,
+    //     .video_cb = video_write,
+    //     // .audio_set_clock_cb = audio_set_clock,
+    //     .avi_play_end_cb = avi_play_end,
+    //     .coreID = 1,
+
+    // };
+ 
+    int free_sram = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+    int min_free_sram = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
+    int free_psram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+    ESP_LOGI(TAG, "Free internal: %u minimal internal: %u free_psram: %u", free_sram, min_free_sram, free_psram);
+    SetupUI();   
+    avi_player_config_t config;
+
+    config.buffer_size = 50 * 1024;
+    config.audio_cb = audio_write;
+    config.video_cb = video_write;
+    config.audio_set_clock_cb = audio_set_clock,
+    config.avi_play_end_cb = avi_play_end;
+    config.coreID = 1;
+
+    avi_player_init(config);
+
+    avi_player_play_from_file("/spiffs/output.avi");
+         free_sram = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+     min_free_sram = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
+     free_psram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+    ESP_LOGI(TAG, "Free internal: %u minimal internal: %u free_psram: %u", free_sram, min_free_sram, free_psram);
 }
 
 LcdDisplay::~LcdDisplay() {
@@ -258,13 +541,17 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_text_color(screen, lv_color_black(), 0);
 
     lv_obj_set_style_bg_color(lv_scr_act(), lv_color_hex(0x000000), 0);
-
+    img_cam = lv_img_create(lv_scr_act());
+	// lv_obj_set_pos(img_cam, 0, 0);
+	// lv_obj_set_size(img_cam, 240, 240);
+	lv_obj_center(img_cam);
     status_bar_ = lv_obj_create(lv_scr_act());
     lv_obj_set_size(status_bar_, LV_HOR_RES - 40, 40);
     lv_obj_set_style_radius(status_bar_, 0, 0);
     // lv_obj_set_x(status_bar_, 5);
     lv_obj_set_align(status_bar_, LV_ALIGN_TOP_MID);
     lv_obj_set_style_bg_color(status_bar_, lv_color_hex(0x000000), 0);
+    lv_obj_set_style_bg_opa(status_bar_, LV_OPA_0, 0);
 
     emotion_label_ = lv_label_create(lv_scr_act());
     lv_obj_set_style_text_font(emotion_label_, &font_awesome_30_1, 0);
@@ -281,10 +568,10 @@ void LcdDisplay::SetupUI() {
     lv_label_set_long_mode(chat_message_label_, LV_LABEL_LONG_WRAP); // 设置为自动换行模式
     lv_obj_set_style_text_align(chat_message_label_, LV_TEXT_ALIGN_CENTER, 0); // 设置文本居中对齐
     lv_obj_set_style_text_font(chat_message_label_, &font_dingding, 0);
-    lv_label_set_text(chat_message_label_, "XiaoZhi AI\n酷世DIY\nSPV3开发板");
+    lv_label_set_text(chat_message_label_, "XiaoZhi AI");
     lv_obj_set_style_text_color(chat_message_label_, lv_palette_main(LV_PALETTE_GREEN), 0);
     lv_obj_set_align(chat_message_label_, LV_ALIGN_BOTTOM_MID);
-    lv_obj_set_y(chat_message_label_, -50);
+    lv_obj_set_y(chat_message_label_, -10);
 
     /* Status bar */
     lv_obj_set_flex_flow(status_bar_, LV_FLEX_FLOW_ROW_WRAP);

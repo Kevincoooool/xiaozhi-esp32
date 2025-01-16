@@ -29,6 +29,7 @@ protected:
     lv_obj_t* container_ = nullptr;
     lv_obj_t* side_bar_ = nullptr;
     lv_obj_t* chat_message_label_ = nullptr;
+    // lv_obj_t* img_cam = nullptr;
 
     void InitializeBacklight(gpio_num_t backlight_pin);
     // void SetBacklight(uint8_t brightness);
