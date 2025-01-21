@@ -68,6 +68,8 @@ choice BOARD_TYPE
         bool "Waveshare ESP32-S3-Touch-AMOLED-1.8"
     config BOARD_TYPE_BREAD_COMPACT_WIFI_LCD
          bool "面包板新版接线（WiFi）+ LCD"
+    config BOARD_TYPE_YUYING1_9LCD
+        bool "鱼鹰1.9LCD开发板"
 endchoice
 
 choice DISPLAY_LCD_TYPE
