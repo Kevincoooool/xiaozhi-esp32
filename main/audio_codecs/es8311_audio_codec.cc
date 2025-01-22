@@ -57,7 +57,8 @@ Es8311AudioCodec::Es8311AudioCodec(void* i2c_master_handle, i2c_port_t i2c_port,
     dev_cfg.dev_type = ESP_CODEC_DEV_TYPE_IN;
     input_dev_ = esp_codec_dev_new(&dev_cfg);
     assert(input_dev_ != NULL);
-
+    esp_codec_set_disable_when_closed(input_dev_, false);
+    esp_codec_set_disable_when_closed(output_dev_, false);
     ESP_LOGI(TAG, "Es8311AudioCodec initialized");
 }
 
@@ -165,10 +166,12 @@ void Es8311AudioCodec::EnableOutput(bool enable) {
         };
         ESP_ERROR_CHECK(esp_codec_dev_open(output_dev_, &fs));
         ESP_ERROR_CHECK(esp_codec_dev_set_out_vol(output_dev_, output_volume_));
-        esp_codec_dev_set_out_mute(output_dev_, false);
+
+        // esp_codec_dev_set_out_mute(output_dev_, false);
     } else {
-        // ESP_ERROR_CHECK(esp_codec_dev_close(output_dev_));
-        esp_codec_dev_set_out_mute(output_dev_, true);
+        ESP_ERROR_CHECK(esp_codec_dev_close(output_dev_));
+        // esp_codec_set_disable_when_closed(output_dev_, true);
+        // esp_codec_dev_set_out_mute(output_dev_, true);
     }
     AudioCodec::EnableOutput(enable);
 }

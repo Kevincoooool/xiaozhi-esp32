@@ -1,5 +1,5 @@
-#include "ml307_board.h"
-// #include "wifi_board.h"
+// #include "ml307_board.h"
+#include "wifi_board.h"
 
 #include "audio_codecs/es8311_audio_codec.h"
 #include "display/lcd_display.h"
@@ -19,7 +19,7 @@
 #include <esp_lcd_panel_vendor.h>
 #define TAG "Yuying1_9LCD"
 //Ml307Board WifiBoard
-class Yuying1_9LCD : public Ml307Board {
+class Yuying1_9LCD : public WifiBoard {
 private:
     i2c_master_bus_handle_t codec_i2c_bus_;
     Axp2101* axp2101_ = nullptr;
@@ -218,7 +218,7 @@ private:
         }
 public:
     Yuying1_9LCD() : 
-    Ml307Board(ML307_TX_PIN, ML307_RX_PIN, 4096),
+    // Ml307Board(ML307_TX_PIN, ML307_RX_PIN, 4096),
         boot_button_(BOOT_BUTTON_GPIO),
         volume_up_button_(VOLUME_UP_BUTTON_GPIO),
         voice_button_(VOICE_BUTTON_GPIO)
