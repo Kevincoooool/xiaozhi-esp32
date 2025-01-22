@@ -165,8 +165,10 @@ void Es8311AudioCodec::EnableOutput(bool enable) {
         };
         ESP_ERROR_CHECK(esp_codec_dev_open(output_dev_, &fs));
         ESP_ERROR_CHECK(esp_codec_dev_set_out_vol(output_dev_, output_volume_));
+        esp_codec_dev_set_out_mute(output_dev_, false);
     } else {
-        ESP_ERROR_CHECK(esp_codec_dev_close(output_dev_));
+        // ESP_ERROR_CHECK(esp_codec_dev_close(output_dev_));
+        esp_codec_dev_set_out_mute(output_dev_, true);
     }
     AudioCodec::EnableOutput(enable);
 }
