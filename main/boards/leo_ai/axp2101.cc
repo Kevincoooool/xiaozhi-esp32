@@ -37,6 +37,9 @@ Axp2101::Axp2101(i2c_master_bus_handle_t i2c_bus, uint8_t addr) : I2cDevice(i2c_
 
     WriteReg(0x24, 0x01); // set Vsys for PWROFF threshold to 3.2V (default - 2.6V and kill battery)
     WriteReg(0x50, 0x14); // set TS pin to EXTERNAL input (not temperature)
+    WriteReg(0x36, 0b11000000); // set power off time to 6 seconds
+    WriteReg(0x31, 0x01); // set long press key enable
+
 }
 
 bool Axp2101::IsCharging() {
