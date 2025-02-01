@@ -30,7 +30,7 @@ protected:
     lv_obj_t* container_ = nullptr;
     lv_obj_t* side_bar_ = nullptr;
     lv_obj_t* chat_message_label_ = nullptr;
-
+    lv_obj_t* gps_label_ = nullptr;
     DisplayFonts fonts_;
 
     void InitializeBacklight(gpio_num_t backlight_pin);

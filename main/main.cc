@@ -7,7 +7,7 @@
 
 #include "application.h"
 #include "system_info.h"
-
+#include "gps_controller.h"
 #define TAG "main"
 
 extern "C" void app_main(void)
@@ -26,7 +26,7 @@ extern "C" void app_main(void)
 
     // Launch the application
     Application::GetInstance().Start();
-
+    gps_controller_init();
     // Dump CPU usage every 10 second
     while (true) {
         vTaskDelay(10000 / portTICK_PERIOD_MS);

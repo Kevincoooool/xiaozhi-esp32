@@ -6,7 +6,7 @@
 #include <driver/ledc.h>
 #include <vector>
 #include "board.h"
-
+#include "gps_controller.h"
 #define TAG "LcdDisplay"
 #define LCD_LEDC_CH LEDC_CHANNEL_0
 
@@ -286,6 +286,12 @@ void LcdDisplay::SetupUI() {
     lv_label_set_long_mode(chat_message_label_, LV_LABEL_LONG_WRAP); // 设置为自动换行模式
     lv_obj_set_style_text_align(chat_message_label_, LV_TEXT_ALIGN_CENTER, 0); // 设置文本居中对齐
 
+    gps_label_ = lv_label_create(content_);
+    lv_label_set_text(gps_label_, "");
+    lv_obj_set_width(gps_label_, LV_HOR_RES * 0.9); // 限制宽度为屏幕宽度的 90%
+    lv_label_set_long_mode(gps_label_, LV_LABEL_LONG_WRAP); // 设置为自动换行模式
+    lv_obj_set_style_text_align(gps_label_, LV_TEXT_ALIGN_CENTER, 0); // 设置文本居中对齐
+
     /* Status bar */
     lv_obj_set_flex_flow(status_bar_, LV_FLEX_FLOW_ROW);
     lv_obj_set_style_pad_all(status_bar_, 0, 0);
@@ -323,9 +329,14 @@ void LcdDisplay::SetChatMessage(const std::string &role, const std::string &cont
     if (chat_message_label_ == nullptr) {
         return;
     }
-
+    
     DisplayLockGuard lock(this);
     lv_label_set_text(chat_message_label_, content.c_str());
+    static char buf[512] = {0};
+    memset(buf, 0, sizeof(buf));
+    snprintf(buf, sizeof(buf), "Speed:%.2fKm/h\nSatellite:%d\nLatitude:%.6lf\nLongitude:%.6lf\n", f_speed_gps, total_sats, f_latitude_lv, f_longitude_lv);
+    lv_label_set_text(gps_label_, buf);
+
 }
 
 void LcdDisplay::SetEmotion(const std::string &emotion) {
