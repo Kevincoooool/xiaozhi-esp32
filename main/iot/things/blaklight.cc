@@ -23,8 +23,8 @@ public:
         methods_.AddMethod("SetLight", "设置亮度", ParameterList({
             Parameter("light", "0到100之间的整数", kValueTypeNumber, true)
         }), [this](const ParameterList& parameters) {
-            auto display_ = Board::GetInstance().GetDisplay();
-            display_->SetBacklight(static_cast<uint8_t>(parameters["light"].number()));
+            // auto display_ = Board::GetInstance().GetDisplay();
+            // display_->SetBacklight(static_cast<uint8_t>(parameters["light"].number()));
         });
     }
 };
