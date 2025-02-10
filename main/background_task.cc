@@ -5,18 +5,10 @@
 #define TAG "BackgroundTask"
 
 BackgroundTask::BackgroundTask(uint32_t stack_size) {
-#if CONFIG_IDF_TARGET_ESP32S3
-    task_stack_ = (StackType_t*)heap_caps_malloc(stack_size, MALLOC_CAP_SPIRAM);
-    background_task_handle_ = xTaskCreateStatic([](void* arg) {
-        BackgroundTask* task = (BackgroundTask*)arg;
-        task->BackgroundTaskLoop();
-    }, "background_task", stack_size, this, 1, task_stack_, &task_buffer_);
-#else
     xTaskCreate([](void* arg) {
         BackgroundTask* task = (BackgroundTask*)arg;
         task->BackgroundTaskLoop();
     }, "background_task", stack_size, this, 1, &background_task_handle_);
-#endif
 }
 
 BackgroundTask::~BackgroundTask() {

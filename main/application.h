@@ -17,7 +17,7 @@
 #include "ota.h"
 #include "background_task.h"
 
-#if CONFIG_IDF_TARGET_ESP32S3
+#if CONFIG_USE_AUDIO_PROCESSING
 #include "wake_word_detect.h"
 #include "audio_processor.h"
 #endif
@@ -66,7 +66,7 @@ private:
     Application();
     ~Application();
 
-#if CONFIG_IDF_TARGET_ESP32S3
+#if CONFIG_USE_AUDIO_PROCESSING
     WakeWordDetect wake_word_detect_;
     AudioProcessor audio_processor_;
 #endif
@@ -82,7 +82,7 @@ private:
     std::string last_iot_states_;
 
     // Audio encode / decode
-    BackgroundTask background_task_;
+    BackgroundTask* background_task_ = nullptr;
     std::chrono::steady_clock::time_point last_output_time_;
     std::list<std::vector<uint8_t>> audio_decode_queue_;
 

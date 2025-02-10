@@ -23,6 +23,8 @@ extern "C" void app_main(void)
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
+
+    // Launch the application
     Application::GetInstance().Start();
 
     // Dump CPU usage every 10 second
