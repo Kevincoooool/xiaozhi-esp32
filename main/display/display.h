@@ -6,7 +6,6 @@
 #include <esp_log.h>
 
 #include <string>
-#include <driver/gpio.h>
 
 struct DisplayFonts {
     const lv_font_t* text_font = nullptr;
@@ -18,13 +17,13 @@ class Display {
 public:
     Display();
     virtual ~Display();
+
     virtual void SetStatus(const std::string &status);
     virtual void ShowNotification(const std::string &notification, int duration_ms = 3000);
     virtual void SetEmotion(const std::string &emotion);
     virtual void SetChatMessage(const std::string &role, const std::string &content);
     virtual void SetIcon(const char* icon);
-    virtual void SetBacklight(uint8_t brightness) ;
-
+    virtual void SetBacklight(uint8_t brightness) = 0;
 
     int width() const { return width_; }
     int height() const { return height_; }
@@ -38,8 +37,6 @@ protected:
     lv_obj_t *emotion_label_ = nullptr;
     lv_obj_t *network_label_ = nullptr;
     lv_obj_t *status_label_ = nullptr;
-    lv_obj_t *reply_label_ = nullptr;
-
     lv_obj_t *notification_label_ = nullptr;
     lv_obj_t *mute_label_ = nullptr;
     lv_obj_t *battery_label_ = nullptr;

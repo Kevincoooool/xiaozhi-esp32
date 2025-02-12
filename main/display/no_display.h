@@ -11,6 +11,10 @@ private:
 public:
     NoDisplay();
     ~NoDisplay();
+    
+    virtual void SetBacklight(uint8_t brightness) override {
+        // 空实现，因为这是一个无显示设备
+    }
 };
 
 #endif

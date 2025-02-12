@@ -24,17 +24,16 @@ LcdDisplay::LcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_
     height_ = height;
 
     InitializeBacklight(backlight_pin);
-    emoji_font_init();
+
     // draw white
     // std::vector<uint16_t> buffer(width_, 0xFFFF);
-    // for (int y = 0; y < height_; y++)
-    // {
+    // for (int y = 0; y < height_; y++) {
     //     esp_lcd_panel_draw_bitmap(panel_, 0, y, width_, y + 1, buffer.data());
     // }
 
     // Set the display to on
-    ESP_LOGI(TAG, "Turning display on");
-    ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel_, true));
+    // ESP_LOGI(TAG, "Turning display on");
+    // ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel_, true));
 
     ESP_LOGI(TAG, "Initialize LVGL library");
     lv_init();
@@ -44,33 +43,77 @@ LcdDisplay::LcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_
     lvgl_port_init(&port_cfg);
 
     ESP_LOGI(TAG, "Adding LCD screen");
-    const lvgl_port_display_cfg_t display_cfg = {
-        .io_handle = panel_io_,
+    // const lvgl_port_display_cfg_t display_cfg = {
+    //     .io_handle = panel_io_,
+    //     .panel_handle = panel_,
+    //     .control_handle = nullptr,
+    //     .buffer_size = static_cast<uint32_t>(width_ * height_),
+    //     .double_buffer = true,
+    //     .trans_size = 0,
+    //     .hres = static_cast<uint32_t>(width_),
+    //     .vres = static_cast<uint32_t>(height_),
+    //     .monochrome = false,
+    //     .rotation = {
+    //         .swap_xy = swap_xy,
+    //         .mirror_x = mirror_x,
+    //         .mirror_y = mirror_y,
+    //     },
+    //     .color_format = LV_COLOR_FORMAT_RGB565,
+    //     .flags = {
+    //         .buff_dma = 0,
+    //         .buff_spiram = 1,
+    //         .sw_rotate = 0,
+    //         .swap_bytes = 0,
+    //         .full_refresh = 1,
+    //         .direct_mode = 0,
+    //     },
+    // };
+
+    // display_ = lvgl_port_add_disp(&display_cfg);
+
+    const lvgl_port_display_cfg_t disp_cfg = {
         .panel_handle = panel_,
-        .control_handle = nullptr,
-        .buffer_size = static_cast<uint32_t>(width_ * 10),
-        .double_buffer = false,
-        .trans_size = 0,
+        .buffer_size = static_cast<uint32_t>(width_ * height_),
+        .double_buffer = true,
         .hres = static_cast<uint32_t>(width_),
         .vres = static_cast<uint32_t>(height_),
         .monochrome = false,
-        .rotation = {
-            .swap_xy = swap_xy,
-            .mirror_x = mirror_x,
-            .mirror_y = mirror_y,
-        },
+#if LVGL_VERSION_MAJOR >= 9
         .color_format = LV_COLOR_FORMAT_RGB565,
+#endif
+        // .rotation = {
+        //     .swap_xy = false,
+        //     .mirror_x = false,
+        //     .mirror_y = false,
+        // },
         .flags = {
-            .buff_dma = 1,
-            .buff_spiram = 0,
-            .sw_rotate = 0,
-            .swap_bytes = 1,
-            .full_refresh = 0,
-            .direct_mode = 0,
-        },
-    };
+            .buff_dma = false,
+            .buff_spiram = true,
+#if LVGL_VERSION_MAJOR >= 9
+            .swap_bytes = false,
+#endif
+            .full_refresh = true,
+            .direct_mode = false,
 
-    display_ = lvgl_port_add_disp(&display_cfg);
+        }
+    };
+    const lvgl_port_display_rgb_cfg_t rgb_cfg = {
+        .flags = {
+// #if EXAMPLE_LCD_RGB_BOUNCE_BUFFER_MODE
+//             .bb_mode = true,
+// #else
+            .bb_mode = false,
+// #endif
+// #if EXAMPLE_LCD_LVGL_AVOID_TEAR
+            .avoid_tearing = false,
+// #else
+//             .avoid_tearing = false,
+// #endif
+        }
+    };
+    display_ = lvgl_port_add_disp_rgb(&disp_cfg, &rgb_cfg);
+
+
     if (display_ == nullptr) {
         ESP_LOGE(TAG, "Failed to add display");
         return;
@@ -90,28 +133,23 @@ LcdDisplay::~LcdDisplay() {
     if (content_ != nullptr) {
         lv_obj_del(content_);
     }
-    if (status_bar_ != nullptr)
-    {
+    if (status_bar_ != nullptr) {
         lv_obj_del(status_bar_);
     }
-    if (side_bar_ != nullptr)
-    {
+    if (side_bar_ != nullptr) {
         lv_obj_del(side_bar_);
     }
-    if (container_ != nullptr)
-    {
+    if (container_ != nullptr) {
         lv_obj_del(container_);
     }
     if (display_ != nullptr) {
         lv_display_delete(display_);
     }
 
-    if (panel_ != nullptr)
-    {
+    if (panel_ != nullptr) {
         esp_lcd_panel_del(panel_);
     }
-    if (panel_io_ != nullptr)
-    {
+    if (panel_io_ != nullptr) {
         esp_lcd_panel_io_del(panel_io_);
     }
 }
@@ -120,6 +158,7 @@ void LcdDisplay::InitializeBacklight(gpio_num_t backlight_pin) {
     if (backlight_pin == GPIO_NUM_NC) {
         return;
     }
+
     // Setup LEDC peripheral for PWM backlight control
     const ledc_channel_config_t backlight_channel = {
         .gpio_num = backlight_pin,
@@ -131,35 +170,36 @@ void LcdDisplay::InitializeBacklight(gpio_num_t backlight_pin) {
         .hpoint = 0,
         .flags = {
             .output_invert = backlight_output_invert_,
-        }};
+        }
+    };
     const ledc_timer_config_t backlight_timer = {
         .speed_mode = LEDC_LOW_SPEED_MODE,
         .duty_resolution = LEDC_TIMER_10_BIT,
         .timer_num = LEDC_TIMER_0,
         .freq_hz = 5000,
         .clk_cfg = LEDC_AUTO_CLK,
-        .deconfigure = false};
+        .deconfigure = false
+    };
 
     ESP_ERROR_CHECK(ledc_timer_config(&backlight_timer));
     ESP_ERROR_CHECK(ledc_channel_config(&backlight_channel));
 }
 
-// void LcdDisplay::SetBacklight(uint8_t brightness) {
-//     if (backlight_pin_ == GPIO_NUM_NC) {
-//         return;
-//     }
+void LcdDisplay::SetBacklight(uint8_t brightness) {
+    if (backlight_pin_ == GPIO_NUM_NC) {
+        return;
+    }
 
-//     if (brightness > 100)
-//     {
-//         brightness = 100;
-//     }
+    if (brightness > 100) {
+        brightness = 100;
+    }
 
-//     ESP_LOGI(TAG, "Setting LCD backlight: %d%%", brightness);
-//     // LEDC resolution set to 10bits, thus: 100% = 1023
-//     uint32_t duty_cycle = (1023 * brightness) / 100;
-//     ESP_ERROR_CHECK(ledc_set_duty(LEDC_LOW_SPEED_MODE, LCD_LEDC_CH, duty_cycle));
-//     ESP_ERROR_CHECK(ledc_update_duty(LEDC_LOW_SPEED_MODE, LCD_LEDC_CH));
-// }
+    ESP_LOGI(TAG, "Setting LCD backlight: %d%%", brightness);
+    // LEDC resolution set to 10bits, thus: 100% = 1023
+    uint32_t duty_cycle = (1023 * brightness) / 100;
+    ESP_ERROR_CHECK(ledc_set_duty(LEDC_LOW_SPEED_MODE, LCD_LEDC_CH, duty_cycle));
+    ESP_ERROR_CHECK(ledc_update_duty(LEDC_LOW_SPEED_MODE, LCD_LEDC_CH));
+}
 
 bool LcdDisplay::Lock(int timeout_ms) {
     return lvgl_port_lock(timeout_ms);
@@ -176,15 +216,25 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_text_font(screen, fonts_.text_font, 0);
     lv_obj_set_style_text_color(screen, lv_color_black(), 0);
 
-    lv_obj_set_style_bg_color(lv_scr_act(), lv_color_hex(0x000000), 0);
+    /* Container */
+    container_ = lv_obj_create(screen);
+    lv_obj_set_size(container_, LV_HOR_RES, LV_VER_RES);
+    lv_obj_set_flex_flow(container_, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_all(container_, 0, 0);
+    lv_obj_set_style_border_width(container_, 0, 0);
+    lv_obj_set_style_pad_row(container_, 0, 0);
 
     /* Status bar */
     status_bar_ = lv_obj_create(container_);
     lv_obj_set_size(status_bar_, LV_HOR_RES, fonts_.text_font->line_height);
     lv_obj_set_style_radius(status_bar_, 0, 0);
-    // lv_obj_set_x(status_bar_, 5);
-    lv_obj_set_align(status_bar_, LV_ALIGN_TOP_MID);
-    lv_obj_set_style_bg_color(status_bar_, lv_color_hex(0x000000), 0);
+    
+    /* Content */
+    content_ = lv_obj_create(container_);
+    lv_obj_set_scrollbar_mode(content_, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_style_radius(content_, 0, 0);
+    lv_obj_set_width(content_, LV_HOR_RES);
+    lv_obj_set_flex_grow(content_, 1);
 
     lv_obj_set_flex_flow(content_, LV_FLEX_FLOW_COLUMN); // 垂直布局（从上到下）
     lv_obj_set_flex_align(content_, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_SPACE_EVENLY); // 子对象居中对齐，等距分布
@@ -193,19 +243,14 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_text_font(emotion_label_, &font_awesome_30_4, 0);
     lv_label_set_text(emotion_label_, FONT_AWESOME_AI_CHIP);
 
-    chat_message_label_ = lv_label_create(lv_scr_act());
+    chat_message_label_ = lv_label_create(content_);
     lv_label_set_text(chat_message_label_, "");
     lv_obj_set_width(chat_message_label_, LV_HOR_RES * 0.9); // 限制宽度为屏幕宽度的 90%
     lv_label_set_long_mode(chat_message_label_, LV_LABEL_LONG_WRAP); // 设置为自动换行模式
     lv_obj_set_style_text_align(chat_message_label_, LV_TEXT_ALIGN_CENTER, 0); // 设置文本居中对齐
-    lv_obj_set_style_text_font(chat_message_label_, &font_dingding, 0);
-    lv_label_set_text(chat_message_label_, "XiaoZhi AI\n酷世DIY\nSPV3开发板");
-    lv_obj_set_style_text_color(chat_message_label_, lv_palette_main(LV_PALETTE_GREEN), 0);
-    lv_obj_set_align(chat_message_label_, LV_ALIGN_BOTTOM_MID);
-    lv_obj_set_y(chat_message_label_, -50);
 
     /* Status bar */
-    lv_obj_set_flex_flow(status_bar_, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_flex_flow(status_bar_, LV_FLEX_FLOW_ROW);
     lv_obj_set_style_pad_all(status_bar_, 0, 0);
     lv_obj_set_style_border_width(status_bar_, 0, 0);
     lv_obj_set_style_pad_column(status_bar_, 0, 0);
@@ -220,27 +265,13 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_flex_grow(notification_label_, 1);
     lv_obj_set_style_text_align(notification_label_, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_text(notification_label_, "通知");
-    // lv_label_set_long_mode(notification_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
-
     lv_obj_add_flag(notification_label_, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_set_style_text_font(notification_label_, &font_dingding, 0);
-    lv_obj_set_style_text_color(notification_label_, lv_palette_main(LV_PALETTE_GREEN), 0);
 
     status_label_ = lv_label_create(status_bar_);
     lv_obj_set_flex_grow(status_label_, 1);
     lv_label_set_long_mode(status_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
     lv_label_set_text(status_label_, "正在初始化");
     lv_obj_set_style_text_align(status_label_, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_style_text_font(status_label_, &font_dingding, 0);
-    lv_obj_set_style_text_color(status_label_, lv_palette_main(LV_PALETTE_GREEN), 0);
-    // lv_label_set_long_mode(status_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
-
-    battery_label_ = lv_label_create(status_bar_);
-    lv_label_set_text(battery_label_, "");
-    lv_obj_set_style_text_font(battery_label_, &font_awesome_14_1, 0);
-    // lv_obj_set_x(battery_label_, 220);
-    // lv_obj_set_y(battery_label_, 30);
-    lv_obj_set_align(battery_label_, LV_ALIGN_TOP_RIGHT);
 
     mute_label_ = lv_label_create(status_bar_);
     lv_label_set_text(mute_label_, "");
@@ -250,7 +281,6 @@ void LcdDisplay::SetupUI() {
     lv_label_set_text(battery_label_, "");
     lv_obj_set_style_text_font(battery_label_, fonts_.icon_font, 0);
 }
-
 
 void LcdDisplay::SetChatMessage(const std::string &role, const std::string &content) {
     DisplayLockGuard lock(this);

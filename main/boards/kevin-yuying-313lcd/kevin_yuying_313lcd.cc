@@ -1,8 +1,9 @@
 #include "wifi_board.h"
 #include "audio_codecs/es8311_audio_codec.h"
-#include "display/rgb_gc9503v_display.h"
+#include "display/lcd_display.h"
 #include "application.h"
 #include "button.h"
+#include "pin_config.h"
 
 #include "config.h"
 #include "iot/thing_manager.h"
@@ -10,19 +11,120 @@
 #include <wifi_station.h>
 #include <esp_log.h>
 #include <driver/i2c_master.h>
+#include "esp_lcd_gc9503.h"
+#include <esp_lcd_panel_io.h>
+#include <esp_lcd_panel_ops.h>
+#include <esp_lcd_panel_io_additions.h>
 
 #define TAG "Yuying_313lcd"
+LV_FONT_DECLARE(font_puhui_30_4);
+LV_FONT_DECLARE(font_awesome_30_4);
 
 class Yuying_313lcd : public WifiBoard {
 private:
     i2c_master_bus_handle_t codec_i2c_bus_;
     Button boot_button_;
-    RGB_GC9503V_Display* display_;
+    LcdDisplay* display_;
 
+    
     void InitializeRGB_GC9503V_Display() {
-       
-        display_ = new RGB_GC9503V_Display(DISPLAY_BACKLIGHT_PIN, DISPLAY_BACKLIGHT_OUTPUT_INVERT,
-                                    DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY);
+        ESP_LOGI(TAG, "Init GC9503V");
+
+        esp_lcd_panel_io_handle_t panel_io = nullptr;
+        esp_lcd_panel_handle_t panel = nullptr;
+
+        ESP_LOGI(TAG, "Install 3-wire SPI panel IO");
+        spi_line_config_t line_config = {
+            .cs_io_type = IO_TYPE_GPIO,
+            .cs_gpio_num = TEST_LCD_IO_SPI_CS_1,
+            .scl_io_type = IO_TYPE_GPIO,
+            .scl_gpio_num = TEST_LCD_IO_SPI_SCL_1,
+            .sda_io_type = IO_TYPE_GPIO,
+            .sda_gpio_num = TEST_LCD_IO_SPI_SDO_1,
+            .io_expander = NULL,
+        };
+        esp_lcd_panel_io_3wire_spi_config_t io_config = GC9503_PANEL_IO_3WIRE_SPI_CONFIG(line_config, 0);
+        (esp_lcd_new_panel_io_3wire_spi(&io_config, &panel_io));
+    
+        ESP_LOGI(TAG, "Install RGB LCD panel driver");
+        esp_lcd_panel_handle_t panel_handle = NULL;
+        esp_lcd_rgb_panel_config_t rgb_config = {
+            .clk_src = LCD_CLK_SRC_PLL240M,
+            .timings = GC9503_376_960_PANEL_60HZ_RGB_TIMING(),
+            .data_width = 16, // RGB565 in parallel mode, thus 16bit in width
+            .bits_per_pixel = 16,
+            .num_fbs = EXAMPLE_LCD_NUM_FB,
+    #if CONFIG_EXAMPLE_USE_BOUNCE_BUFFER
+            .bounce_buffer_size_px = 10 * EXAMPLE_LCD_H_RES,
+    #endif
+            .dma_burst_size = 64,
+            .hsync_gpio_num = EXAMPLE_PIN_NUM_HSYNC,
+            .vsync_gpio_num = EXAMPLE_PIN_NUM_VSYNC,
+            .de_gpio_num = EXAMPLE_PIN_NUM_DE,
+            .pclk_gpio_num = EXAMPLE_PIN_NUM_PCLK,
+            .disp_gpio_num = EXAMPLE_PIN_NUM_DISP_EN,
+            .data_gpio_nums = {
+                EXAMPLE_PIN_NUM_DATA0,
+                EXAMPLE_PIN_NUM_DATA1,
+                EXAMPLE_PIN_NUM_DATA2,
+                EXAMPLE_PIN_NUM_DATA3,
+                EXAMPLE_PIN_NUM_DATA4,
+                EXAMPLE_PIN_NUM_DATA5,
+                EXAMPLE_PIN_NUM_DATA6,
+                EXAMPLE_PIN_NUM_DATA7,
+                EXAMPLE_PIN_NUM_DATA8,
+                EXAMPLE_PIN_NUM_DATA9,
+                EXAMPLE_PIN_NUM_DATA10,
+                EXAMPLE_PIN_NUM_DATA11,
+                EXAMPLE_PIN_NUM_DATA12,
+                EXAMPLE_PIN_NUM_DATA13,
+                EXAMPLE_PIN_NUM_DATA14,
+                EXAMPLE_PIN_NUM_DATA15,
+            },
+            .flags= {
+                .fb_in_psram = true, // allocate frame buffer in PSRAM
+            }
+        };
+    
+        ESP_LOGI(TAG, "Initialize RGB LCD panel");
+    
+        gc9503_vendor_config_t vendor_config = {
+            .rgb_config = &rgb_config,
+            .flags = {
+                .mirror_by_cmd = 0,
+                .auto_del_panel_io = 1,
+            },
+        };
+        const esp_lcd_panel_dev_config_t panel_config = {
+            .reset_gpio_num = -1,
+            .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
+            .bits_per_pixel = 16,
+            .vendor_config = &vendor_config,
+        };
+        (esp_lcd_new_panel_gc9503(panel_io, &panel_config, &panel_handle));
+        (esp_lcd_panel_reset(panel_handle));
+        (esp_lcd_panel_init(panel_handle));
+
+        display_ = new LcdDisplay(panel_io, panel_handle, DISPLAY_BACKLIGHT_PIN, DISPLAY_BACKLIGHT_OUTPUT_INVERT,
+                                  DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y, DISPLAY_MIRROR_X,
+                                  DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY,
+                                  {
+                                      .text_font = &font_puhui_30_4,
+                                      .icon_font = &font_awesome_30_4,
+                                      .emoji_font = font_emoji_64_init(),
+                                  });
+
+        gpio_config_t config;
+        config.pin_bit_mask = BIT64(EXAMPLE_PIN_NUM_BK_LIGHT);
+        config.mode = GPIO_MODE_OUTPUT;
+        config.pull_up_en = GPIO_PULLUP_DISABLE;
+        config.pull_down_en = GPIO_PULLDOWN_ENABLE;
+        config.intr_type = GPIO_INTR_DISABLE;
+#if SOC_GPIO_SUPPORT_PIN_HYS_FILTER
+        config.hys_ctrl_mode = GPIO_HYS_SOFT_ENABLE;
+#endif
+        gpio_config(&config);
+        gpio_set_level(EXAMPLE_PIN_NUM_BK_LIGHT, 0);
     }
     void InitializeCodecI2c() {
         // Initialize I2C peripheral
