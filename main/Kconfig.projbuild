@@ -89,7 +89,7 @@ choice BOARD_TYPE
     config BOARD_TYPE_ESP32S3_Taiji_Pi
         bool "太极小派esp32s3"  
     config BOARD_TYPE_KEVIN_YUYING_313LCD
-        bool "鱼鹰3.13LCD开发板"  
+        bool "鱼鹰科技3.13LCD开发板"
 endchoice
 config EXAMPLE_DOUBLE_FB
         bool "Use double Frame Buffer"

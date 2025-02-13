@@ -26,10 +26,10 @@ LcdDisplay::LcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_
     InitializeBacklight(backlight_pin);
 
     // draw white
-    // std::vector<uint16_t> buffer(width_, 0xFFFF);
-    // for (int y = 0; y < height_; y++) {
-    //     esp_lcd_panel_draw_bitmap(panel_, 0, y, width_, y + 1, buffer.data());
-    // }
+    std::vector<uint16_t> buffer(width_, 0xFFFF);
+    for (int y = 0; y < height_; y++) {
+        esp_lcd_panel_draw_bitmap(panel_, 0, y, width_, y + 1, buffer.data());
+    }
 
     // Set the display to on
     // ESP_LOGI(TAG, "Turning display on");
@@ -73,7 +73,7 @@ LcdDisplay::LcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_
 
     const lvgl_port_display_cfg_t disp_cfg = {
         .panel_handle = panel_,
-        .buffer_size = static_cast<uint32_t>(width_ * 100),
+        .buffer_size = static_cast<uint32_t>(width_ * 10),
         .double_buffer = true,
         .hres = static_cast<uint32_t>(width_),
         .vres = static_cast<uint32_t>(height_),
