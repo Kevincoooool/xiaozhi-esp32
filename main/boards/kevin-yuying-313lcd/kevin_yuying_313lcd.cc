@@ -17,6 +17,7 @@
 #include <esp_lcd_panel_io_additions.h>
 
 #define TAG "Yuying_313lcd"
+
 LV_FONT_DECLARE(font_puhui_30_4);
 LV_FONT_DECLARE(font_awesome_30_4);
 
@@ -36,11 +37,11 @@ private:
         ESP_LOGI(TAG, "Install 3-wire SPI panel IO");
         spi_line_config_t line_config = {
             .cs_io_type = IO_TYPE_GPIO,
-            .cs_gpio_num = TEST_LCD_IO_SPI_CS_1,
+            .cs_gpio_num = GC9503V_LCD_IO_SPI_CS_1,
             .scl_io_type = IO_TYPE_GPIO,
-            .scl_gpio_num = TEST_LCD_IO_SPI_SCL_1,
+            .scl_gpio_num = GC9503V_LCD_IO_SPI_SCL_1,
             .sda_io_type = IO_TYPE_GPIO,
-            .sda_gpio_num = TEST_LCD_IO_SPI_SDO_1,
+            .sda_gpio_num = GC9503V_LCD_IO_SPI_SDO_1,
             .io_expander = NULL,
         };
         esp_lcd_panel_io_3wire_spi_config_t io_config = GC9503_PANEL_IO_3WIRE_SPI_CONFIG(line_config, 0);
@@ -49,37 +50,35 @@ private:
         ESP_LOGI(TAG, "Install RGB LCD panel driver");
         esp_lcd_panel_handle_t panel_handle = NULL;
         esp_lcd_rgb_panel_config_t rgb_config = {
-            .clk_src = LCD_CLK_SRC_PLL240M,
+            .clk_src = LCD_CLK_SRC_PLL160M,
             .timings = GC9503_376_960_PANEL_60HZ_RGB_TIMING(),
             .data_width = 16, // RGB565 in parallel mode, thus 16bit in width
             .bits_per_pixel = 16,
-            .num_fbs = EXAMPLE_LCD_NUM_FB,
-    #if CONFIG_EXAMPLE_USE_BOUNCE_BUFFER
-            .bounce_buffer_size_px = 10 * EXAMPLE_LCD_H_RES,
-    #endif
+            .num_fbs = GC9503V_LCD_RGB_BUFFER_NUMS,
+            .bounce_buffer_size_px = GC9503V_LCD_H_RES * GC9503V_LCD_RGB_BOUNCE_BUFFER_HEIGHT,
             .dma_burst_size = 64,
-            .hsync_gpio_num = EXAMPLE_PIN_NUM_HSYNC,
-            .vsync_gpio_num = EXAMPLE_PIN_NUM_VSYNC,
-            .de_gpio_num = EXAMPLE_PIN_NUM_DE,
-            .pclk_gpio_num = EXAMPLE_PIN_NUM_PCLK,
-            .disp_gpio_num = EXAMPLE_PIN_NUM_DISP_EN,
+            .hsync_gpio_num = GC9503V_PIN_NUM_HSYNC,
+            .vsync_gpio_num = GC9503V_PIN_NUM_VSYNC,
+            .de_gpio_num = GC9503V_PIN_NUM_DE,
+            .pclk_gpio_num = GC9503V_PIN_NUM_PCLK,
+            .disp_gpio_num = GC9503V_PIN_NUM_DISP_EN,
             .data_gpio_nums = {
-                EXAMPLE_PIN_NUM_DATA0,
-                EXAMPLE_PIN_NUM_DATA1,
-                EXAMPLE_PIN_NUM_DATA2,
-                EXAMPLE_PIN_NUM_DATA3,
-                EXAMPLE_PIN_NUM_DATA4,
-                EXAMPLE_PIN_NUM_DATA5,
-                EXAMPLE_PIN_NUM_DATA6,
-                EXAMPLE_PIN_NUM_DATA7,
-                EXAMPLE_PIN_NUM_DATA8,
-                EXAMPLE_PIN_NUM_DATA9,
-                EXAMPLE_PIN_NUM_DATA10,
-                EXAMPLE_PIN_NUM_DATA11,
-                EXAMPLE_PIN_NUM_DATA12,
-                EXAMPLE_PIN_NUM_DATA13,
-                EXAMPLE_PIN_NUM_DATA14,
-                EXAMPLE_PIN_NUM_DATA15,
+                GC9503V_PIN_NUM_DATA0,
+                GC9503V_PIN_NUM_DATA1,
+                GC9503V_PIN_NUM_DATA2,
+                GC9503V_PIN_NUM_DATA3,
+                GC9503V_PIN_NUM_DATA4,
+                GC9503V_PIN_NUM_DATA5,
+                GC9503V_PIN_NUM_DATA6,
+                GC9503V_PIN_NUM_DATA7,
+                GC9503V_PIN_NUM_DATA8,
+                GC9503V_PIN_NUM_DATA9,
+                GC9503V_PIN_NUM_DATA10,
+                GC9503V_PIN_NUM_DATA11,
+                GC9503V_PIN_NUM_DATA12,
+                GC9503V_PIN_NUM_DATA13,
+                GC9503V_PIN_NUM_DATA14,
+                GC9503V_PIN_NUM_DATA15,
             },
             .flags= {
                 .fb_in_psram = true, // allocate frame buffer in PSRAM
@@ -113,18 +112,6 @@ private:
                                       .icon_font = &font_awesome_30_4,
                                       .emoji_font = font_emoji_64_init(),
                                   });
-
-        gpio_config_t config;
-        config.pin_bit_mask = BIT64(EXAMPLE_PIN_NUM_BK_LIGHT);
-        config.mode = GPIO_MODE_OUTPUT;
-        config.pull_up_en = GPIO_PULLUP_DISABLE;
-        config.pull_down_en = GPIO_PULLDOWN_ENABLE;
-        config.intr_type = GPIO_INTR_DISABLE;
-#if SOC_GPIO_SUPPORT_PIN_HYS_FILTER
-        config.hys_ctrl_mode = GPIO_HYS_SOFT_ENABLE;
-#endif
-        gpio_config(&config);
-        gpio_set_level(EXAMPLE_PIN_NUM_BK_LIGHT, 0);
     }
     void InitializeCodecI2c() {
         // Initialize I2C peripheral
@@ -162,6 +149,7 @@ private:
     void InitializeIot() {
         auto& thing_manager = iot::ThingManager::GetInstance();
         thing_manager.AddThing(iot::CreateThing("Speaker"));
+        thing_manager.AddThing(iot::CreateThing("Backlight"));
     }
 
 public:

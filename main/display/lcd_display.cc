@@ -73,42 +73,30 @@ LcdDisplay::LcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_
 
     const lvgl_port_display_cfg_t disp_cfg = {
         .panel_handle = panel_,
-        .buffer_size = static_cast<uint32_t>(width_ * height_),
+        .buffer_size = static_cast<uint32_t>(width_ * 100),
         .double_buffer = true,
         .hres = static_cast<uint32_t>(width_),
         .vres = static_cast<uint32_t>(height_),
         .monochrome = false,
-#if LVGL_VERSION_MAJOR >= 9
+        .rotation = {
+            .swap_xy = false,
+            .mirror_x = false,
+            .mirror_y = false,
+        },
         .color_format = LV_COLOR_FORMAT_RGB565,
-#endif
-        // .rotation = {
-        //     .swap_xy = false,
-        //     .mirror_x = false,
-        //     .mirror_y = false,
-        // },
         .flags = {
-            .buff_dma = false,
-            .buff_spiram = true,
-#if LVGL_VERSION_MAJOR >= 9
+            .buff_dma = true,
+            .buff_spiram = false,
+            .sw_rotate = false,
             .swap_bytes = false,
-#endif
             .full_refresh = true,
-            .direct_mode = false,
-
+            .direct_mode = true,
         }
     };
     const lvgl_port_display_rgb_cfg_t rgb_cfg = {
         .flags = {
-// #if EXAMPLE_LCD_RGB_BOUNCE_BUFFER_MODE
-//             .bb_mode = true,
-// #else
-            .bb_mode = false,
-// #endif
-// #if EXAMPLE_LCD_LVGL_AVOID_TEAR
-            .avoid_tearing = false,
-// #else
-//             .avoid_tearing = false,
-// #endif
+            .bb_mode = true,
+            .avoid_tearing = true,
         }
     };
     display_ = lvgl_port_add_disp_rgb(&disp_cfg, &rgb_cfg);
@@ -176,7 +164,7 @@ void LcdDisplay::InitializeBacklight(gpio_num_t backlight_pin) {
         .speed_mode = LEDC_LOW_SPEED_MODE,
         .duty_resolution = LEDC_TIMER_10_BIT,
         .timer_num = LEDC_TIMER_0,
-        .freq_hz = 5000,
+        .freq_hz = 20000,
         .clk_cfg = LEDC_AUTO_CLK,
         .deconfigure = false
     };
