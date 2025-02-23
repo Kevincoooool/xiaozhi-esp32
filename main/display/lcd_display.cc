@@ -6,13 +6,15 @@
 #include <driver/ledc.h>
 #include <vector>
 #include <esp_lvgl_port.h>
+#include <esp_timer.h>
+#include "assets/lang_config.h"
+
 #include "board.h"
 
 #define TAG "LcdDisplay"
 #define LCD_LEDC_CH LEDC_CHANNEL_0
 
 LV_FONT_DECLARE(font_awesome_30_4);
-
 
 LcdDisplay::LcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_t panel,
                            gpio_num_t backlight_pin, bool backlight_output_invert,
@@ -23,6 +25,18 @@ LcdDisplay::LcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_
     width_ = width;
     height_ = height;
 
+    // 创建背光渐变定时器
+    const esp_timer_create_args_t timer_args = {
+        .callback = [](void* arg) {
+            LcdDisplay* display = static_cast<LcdDisplay*>(arg);
+            display->OnBacklightTimer();
+        },
+        .arg = this,
+        .dispatch_method = ESP_TIMER_TASK,
+        .name = "backlight_timer",
+        .skip_unhandled_events = true,
+    };
+    ESP_ERROR_CHECK(esp_timer_create(&timer_args, &backlight_timer_));
     InitializeBacklight(backlight_pin);
 
     // draw white
@@ -79,12 +93,16 @@ LcdDisplay::LcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_
         lv_display_set_offset(display_, offset_x, offset_y);
     }
 
-    SetBacklight(100);
-
     SetupUI();
+
+    SetBacklight(brightness_);
 }
 
 LcdDisplay::~LcdDisplay() {
+    if (backlight_timer_ != nullptr) {
+        esp_timer_stop(backlight_timer_);
+        esp_timer_delete(backlight_timer_);
+    }
     // 然后再清理 LVGL 对象
     if (content_ != nullptr) {
         lv_obj_del(content_);
@@ -132,13 +150,30 @@ void LcdDisplay::InitializeBacklight(gpio_num_t backlight_pin) {
         .speed_mode = LEDC_LOW_SPEED_MODE,
         .duty_resolution = LEDC_TIMER_10_BIT,
         .timer_num = LEDC_TIMER_0,
-        .freq_hz = 5000,
+        .freq_hz = 20000, //背光pwm频率需要高一点，防止电感啸叫
         .clk_cfg = LEDC_AUTO_CLK,
         .deconfigure = false
     };
 
     ESP_ERROR_CHECK(ledc_timer_config(&backlight_timer));
     ESP_ERROR_CHECK(ledc_channel_config(&backlight_channel));
+}
+
+void LcdDisplay::OnBacklightTimer() {
+    if (current_brightness_ < brightness_) {
+        current_brightness_++;
+    } else if (current_brightness_ > brightness_) {
+        current_brightness_--;
+    }
+    
+    // LEDC resolution set to 10bits, thus: 100% = 1023
+    uint32_t duty_cycle = (1023 * current_brightness_) / 100;
+    ledc_set_duty(LEDC_LOW_SPEED_MODE, LCD_LEDC_CH, duty_cycle);
+    ledc_update_duty(LEDC_LOW_SPEED_MODE, LCD_LEDC_CH);
+    
+    if (current_brightness_ == brightness_) {
+        esp_timer_stop(backlight_timer_);
+    }
 }
 
 void LcdDisplay::SetBacklight(uint8_t brightness) {
@@ -151,10 +186,12 @@ void LcdDisplay::SetBacklight(uint8_t brightness) {
     }
 
     ESP_LOGI(TAG, "Setting LCD backlight: %d%%", brightness);
-    // LEDC resolution set to 10bits, thus: 100% = 1023
-    uint32_t duty_cycle = (1023 * brightness) / 100;
-    ESP_ERROR_CHECK(ledc_set_duty(LEDC_LOW_SPEED_MODE, LCD_LEDC_CH, duty_cycle));
-    ESP_ERROR_CHECK(ledc_update_duty(LEDC_LOW_SPEED_MODE, LCD_LEDC_CH));
+    // 停止现有的定时器（如果正在运行）
+    esp_timer_stop(backlight_timer_);
+
+    Display::SetBacklight(brightness);
+    // 启动定时器，每 5ms 更新一次
+    ESP_ERROR_CHECK(esp_timer_start_periodic(backlight_timer_, 5 * 1000));
 }
 
 bool LcdDisplay::Lock(int timeout_ms) {
@@ -220,15 +257,14 @@ void LcdDisplay::SetupUI() {
     notification_label_ = lv_label_create(status_bar_);
     lv_obj_set_flex_grow(notification_label_, 1);
     lv_obj_set_style_text_align(notification_label_, LV_TEXT_ALIGN_CENTER, 0);
-    lv_label_set_text(notification_label_, "通知");
+    lv_label_set_text(notification_label_, "");
     lv_obj_add_flag(notification_label_, LV_OBJ_FLAG_HIDDEN);
 
     status_label_ = lv_label_create(status_bar_);
     lv_obj_set_flex_grow(status_label_, 1);
     lv_label_set_long_mode(status_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
-    lv_label_set_text(status_label_, "正在初始化");
     lv_obj_set_style_text_align(status_label_, LV_TEXT_ALIGN_CENTER, 0);
-
+    lv_label_set_text(status_label_, Lang::Strings::INITIALIZING);
     mute_label_ = lv_label_create(status_bar_);
     lv_label_set_text(mute_label_, "");
     lv_obj_set_style_text_font(mute_label_, fonts_.icon_font, 0);
@@ -238,15 +274,7 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_text_font(battery_label_, fonts_.icon_font, 0);
 }
 
-void LcdDisplay::SetChatMessage(const std::string &role, const std::string &content) {
-    DisplayLockGuard lock(this);
-    if (chat_message_label_ == nullptr) {
-        return;
-    }
-    lv_label_set_text(chat_message_label_, content.c_str());
-}
-
-void LcdDisplay::SetEmotion(const std::string &emotion) {
+void LcdDisplay::SetEmotion(const char* emotion) {
     struct Emotion {
         const char* icon;
         const char* text;
@@ -277,8 +305,9 @@ void LcdDisplay::SetEmotion(const std::string &emotion) {
     };
     
     // 查找匹配的表情
+    std::string_view emotion_view(emotion);
     auto it = std::find_if(emotions.begin(), emotions.end(),
-        [&emotion](const Emotion& e) { return e.text == emotion; });
+        [&emotion_view](const Emotion& e) { return e.text == emotion_view; });
 
     DisplayLockGuard lock(this);
     if (emotion_label_ == nullptr) {

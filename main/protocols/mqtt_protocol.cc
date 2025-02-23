@@ -8,13 +8,12 @@
 #include <ml307_udp.h>
 #include <cstring>
 #include <arpa/inet.h>
+#include "assets/lang_config.h"
 
 #define TAG "MQTT"
 
 MqttProtocol::MqttProtocol() {
     event_group_handle_ = xEventGroupCreate();
-
-    StartMqttClient();
 }
 
 MqttProtocol::~MqttProtocol() {
@@ -26,6 +25,10 @@ MqttProtocol::~MqttProtocol() {
         delete mqtt_;
     }
     vEventGroupDelete(event_group_handle_);
+}
+
+void MqttProtocol::Start() {
+    StartMqttClient();
 }
 
 bool MqttProtocol::StartMqttClient() {
@@ -85,7 +88,7 @@ bool MqttProtocol::StartMqttClient() {
     if (!mqtt_->Connect(endpoint_, 8883, client_id_, username_, password_)) {
         ESP_LOGE(TAG, "Failed to connect to endpoint");
         if (on_network_error_ != nullptr) {
-            on_network_error_("无法连接服务");
+            on_network_error_(Lang::Strings::UNABLE_TO_CONNECT_TO_SERVICE);
         }
         return false;
     }
@@ -98,7 +101,12 @@ void MqttProtocol::SendText(const std::string& text) {
     if (publish_topic_.empty()) {
         return;
     }
-    mqtt_->Publish(publish_topic_, text);
+    if (!mqtt_->Publish(publish_topic_, text)) {
+        ESP_LOGE(TAG, "Failed to publish message");
+        if (on_network_error_ != nullptr) {
+            on_network_error_(Lang::Strings::SENDING_FAILED_PLEASE_CHECK_THE_NETWORK);
+        }
+    }
 }
 
 void MqttProtocol::SendAudio(const std::vector<uint8_t>& data) {
@@ -171,7 +179,7 @@ bool MqttProtocol::OpenAudioChannel() {
     if (!(bits & MQTT_PROTOCOL_SERVER_HELLO_EVENT)) {
         ESP_LOGE(TAG, "Failed to receive server hello");
         if (on_network_error_ != nullptr) {
-            on_network_error_("等待响应超时");
+            on_network_error_(Lang::Strings::WAITING_FOR_RESPONSE_TIMEOUT);
         }
         return false;
     }

@@ -8,10 +8,15 @@
 #include "application.h"
 #include "font_awesome_symbols.h"
 #include "audio_codec.h"
+#include "settings.h"
 
 #define TAG "Display"
 
 Display::Display() {
+    // Load brightness from settings
+    Settings settings("display");
+    brightness_ = settings.GetInt("brightness", 100);
+
     // Notification timer
     esp_timer_create_args_t notification_timer_args = {
         .callback = [](void *arg) {
@@ -62,22 +67,26 @@ Display::~Display() {
     }
 }
 
-void Display::SetStatus(const std::string &status) {
+void Display::SetStatus(const char* status) {
     DisplayLockGuard lock(this);
     if (status_label_ == nullptr) {
         return;
     }
-    lv_label_set_text(status_label_, status.c_str());
+    lv_label_set_text(status_label_, status);
     lv_obj_clear_flag(status_label_, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(notification_label_, LV_OBJ_FLAG_HIDDEN);
 }
 
 void Display::ShowNotification(const std::string &notification, int duration_ms) {
+    ShowNotification(notification.c_str(), duration_ms);
+}
+
+void Display::ShowNotification(const char* notification, int duration_ms) {
     DisplayLockGuard lock(this);
     if (notification_label_ == nullptr) {
         return;
     }
-    lv_label_set_text(notification_label_, notification.c_str());
+    lv_label_set_text(notification_label_, notification);
     lv_obj_clear_flag(notification_label_, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(status_label_, LV_OBJ_FLAG_HIDDEN);
 
@@ -149,7 +158,7 @@ void Display::Update() {
 }
 
 
-void Display::SetEmotion(const std::string &emotion) {
+void Display::SetEmotion(const char* emotion) {
     struct Emotion {
         const char* icon;
         const char* text;
@@ -180,8 +189,9 @@ void Display::SetEmotion(const std::string &emotion) {
     };
     
     // 查找匹配的表情
+    std::string_view emotion_view(emotion);
     auto it = std::find_if(emotions.begin(), emotions.end(),
-        [&emotion](const Emotion& e) { return e.text == emotion; });
+        [&emotion_view](const Emotion& e) { return e.text == emotion_view; });
     
     DisplayLockGuard lock(this);
     if (emotion_label_ == nullptr) {
@@ -204,5 +214,16 @@ void Display::SetIcon(const char* icon) {
     lv_label_set_text(emotion_label_, icon);
 }
 
-void Display::SetChatMessage(const std::string &role, const std::string &content) {
+void Display::SetChatMessage(const char* role, const char* content) {
+    DisplayLockGuard lock(this);
+    if (chat_message_label_ == nullptr) {
+        return;
+    }
+    lv_label_set_text(chat_message_label_, content);
+}
+
+void Display::SetBacklight(uint8_t brightness) {
+    Settings settings("display", true);
+    settings.SetInt("brightness", brightness);
+    brightness_ = brightness;
 }
