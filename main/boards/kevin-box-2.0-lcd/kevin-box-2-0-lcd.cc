@@ -205,7 +205,7 @@ private:
         boot_button_.OnClick([this]() {
             auto& app = Application::GetInstance();
             if (app.GetDeviceState() == kDeviceStateStarting && !WifiStation::GetInstance().IsConnected()) {
-                // ResetWifiConfiguration();
+                ResetWifiConfiguration();
             }
         });
         boot_button_.OnPressDown([this]() {
@@ -225,7 +225,7 @@ private:
         io_config.cs_gpio_num = GPIO_NUM_13;
         io_config.dc_gpio_num = GPIO_NUM_11;
         io_config.spi_mode = 0;
-        io_config.pclk_hz = 60 * 1000 * 1000;
+        io_config.pclk_hz = 80 * 1000 * 1000;
         io_config.trans_queue_depth = 10;
         io_config.lcd_cmd_bits = 8;
         io_config.lcd_param_bits = 8;
@@ -257,6 +257,7 @@ private:
     void InitializeIot() {
         auto& thing_manager = iot::ThingManager::GetInstance();
         thing_manager.AddThing(iot::CreateThing("Speaker"));
+        thing_manager.AddThing(iot::CreateThing("Backlight"));
 
     }
 
