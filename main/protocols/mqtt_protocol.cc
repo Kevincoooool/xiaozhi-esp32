@@ -8,13 +8,12 @@
 #include <ml307_udp.h>
 #include <cstring>
 #include <arpa/inet.h>
+#include "assets/lang_config.h"
 
 #define TAG "MQTT"
 
 MqttProtocol::MqttProtocol() {
     event_group_handle_ = xEventGroupCreate();
-
-    StartMqttClient();
 }
 
 MqttProtocol::~MqttProtocol() {
@@ -28,6 +27,10 @@ MqttProtocol::~MqttProtocol() {
     vEventGroupDelete(event_group_handle_);
 }
 
+void MqttProtocol::Start() {
+    StartMqttClient();
+}
+
 bool MqttProtocol::StartMqttClient() {
     if (mqtt_ != nullptr) {
         ESP_LOGW(TAG, "Mqtt client already started");
@@ -39,11 +42,13 @@ bool MqttProtocol::StartMqttClient() {
     client_id_ = settings.GetString("client_id");
     username_ = settings.GetString("username");
     password_ = settings.GetString("password");
-    subscribe_topic_ = settings.GetString("subscribe_topic");
     publish_topic_ = settings.GetString("publish_topic");
 
     if (endpoint_.empty()) {
         ESP_LOGE(TAG, "MQTT endpoint is not specified");
+        if (on_network_error_ != nullptr) {
+            on_network_error_(Lang::Strings::SERVER_NOT_FOUND);
+        }
         return false;
     }
 
@@ -86,15 +91,12 @@ bool MqttProtocol::StartMqttClient() {
     if (!mqtt_->Connect(endpoint_, 8883, client_id_, username_, password_)) {
         ESP_LOGE(TAG, "Failed to connect to endpoint");
         if (on_network_error_ != nullptr) {
-            on_network_error_("无法连接服务");
+            on_network_error_(Lang::Strings::SERVER_NOT_CONNECTED);
         }
         return false;
     }
 
     ESP_LOGI(TAG, "Connected to endpoint");
-    if (!subscribe_topic_.empty()) {
-        mqtt_->Subscribe(subscribe_topic_, 2);
-    }
     return true;
 }
 
@@ -102,7 +104,12 @@ void MqttProtocol::SendText(const std::string& text) {
     if (publish_topic_.empty()) {
         return;
     }
-    mqtt_->Publish(publish_topic_, text);
+    if (!mqtt_->Publish(publish_topic_, text)) {
+        ESP_LOGE(TAG, "Failed to publish message");
+        if (on_network_error_ != nullptr) {
+            on_network_error_(Lang::Strings::SERVER_ERROR);
+        }
+    }
 }
 
 void MqttProtocol::SendAudio(const std::vector<uint8_t>& data) {
@@ -158,6 +165,7 @@ bool MqttProtocol::OpenAudioChannel() {
     }
 
     session_id_ = "";
+    xEventGroupClearBits(event_group_handle_, MQTT_PROTOCOL_SERVER_HELLO_EVENT);
 
     // 发送 hello 消息申请 UDP 通道
     std::string message = "{";
@@ -174,7 +182,7 @@ bool MqttProtocol::OpenAudioChannel() {
     if (!(bits & MQTT_PROTOCOL_SERVER_HELLO_EVENT)) {
         ESP_LOGE(TAG, "Failed to receive server hello");
         if (on_network_error_ != nullptr) {
-            on_network_error_("等待响应超时");
+            on_network_error_(Lang::Strings::SERVER_TIMEOUT);
         }
         return false;
     }
@@ -238,6 +246,7 @@ void MqttProtocol::ParseServerHello(const cJSON* root) {
     auto session_id = cJSON_GetObjectItem(root, "session_id");
     if (session_id != nullptr) {
         session_id_ = session_id->valuestring;
+        ESP_LOGI(TAG, "Session ID: %s", session_id_.c_str());
     }
 
     // Get sample rate from hello message

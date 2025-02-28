@@ -9,12 +9,14 @@
 #include "led/single_led.h"
 
 #include <esp_log.h>
-#include <esp_spiffs.h>
 #include <driver/gpio.h>
 #include <driver/i2c_master.h>
 #include <esp_timer.h>
 
 #define TAG "KevinBoxBoard"
+
+LV_FONT_DECLARE(font_puhui_14_1);
+LV_FONT_DECLARE(font_awesome_14_1);
 
 class KevinBoxBoard : public Ml307Board {
 private:
@@ -35,7 +37,7 @@ private:
             },
             .arg = this,
             .dispatch_method = ESP_TIMER_TASK,
-            .name = "Power Save Timer",
+            .name = "power_save_timer",
             .skip_unhandled_events = false,
         };
         ESP_ERROR_CHECK(esp_timer_create(&power_save_timer_args, &power_save_timer_));
@@ -59,17 +61,6 @@ private:
         if (seconds >= seconds_to_shutdown) {
             axp2101_->PowerOff();
         }
-    }
-
-    void MountStorage() {
-        // Mount the storage partition
-        esp_vfs_spiffs_conf_t conf = {
-            .base_path = "/storage",
-            .partition_label = "storage",
-            .max_files = 5,
-            .format_if_mount_failed = true,
-        };
-        esp_vfs_spiffs_register(&conf);
     }
 
     void Enable4GModule() {
@@ -172,7 +163,6 @@ public:
         InitializeCodecI2c();
         axp2101_ = new Axp2101(codec_i2c_bus_, AXP2101_I2C_ADDR);
 
-        MountStorage();
         Enable4GModule();
 
         InitializeButtons();
@@ -193,7 +183,8 @@ public:
     }
 
     virtual Display* GetDisplay() override {
-        static Ssd1306Display display(display_i2c_bus_, DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y);
+        static Ssd1306Display display(display_i2c_bus_, DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y,
+                                    &font_puhui_14_1, &font_awesome_14_1);
         return &display;
     }
 
