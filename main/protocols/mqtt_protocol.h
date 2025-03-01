@@ -25,6 +25,7 @@ public:
     MqttProtocol();
     ~MqttProtocol();
 
+    void Start() override;
     void SendAudio(const std::vector<uint8_t>& data) override;
     bool OpenAudioChannel() override;
     void CloseAudioChannel() override;
@@ -37,7 +38,6 @@ private:
     std::string client_id_;
     std::string username_;
     std::string password_;
-    std::string subscribe_topic_;
     std::string publish_topic_;
 
     std::mutex channel_mutex_;
