@@ -227,3 +227,7 @@ void Display::SetBacklight(uint8_t brightness) {
     settings.SetInt("brightness", brightness);
     brightness_ = brightness;
 }
+
+void Display::SetFaceImage(uint8_t* frame_buffer, int width, int height) {
+    
+}

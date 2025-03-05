@@ -13,7 +13,7 @@
 #include <font_emoji.h>
 
 #include <atomic>
-
+#include <cstring>
 class LcdDisplay : public Display {
 protected:
     esp_lcd_panel_io_handle_t panel_io_ = nullptr;
@@ -26,7 +26,6 @@ protected:
     lv_obj_t* content_ = nullptr;
     lv_obj_t* container_ = nullptr;
     lv_obj_t* side_bar_ = nullptr;
-
     DisplayFonts fonts_;
 
     esp_timer_handle_t backlight_timer_ = nullptr;
@@ -52,6 +51,8 @@ public:
     virtual void SetEmotion(const char* emotion) override;
     virtual void SetIcon(const char* icon) override;
     virtual void SetBacklight(uint8_t brightness) override;
+    virtual void SetFaceImage(uint8_t* frame_buffer, int width, int height);
+
 };
 
 // RGB LCD显示器

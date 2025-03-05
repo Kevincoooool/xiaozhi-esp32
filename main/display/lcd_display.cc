@@ -10,7 +10,7 @@
 #include "assets/lang_config.h"
 
 #include "board.h"
-
+#include "avi_player_port.h"
 #define TAG "LcdDisplay"
 #define LCD_LEDC_CH LEDC_CHANNEL_0
 
@@ -61,7 +61,7 @@ SpiLcdDisplay::SpiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_h
         .panel_handle = panel_,
         .control_handle = nullptr,
         .buffer_size = static_cast<uint32_t>(width_ * 10),
-        .double_buffer = false,
+        .double_buffer = true,
         .trans_size = 0,
         .hres = static_cast<uint32_t>(width_),
         .vres = static_cast<uint32_t>(height_),
@@ -94,7 +94,8 @@ SpiLcdDisplay::SpiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_h
 
     SetupUI();
 
-    SetBacklight(brightness_);
+    SetBacklight(brightness_);    
+
 }
 
 // RGB LCD实现
@@ -279,14 +280,14 @@ bool LcdDisplay::Lock(int timeout_ms) {
 
 void LcdDisplay::Unlock() {
     lvgl_port_unlock();
-}
+} 
 
 void LcdDisplay::SetupUI() {
     DisplayLockGuard lock(this);
 
     auto screen = lv_screen_active();
     lv_obj_set_style_text_font(screen, fonts_.text_font, 0);
-    lv_obj_set_style_text_color(screen, lv_color_black(), 0);
+    lv_obj_set_style_text_color(screen, lv_color_white(), 0);
 
     /* Container */
     container_ = lv_obj_create(screen);
@@ -296,11 +297,14 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_border_width(container_, 0, 0);
     lv_obj_set_style_pad_row(container_, 0, 0);
 
+   
     /* Status bar */
     status_bar_ = lv_obj_create(container_);
     lv_obj_set_size(status_bar_, LV_HOR_RES, fonts_.text_font->line_height);
     lv_obj_set_style_radius(status_bar_, 0, 0);
-    
+    avi_image = lv_canvas_create(container_);
+    lv_obj_set_size(avi_image, LV_HOR_RES, 220); // 设置合适的大小
+    lv_obj_center(avi_image);
     /* Content */
     content_ = lv_obj_create(container_);
     lv_obj_set_scrollbar_mode(content_, LV_SCROLLBAR_MODE_OFF);
@@ -311,15 +315,16 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_flex_flow(content_, LV_FLEX_FLOW_COLUMN); // 垂直布局（从上到下）
     lv_obj_set_flex_align(content_, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_SPACE_EVENLY); // 子对象居中对齐，等距分布
 
-    emotion_label_ = lv_label_create(content_);
-    lv_obj_set_style_text_font(emotion_label_, &font_awesome_30_4, 0);
-    lv_label_set_text(emotion_label_, FONT_AWESOME_AI_CHIP);
+    // emotion_label_ = lv_label_create(content_);
+    // lv_obj_set_style_text_font(emotion_label_, &font_awesome_30_4, 0);
+    // lv_label_set_text(emotion_label_, FONT_AWESOME_AI_CHIP);
 
     chat_message_label_ = lv_label_create(content_);
     lv_label_set_text(chat_message_label_, "");
     lv_obj_set_width(chat_message_label_, LV_HOR_RES * 0.9); // 限制宽度为屏幕宽度的 90%
     lv_label_set_long_mode(chat_message_label_, LV_LABEL_LONG_WRAP); // 设置为自动换行模式
     lv_obj_set_style_text_align(chat_message_label_, LV_TEXT_ALIGN_CENTER, 0); // 设置文本居中对齐
+    
 
     /* Status bar */
     lv_obj_set_flex_flow(status_bar_, LV_FLEX_FLOW_ROW);
@@ -351,6 +356,7 @@ void LcdDisplay::SetupUI() {
     battery_label_ = lv_label_create(status_bar_);
     lv_label_set_text(battery_label_, "");
     lv_obj_set_style_text_font(battery_label_, fonts_.icon_font, 0);
+
 }
 
 void LcdDisplay::SetEmotion(const char* emotion) {
@@ -389,17 +395,53 @@ void LcdDisplay::SetEmotion(const char* emotion) {
         [&emotion_view](const Emotion& e) { return e.text == emotion_view; });
 
     DisplayLockGuard lock(this);
-    if (emotion_label_ == nullptr) {
-        return;
-    }
+    // if (emotion_label_ == nullptr) {
+    //     return;
+    // }
 
-    // 如果找到匹配的表情就显示对应图标，否则显示默认的neutral表情
-    lv_obj_set_style_text_font(emotion_label_, fonts_.emoji_font, 0);
-    if (it != emotions.end()) {
-        lv_label_set_text(emotion_label_, it->icon);
-    } else {
-        lv_label_set_text(emotion_label_, "😶");
+    // // 如果找到匹配的表情就显示对应图标，否则显示默认的neutral表情
+    // lv_obj_set_style_text_font(emotion_label_, fonts_.emoji_font, 0);
+    // if (it != emotions.end()) {
+    //     lv_label_set_text(emotion_label_, it->icon);
+    // } else {
+    //     lv_label_set_text(emotion_label_, "😶");
+    // }
+     // 可以根据emotion选择不同的视频文件
+     const char* video_path = "/spiffs/neutral.avi"; // 默认视频
+    printf("emotion: %s\n", emotion);
+    if (strcmp(emotion, "happy") == 0) {
+        video_path = "/spiffs/happy.avi";
+    } else if (strcmp(emotion, "laughing") == 0) {
+        video_path = "/spiffs/laughing.avi";
+    } else if (strcmp(emotion, "funny") == 0) {
+        video_path = "/spiffs/funny.avi";
+    } else if (strcmp(emotion, "sad") == 0) {
+        video_path = "/spiffs/sad.avi";
+    } else if (strcmp(emotion, "angry") == 0) {
+        video_path = "/spiffs/angry.avi";
+    } else if (strcmp(emotion, "crying") == 0) {
+        video_path = "/spiffs/crying.avi";
+    } else if (strcmp(emotion, "loving") == 0) {
+        video_path = "/spiffs/loving.avi";
+    } else if (strcmp(emotion, "embarrassed") == 0) {
+        video_path = "/spiffs/embarrassed.avi";
+    } else if (strcmp(emotion, "surprised") == 0) {
+        video_path = "/spiffs/surprised.avi";
+    } else if (strcmp(emotion, "thinking") == 0) {
+        video_path = "/spiffs/thinking.avi";
+    } else if (strcmp(emotion, "sleepy") == 0) {
+        video_path = "/spiffs/sleepy.avi";
+    } else if (strcmp(emotion, "cool") == 0) {
+        video_path = "/spiffs/cool.avi";
+    } else if (strcmp(emotion, "confused") == 0) {
+        video_path = "/spiffs/confused.avi";
+    } else if (strcmp(emotion, "talk") == 0) {
+        video_path = "/spiffs/talk.avi";
     }
+     // ... 添加更多情绪对应的视频
+     
+     // 播放对应的视频文件
+     avi_player_port_play_file(video_path);
 }
 
 void LcdDisplay::SetIcon(const char* icon) {
@@ -409,4 +451,11 @@ void LcdDisplay::SetIcon(const char* icon) {
     }
     lv_obj_set_style_text_font(emotion_label_, &font_awesome_30_4, 0);
     lv_label_set_text(emotion_label_, icon);
+}
+void LcdDisplay::SetFaceImage(uint8_t* frame_buffer, int width, int height) {
+    DisplayLockGuard lock(this);
+    if (avi_image == nullptr || frame_buffer == nullptr) {
+        return;
+    }
+    lv_canvas_set_buffer(avi_image, frame_buffer, width, height, LV_COLOR_FORMAT_RGB565);
 }

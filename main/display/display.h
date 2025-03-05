@@ -25,11 +25,12 @@ public:
     virtual void SetChatMessage(const char* role, const char* content);
     virtual void SetIcon(const char* icon);
     virtual void SetBacklight(uint8_t brightness);
+    virtual void SetFaceImage(uint8_t* frame_buffer, int width, int height);
 
     inline int width() const { return width_; }
     inline int height() const { return height_; }
     inline uint8_t brightness() const { return brightness_; }
-
+    
 protected:
     int width_ = 0;
     int height_ = 0;
@@ -44,6 +45,7 @@ protected:
     lv_obj_t *mute_label_ = nullptr;
     lv_obj_t *battery_label_ = nullptr;
     lv_obj_t* chat_message_label_ = nullptr;
+    lv_obj_t *avi_image = nullptr;
     const char* battery_icon_ = nullptr;
     const char* network_icon_ = nullptr;
     bool muted_ = false;
