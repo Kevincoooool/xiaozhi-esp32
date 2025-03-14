@@ -1,0 +1,9 @@
+{
+    "target": "esp32s3",
+    "builds": [
+        {
+            "name": "s3-yuying1.9lcd",
+            "sdkconfig_append": []
+        }
+    ]
+}
