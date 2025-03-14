@@ -78,6 +78,8 @@ choice BOARD_TYPE
         bool "Kevin SP V3开发板"
     config BOARD_TYPE_KEVIN_SP_V4_DEV
         bool "Kevin SP V4开发板"
+    config BOARD_TYPE_KEVIN_SX_101
+        bool "Kevin SX 101"
     config BOARD_TYPE_KEVIN_YUYING_313LCD
         bool "鱼鹰科技3.13LCD开发板"
     config BOARD_TYPE_LICHUANG_DEV
