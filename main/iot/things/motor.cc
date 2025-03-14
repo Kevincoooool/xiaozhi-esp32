@@ -1,0 +1,97 @@
+#include "iot/thing.h"
+#include "board.h"
+#include "audio_codec.h"
+
+#include <driver/ledc.h>
+#include <esp_log.h>
+#include <algorithm>
+
+#define TAG "Motor"
+
+namespace iot {
+
+class Motor : public Thing {
+private:
+    static constexpr gpio_num_t GPIO_NUM = GPIO_NUM_40;    // 电机控制GPIO
+    static constexpr uint32_t FREQ_HZ = 20000;            // PWM频率25KHz
+    static constexpr ledc_timer_t TIMER_NUM = LEDC_TIMER_0;
+    static constexpr ledc_channel_t CHANNEL = LEDC_CHANNEL_0;
+    static constexpr ledc_mode_t SPEED_MODE = LEDC_LOW_SPEED_MODE;
+    static constexpr uint32_t DUTY_MAX = 1024;            // 13位分辨率
+
+    bool running_ = false;
+    uint32_t speed_ = 0;  // 速度值 0-8192
+
+    void InitializePwm() {
+        ledc_timer_config_t timer_conf = {
+            .speed_mode = SPEED_MODE,
+            .duty_resolution = LEDC_TIMER_10_BIT,
+            .timer_num = TIMER_NUM,
+            .freq_hz = FREQ_HZ,
+            .clk_cfg = LEDC_AUTO_CLK
+        };
+        ESP_ERROR_CHECK(ledc_timer_config(&timer_conf));
+
+        ledc_channel_config_t channel_conf = {
+            .gpio_num = GPIO_NUM,
+            .speed_mode = SPEED_MODE,
+            .channel = CHANNEL,
+            .intr_type = LEDC_INTR_DISABLE,
+            .timer_sel = TIMER_NUM,
+            .duty = 0,
+            .hpoint = 0,
+            .flags = {
+                .output_invert = 0
+            }
+        };
+        ESP_ERROR_CHECK(ledc_channel_config(&channel_conf));
+
+        // 启用渐变功能实现平滑控制
+        ESP_ERROR_CHECK(ledc_fade_func_install(0));
+    }
+
+
+public:
+    Motor() : Thing("Motor", "可调力度") {
+        InitializePwm();
+
+        properties_.AddNumberProperty("Speed", "力度 (0-100)", [this]() -> double {
+            return (speed_ * 100.0) / DUTY_MAX;
+        });
+
+        // 定义启动电机的方法
+        methods_.AddMethod("Start", "大力一点", ParameterList(), [this](const ParameterList& parameters) {
+            running_ = true;
+            ESP_LOGI(TAG, "Motor started");
+        });
+
+        // 定义停止电机的方法
+        methods_.AddMethod("Stop", "小点力", ParameterList(), [this](const ParameterList& parameters) {
+            running_ = false;
+
+            ESP_LOGI(TAG, "Motor stopped");
+        });
+
+        // 定义设置速度的方法
+        methods_.AddMethod("SetSpeed", "设置电机速度", ParameterList({
+            Parameter("Speed", "0到100之间的整数",kValueTypeNumber,  true)
+            }), [this](const ParameterList& parameters) {
+                double speed = static_cast<uint8_t>(parameters["Speed"].number());
+                uint32_t duty_cycle = (1023 * speed) / 100;
+                ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty_cycle);
+                ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
+                ESP_LOGI(TAG, "Set motor speed to %.1f%%, duty: %lu", speed, duty_cycle);
+            });
+    }
+
+    ~Motor() {
+        // 停止电机并清理资源
+        running_ = false;
+        ledc_stop(SPEED_MODE, CHANNEL, 0);
+        ledc_fade_func_uninstall();
+    }
+};
+
+} // namespace iot
+
+DECLARE_THING(Motor);
