@@ -9,7 +9,7 @@
 #include <mutex>
 #include <vector>
 
-#define DEFAULT_BRIGHTNESS 32
+#define DEFAULT_BRIGHTNESS 252
 #define LOW_BRIGHTNESS 4
 
 struct StripColor {
