@@ -7,7 +7,8 @@
 #include "config.h"
 #include "iot/thing_manager.h"
 #include "led/single_led.h"
-
+#include "power_save_timer.h"
+#include "axp2101.h"
 #include <esp_log.h>
 #include <esp_lcd_panel_vendor.h>
 #include <driver/i2c_master.h>
@@ -18,12 +19,51 @@
 LV_FONT_DECLARE(font_puhui_20_4);
 LV_FONT_DECLARE(font_awesome_20_4);
 
+
+class Pmic : public Axp2101 {
+    public:
+        Pmic(i2c_master_bus_handle_t i2c_bus, uint8_t addr) : Axp2101(i2c_bus, addr) {
+            // ** EFUSE defaults **
+            WriteReg(0x22, 0b110); // PWRON > OFFLEVEL as POWEROFF Source enable
+            WriteReg(0x27, 0x10);  // hold 4s to power off
+        
+            WriteReg(0x93, 0x1C); // 配置 aldo2 输出为 3.3V
+        
+            uint8_t value = ReadReg(0x90); // XPOWERS_AXP2101_LDO_ONOFF_CTRL0
+            value = value | 0x02; // set bit 1 (ALDO2)
+            WriteReg(0x90, value);  // and power channels now enabled
+        
+            WriteReg(0x64, 0x03); // CV charger voltage setting to 4.2V
+            
+            WriteReg(0x61, 0x05); // set Main battery precharge current to 125mA
+            WriteReg(0x62, 0x0A); // set Main battery charger current to 400mA ( 0x08-200mA, 0x09-300mA, 0x0A-400mA )
+            WriteReg(0x63, 0x15); // set Main battery term charge current to 125mA
+        
+            WriteReg(0x14, 0x00); // set minimum system voltage to 4.1V (default 4.7V), for poor USB cables
+            WriteReg(0x15, 0x00); // set input voltage limit to 3.88v, for poor USB cables
+            WriteReg(0x16, 0x05); // set input current limit to 2000mA
+        
+            WriteReg(0x24, 0x01); // set Vsys for PWROFF threshold to 3.2V (default - 2.6V and kill battery)
+            WriteReg(0x50, 0x14); // set TS pin to EXTERNAL input (not temperature)
+        }
+    };
+    
 class SHIKAI_TOY : public WifiBoard {
 private:
     i2c_master_bus_handle_t display_i2c_bus_;
     Button boot_button_;
     LcdDisplay* display_;
     i2c_master_bus_handle_t codec_i2c_bus_;
+    PowerSaveTimer* power_save_timer_;
+    Pmic* pmic_ = nullptr;
+    void InitializePowerSaveTimer() {
+        power_save_timer_ = new PowerSaveTimer(-1, -1, 600);
+        power_save_timer_->OnShutdownRequest([this]() {
+            pmic_->PowerOff();
+        });
+        power_save_timer_->SetEnabled(true);
+    }
+
     void InitializeCodecI2c() {
         // Initialize I2C peripheral
         i2c_master_bus_config_t i2c_bus_cfg = {
@@ -109,6 +149,7 @@ private:
         auto& thing_manager = iot::ThingManager::GetInstance();
         thing_manager.AddThing(iot::CreateThing("Speaker"));
         thing_manager.AddThing(iot::CreateThing("Motor"));
+        thing_manager.AddThing(iot::CreateThing("Battery"));
         // thing_manager.AddThing(iot::CreateThing("Lamp"));
         // thing_manager.AddThing(iot::CreateThing("Backlight"));
     }
@@ -117,9 +158,11 @@ public:
     SHIKAI_TOY() :  boot_button_(BOOT_BUTTON_GPIO) {
         ESP_LOGI(TAG, "Initializing KEVIN SP V4 Board");
         InitializeCodecI2c();
+        pmic_ = new Pmic(codec_i2c_bus_, AXP2101_I2C_ADDR);
+
         InitializeSpi();
         InitializeButtons();
-        // InitializeSt7789Display();  
+        InitializePowerSaveTimer();
         InitializeIot();
         // GetBacklight()->RestoreBrightness();
     }
@@ -137,14 +180,10 @@ public:
         return &audio_codec;
     }
 
-    // virtual Display *GetDisplay() override {
-    //     return display_;
+    // virtual Backlight* GetBacklight() override {
+    //     static PwmBacklight backlight(DISPLAY_BACKLIGHT_PIN, DISPLAY_BACKLIGHT_OUTPUT_INVERT);
+    //     return &backlight;
     // }
-    
-    virtual Backlight* GetBacklight() override {
-        static PwmBacklight backlight(DISPLAY_BACKLIGHT_PIN, DISPLAY_BACKLIGHT_OUTPUT_INVERT);
-        return &backlight;
-    }
 };
 
 DECLARE_BOARD(SHIKAI_TOY);

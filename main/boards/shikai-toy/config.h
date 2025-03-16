@@ -42,5 +42,6 @@
 
 #define ML307_RX_PIN GPIO_NUM_12
 #define ML307_TX_PIN GPIO_NUM_13
+#define AXP2101_I2C_ADDR 0x34
 
 #endif // _BOARD_CONFIG_H_

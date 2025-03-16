@@ -12,7 +12,7 @@ namespace iot {
 
 class Motor : public Thing {
 private:
-    static constexpr gpio_num_t GPIO_NUM = GPIO_NUM_40;    // 电机控制GPIO
+    static constexpr gpio_num_t GPIO_NUM = GPIO_NUM_38;    // 电机控制GPIO
     static constexpr uint32_t FREQ_HZ = 20000;            // PWM频率25KHz
     static constexpr ledc_timer_t TIMER_NUM = LEDC_TIMER_0;
     static constexpr ledc_channel_t CHANNEL = LEDC_CHANNEL_0;
@@ -72,12 +72,13 @@ public:
             ESP_LOGI(TAG, "Motor stopped");
         });
 
-        // 定义设置速度的方法
-        methods_.AddMethod("SetSpeed", "设置电机速度", ParameterList({
+        // 可以修改代码中的映射关系
+        methods_.AddMethod("SetSpeed", "设置力度", ParameterList({
             Parameter("Speed", "0到100之间的整数",kValueTypeNumber,  true)
             }), [this](const ParameterList& parameters) {
                 double speed = static_cast<uint8_t>(parameters["Speed"].number());
-                uint32_t duty_cycle = (1023 * speed) / 100;
+                // 将输入范围重新映射到70-100%
+                uint32_t duty_cycle = 650 + ((1023 - 650) * speed) / 100; // 717约等于70%*1023
                 ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty_cycle);
                 ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
                 ESP_LOGI(TAG, "Set motor speed to %.1f%%, duty: %lu", speed, duty_cycle);
