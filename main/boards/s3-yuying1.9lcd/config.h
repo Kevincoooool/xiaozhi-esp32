@@ -35,15 +35,25 @@
 
 #define DISPLAY_SDA_PIN GPIO_NUM_NC
 #define DISPLAY_SCL_PIN GPIO_NUM_NC
+/*竖屏配置*/
 #define DISPLAY_WIDTH   170
 #define DISPLAY_HEIGHT  320
 #define DISPLAY_SWAP_XY false
 #define DISPLAY_MIRROR_X false
 #define DISPLAY_MIRROR_Y false
 #define BACKLIGHT_INVERT false
-
 #define DISPLAY_OFFSET_X  35
 #define DISPLAY_OFFSET_Y  0
+/*横屏配置*/
+// #define DISPLAY_WIDTH   320
+// #define DISPLAY_HEIGHT  170
+// #define DISPLAY_SWAP_XY true
+// #define DISPLAY_MIRROR_X false
+// #define DISPLAY_MIRROR_Y true
+// #define BACKLIGHT_INVERT false
+
+// #define DISPLAY_OFFSET_X  0
+// #define DISPLAY_OFFSET_Y  35
 
 #define DISPLAY_BACKLIGHT_PIN GPIO_NUM_11
 #define DISPLAY_BACKLIGHT_OUTPUT_INVERT true
