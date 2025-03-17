@@ -250,11 +250,6 @@ void Display::SetChatMessage(const char* role, const char* content) {
     lv_label_set_text(chat_message_label_, content);
 }
 
-void Display::SetBacklight(uint8_t brightness) {
-    Settings settings("display", true);
-    settings.SetInt("brightness", brightness);
-    brightness_ = brightness;
-}
 
 void Display::SetFaceImage(uint8_t* frame_buffer, int width, int height) {
     

@@ -29,14 +29,17 @@
 #ifdef CONFIG_LCD_ST7789
 #define DISPLAY_SDA_PIN GPIO_NUM_NC
 #define DISPLAY_SCL_PIN GPIO_NUM_NC
-#define DISPLAY_WIDTH   280
+#define DISPLAY_WIDTH   240
 #define DISPLAY_HEIGHT  240
-#define DISPLAY_SWAP_XY true
-#define DISPLAY_MIRROR_X false
-#define DISPLAY_MIRROR_Y true
+// #define DISPLAY_SWAP_XY true
+// #define DISPLAY_MIRROR_X false
+// #define DISPLAY_MIRROR_Y true
+// #define BACKLIGHT_INVERT false
+#define DISPLAY_SWAP_XY false
+#define DISPLAY_MIRROR_X true
+#define DISPLAY_MIRROR_Y false
 #define BACKLIGHT_INVERT false
-
-#define DISPLAY_OFFSET_X  20
+#define DISPLAY_OFFSET_X  0
 #define DISPLAY_OFFSET_Y  0
 #endif
 
@@ -56,7 +59,7 @@
 #define DISPLAY_OFFSET_Y  0
 #endif
 
-#define DISPLAY_BACKLIGHT_PIN GPIO_NUM_NC
+#define DISPLAY_BACKLIGHT_PIN GPIO_NUM_19
 #define DISPLAY_BACKLIGHT_OUTPUT_INVERT false
 
 #endif // _BOARD_CONFIG_H_
