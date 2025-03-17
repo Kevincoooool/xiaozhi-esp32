@@ -8,10 +8,12 @@
 #include "assets/lang_config.h"
 
 #include "board.h"
-
+#include <cstring>
 #define TAG "LcdDisplay"
 
 LV_FONT_DECLARE(font_awesome_30_4);
+LV_FONT_DECLARE(font_dingding);
+
 
 SpiLcdDisplay::SpiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_t panel,
                            int width, int height, int offset_x, int offset_y, bool mirror_x, bool mirror_y, bool swap_xy,
@@ -176,6 +178,70 @@ void LcdDisplay::Unlock() {
     lvgl_port_unlock();
 }
 
+void LcdDisplay::InitClockTimer() {
+    esp_timer_create_args_t timer_args = {
+        .callback = &LcdDisplay::ClockTimerCallback,
+        .arg = this,
+        .dispatch_method = ESP_TIMER_TASK,
+        .name = "clock_update",
+        .skip_unhandled_events = true
+    };
+    ESP_ERROR_CHECK(esp_timer_create(&timer_args, &clock_update_timer_));
+}
+void LcdDisplay::UpdateClockDisplay() {
+    DisplayLockGuard lock(this);
+    
+    time_t now;
+    struct tm timeinfo;
+    time(&now);
+    localtime_r(&now, &timeinfo);
+
+    // 根据冒号状态使用不同的格式
+    char time_str[6];
+    if (colon_visible_) {
+        snprintf(time_str, sizeof(time_str), "%02d:%02d",
+                timeinfo.tm_hour,
+                timeinfo.tm_min);
+    } else {
+        snprintf(time_str, sizeof(time_str), "%02d %02d",
+                timeinfo.tm_hour,
+                timeinfo.tm_min);
+    }
+
+    if (clock_label_ != nullptr) {
+        lv_label_set_text(clock_label_, time_str);
+    }
+
+    // 切换冒号状态
+    colon_visible_ = !colon_visible_;
+}
+void LcdDisplay::ClockTimerCallback(void* arg) {
+    auto display = static_cast<LcdDisplay*>(arg);
+    if (display) {
+        display->UpdateClockDisplay();
+    }
+}
+
+void LcdDisplay::ShowClockView(bool show) {
+    DisplayLockGuard lock(this);
+    
+    if (show) {
+        lv_obj_clear_flag(clock_container_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(chat_messages_container_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(emotion_label_, LV_OBJ_FLAG_HIDDEN);
+        
+        // 使用 ESP 定时器，每秒更新一次
+        esp_timer_start_periodic(clock_update_timer_, 500 * 1000); 
+        UpdateClockDisplay();  // 立即更新一次
+    } else {
+        lv_obj_add_flag(clock_container_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(chat_messages_container_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(emotion_label_, LV_OBJ_FLAG_HIDDEN);
+        
+        esp_timer_stop(clock_update_timer_);
+    }
+}
+
 void LcdDisplay::SetupUI() {
     DisplayLockGuard lock(this);
 
@@ -198,23 +264,55 @@ void LcdDisplay::SetupUI() {
     
     /* Content */
     content_ = lv_obj_create(container_);
-    lv_obj_set_scrollbar_mode(content_, LV_SCROLLBAR_MODE_OFF);
     lv_obj_set_style_radius(content_, 0, 0);
     lv_obj_set_width(content_, LV_HOR_RES);
     lv_obj_set_flex_grow(content_, 1);
-
-    lv_obj_set_flex_flow(content_, LV_FLEX_FLOW_COLUMN); // 垂直布局（从上到下）
-    lv_obj_set_flex_align(content_, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_SPACE_EVENLY); // 子对象居中对齐，等距分布
+    // 设置背景色为微信样式的灰白色
+    lv_obj_set_style_bg_color(content_, lv_color_make(240, 240, 240), 0);
+    // 允许滚动
+    lv_obj_set_scrollbar_mode(content_, LV_SCROLLBAR_MODE_AUTO);
+    lv_obj_set_scroll_dir(content_, LV_DIR_VER);
+    // 设置flex布局
+    lv_obj_set_flex_flow(content_, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(content_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_all(content_, 10, 0);  // 设置内边距
+    lv_obj_set_style_pad_row(content_, 10, 0);  // 设置消息间距
 
     emotion_label_ = lv_label_create(content_);
     lv_obj_set_style_text_font(emotion_label_, &font_awesome_30_4, 0);
     lv_label_set_text(emotion_label_, FONT_AWESOME_AI_CHIP);
+    lv_obj_set_width(emotion_label_, LV_HOR_RES - 20);  // 预留边距
+    lv_obj_set_style_text_align(emotion_label_, LV_TEXT_ALIGN_CENTER, 0);
 
-    chat_message_label_ = lv_label_create(content_);
-    lv_label_set_text(chat_message_label_, "");
-    lv_obj_set_width(chat_message_label_, LV_HOR_RES * 0.9); // 限制宽度为屏幕宽度的 90%
-    lv_label_set_long_mode(chat_message_label_, LV_LABEL_LONG_WRAP); // 设置为自动换行模式
-    lv_obj_set_style_text_align(chat_message_label_, LV_TEXT_ALIGN_CENTER, 0); // 设置文本居中对齐
+    // 创建消息容器
+    chat_messages_container_ = lv_obj_create(content_);
+    lv_obj_set_size(chat_messages_container_, LV_HOR_RES - 20, LV_VER_RES - 100);  // 固定高度
+    lv_obj_set_style_bg_opa(chat_messages_container_, LV_OPA_0, 0);
+    lv_obj_set_style_border_width(chat_messages_container_, 0, 0);
+    lv_obj_set_style_pad_all(chat_messages_container_, 10, 0);
+    lv_obj_set_flex_flow(chat_messages_container_, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_flex_cross_place(chat_messages_container_, LV_FLEX_ALIGN_END, 0);
+    lv_obj_set_scroll_dir(chat_messages_container_, LV_DIR_VER);
+    lv_obj_set_scrollbar_mode(chat_messages_container_, LV_SCROLLBAR_MODE_AUTO);
+    // 创建时钟容器
+    clock_container_ = lv_obj_create(content_);
+    lv_obj_set_size(clock_container_, LV_HOR_RES - 10, LV_VER_RES - 10);  // 固定高度
+    lv_obj_set_style_bg_opa(clock_container_, LV_OPA_0, 0);  // 透明背景
+    lv_obj_set_style_border_width(clock_container_, 0, 0);   // 无边框
+    lv_obj_center(clock_container_);
+    lv_obj_add_flag(clock_container_, LV_OBJ_FLAG_HIDDEN);  // 默认隐藏
+
+    // 创建时钟标签
+    clock_label_ = lv_label_create(clock_container_);
+    static lv_style_t style_clock;
+    lv_style_init(&style_clock);
+    lv_style_set_text_font(&style_clock, &font_dingding);  // 使用大号字体
+    lv_style_set_text_color(&style_clock, lv_color_black());
+    lv_obj_add_style(clock_label_, &style_clock, 0);
+    lv_obj_center(clock_label_);
+
+    // 创建时钟更新定时器
+    InitClockTimer();
 
     /* Status bar */
     lv_obj_set_flex_flow(status_bar_, LV_FLEX_FLOW_ROW);

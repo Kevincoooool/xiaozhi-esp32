@@ -739,13 +739,16 @@ void Application::SetDeviceState(DeviceState state) {
 #if CONFIG_USE_AUDIO_PROCESSOR
             audio_processor_.Stop();
 #endif
+            display->ShowClockView(true);
             break;
         case kDeviceStateConnecting:
+            display->ShowClockView(false);
             display->SetStatus(Lang::Strings::CONNECTING);
             display->SetEmotion("neutral");
             display->SetChatMessage("system", "");
             break;
         case kDeviceStateListening:
+            display->ShowClockView(false);
             display->SetStatus(Lang::Strings::LISTENING);
             display->SetEmotion("neutral");
             ResetDecoder();
@@ -760,12 +763,14 @@ void Application::SetDeviceState(DeviceState state) {
             }
             break;
         case kDeviceStateSpeaking:
+            display->ShowClockView(false);
             display->SetStatus(Lang::Strings::SPEAKING);
             ResetDecoder();
             codec->EnableOutput(true);
 #if CONFIG_USE_AUDIO_PROCESSOR
             audio_processor_.Stop();
 #endif
+
             break;
         default:
             // Do nothing

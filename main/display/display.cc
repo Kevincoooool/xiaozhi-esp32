@@ -241,11 +241,101 @@ void Display::SetIcon(const char* icon) {
     }
     lv_label_set_text(emotion_label_, icon);
 }
+void Display::ShowClockView(bool show) {
 
+}
+// void Display::SetChatMessage(const char* role, const char* content) {
+    // DisplayLockGuard lock(this);
+    // if (chat_message_label_ == nullptr) {
+    //     return;
+    // }
+    // lv_label_set_text(chat_message_label_, content);
+// }
 void Display::SetChatMessage(const char* role, const char* content) {
     DisplayLockGuard lock(this);
-    if (chat_message_label_ == nullptr) {
+    if (chat_messages_container_ == nullptr || content == nullptr || strlen(content) < 4) {
         return;
     }
-    lv_label_set_text(chat_message_label_, content);
+ // 在添加新消息前获取当前滚动位置
+    lv_coord_t scroll_y = lv_obj_get_scroll_y(chat_messages_container_);
+    lv_coord_t scroll_max = lv_obj_get_scroll_bottom(chat_messages_container_);
+    bool should_scroll = (scroll_max - scroll_y <= 30);
+
+    // 创建新的消息气泡
+    lv_obj_t* msg_bubble = lv_obj_create(chat_messages_container_);
+    lv_obj_set_style_radius(msg_bubble, 10, 0);  // 圆角半径
+    lv_obj_set_height(msg_bubble, LV_SIZE_CONTENT);
+    lv_obj_set_style_pad_all(msg_bubble, 12, 0);  // 增加内边距
+    
+    // 设置消息容器的flex布局
+    lv_obj_set_flex_flow(chat_messages_container_, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_row(chat_messages_container_, 12, 0);  // 增加消息间距
+    
+    bool is_user = (strcmp(role, "user") == 0);
+    
+    // 将气泡宽度设置为屏幕宽度的75%
+    
+    // 创建一个临时标签来计算文本宽度
+    lv_obj_t* temp_label = lv_label_create(lv_screen_active());
+    lv_label_set_text(temp_label, content);
+    lv_obj_update_layout(temp_label);  // 更新布局以获取实际宽度
+    
+    // 获取文本实际宽度，并添加一些边距
+    lv_coord_t text_width = lv_obj_get_width(temp_label) + 30;  // 30为左右内边距总和
+    
+    // 设置气泡宽度范围
+    lv_coord_t min_width = LV_HOR_RES * 30 / 100;  // 最小宽度为屏幕宽度的30%
+    lv_coord_t max_width = LV_HOR_RES * 85 / 100;  // 最大宽度为屏幕宽度的85%
+    
+    // 计算实际使用的宽度
+    lv_coord_t bubble_width = text_width;
+    if (bubble_width < min_width) bubble_width = min_width;
+    if (bubble_width > max_width) bubble_width = max_width;
+    
+    // 删除临时标签
+    lv_obj_del(temp_label);
+    
+    // 设置气泡宽度
+    lv_obj_set_width(msg_bubble, bubble_width);
+    // 根据角色设置样式和位置
+    if (is_user) {
+        // 用户消息 - 绿色背景，靠右对齐
+        lv_obj_set_style_bg_color(msg_bubble, lv_color_make(149, 236, 105), 0);
+        lv_obj_set_style_border_width(msg_bubble, 0, 0);
+        lv_obj_set_style_margin_left(msg_bubble, LV_HOR_RES - bubble_width - 30, 0);  // 左边留空
+        lv_obj_set_style_margin_right(msg_bubble, 30, 0);  // 右边距12像素
+    } else {
+        // AI助手消息 - 白色背景，靠左对齐
+        lv_obj_set_style_bg_color(msg_bubble, lv_color_white(), 0);
+        lv_obj_set_style_border_width(msg_bubble, 1, 0);
+        lv_obj_set_style_border_color(msg_bubble, lv_color_make(220, 220, 220), 0);
+        lv_obj_set_style_margin_left(msg_bubble, 12, 0);  // 左边距12像素
+        lv_obj_set_style_margin_right(msg_bubble, LV_HOR_RES - bubble_width - 12, 0);  // 右边留空
+    }
+    // 创建消息文本标签
+    lv_obj_t* msg_label = lv_label_create(msg_bubble);
+    lv_obj_set_width(msg_label, LV_PCT(100));  // 设置标签宽度为气泡的100%
+    lv_label_set_long_mode(msg_label, LV_LABEL_LONG_WRAP);  // 允许文本换行
+    lv_obj_set_style_text_color(msg_label, lv_color_black(), 0);
+    lv_label_set_text(msg_label, content);
+
+    // 设置文本对齐方式
+    if (is_user) {
+        lv_obj_set_style_text_align(msg_label, LV_TEXT_ALIGN_RIGHT, 0);
+    } else {
+        lv_obj_set_style_text_align(msg_label, LV_TEXT_ALIGN_LEFT, 0);
+    }
+
+    // 设置消息容器的flex布局
+    lv_obj_set_flex_flow(chat_messages_container_, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_row(chat_messages_container_, 12, 0);  // 消息间距
+    lv_obj_set_style_pad_bottom(chat_messages_container_, 100, 0);  // 底部留白100像素
+    
+    // 强制布局更新
+    lv_obj_update_layout(chat_messages_container_);
+    
+    // 滚动到最新消息
+    if (should_scroll) {
+        lv_obj_scroll_to_view(msg_bubble, LV_ANIM_ON);
+    }
 }

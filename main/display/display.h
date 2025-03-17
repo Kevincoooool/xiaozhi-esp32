@@ -25,6 +25,7 @@ public:
     virtual void SetEmotion(const char* emotion);
     virtual void SetChatMessage(const char* role, const char* content);
     virtual void SetIcon(const char* icon);
+    virtual void ShowClockView(bool show);
 
     inline int width() const { return width_; }
     inline int height() const { return height_; }
@@ -35,6 +36,7 @@ protected:
     
     esp_pm_lock_handle_t pm_lock_ = nullptr;
     lv_display_t *display_ = nullptr;
+    lv_obj_t* chat_messages_container_ = nullptr;  // 添加聊天消息容器
 
     lv_obj_t *emotion_label_ = nullptr;
     lv_obj_t *network_label_ = nullptr;

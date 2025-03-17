@@ -19,13 +19,20 @@ protected:
     lv_obj_t* content_ = nullptr;
     lv_obj_t* container_ = nullptr;
     lv_obj_t* side_bar_ = nullptr;
-
+    // lv_obj_t* chat_messages_container_ = nullptr;  // 添加聊天消息容器
+    lv_obj_t* clock_container_ = nullptr;
+    lv_obj_t* clock_label_ = nullptr;
+    esp_timer_handle_t clock_update_timer_ = nullptr;  // 使用 ESP 定时器替代 LVGL 定时器
+    void InitClockTimer();
+    static void ClockTimerCallback(void* arg);
+    bool colon_visible_ = true;
     DisplayFonts fonts_;
 
     virtual void SetupUI();
     virtual bool Lock(int timeout_ms = 0) override;
     virtual void Unlock() override;
-
+    static void UpdateClock(lv_timer_t* timer);
+    void UpdateClockDisplay();
 protected:
     // 添加protected构造函数
     LcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_t panel, DisplayFonts fonts)
@@ -35,6 +42,7 @@ public:
     ~LcdDisplay();
     virtual void SetEmotion(const char* emotion) override;
     virtual void SetIcon(const char* icon) override;
+    virtual void ShowClockView(bool show) override;
 };
 
 // RGB LCD显示器
