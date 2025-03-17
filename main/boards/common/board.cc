@@ -1,7 +1,7 @@
 #include "board.h"
 #include "system_info.h"
 #include "settings.h"
-#include "display/no_display.h"
+#include "display/display.h"
 #include "assets/lang_config.h"
 
 #include <esp_log.h>
@@ -18,7 +18,7 @@ Board::Board() {
         uuid_ = GenerateUuid();
         settings.SetString("uuid", uuid_);
     }
-    ESP_LOGI(TAG, "UUID: %s", uuid_.c_str());
+    ESP_LOGI(TAG, "UUID=%s SKU=%s", uuid_.c_str(), BOARD_NAME);
 }
 
 std::string Board::GenerateUuid() {
@@ -44,7 +44,7 @@ std::string Board::GenerateUuid() {
     return std::string(uuid_str);
 }
 
-bool Board::GetBatteryLevel(int &level, bool& charging) {
+bool Board::GetBatteryLevel(int &level, bool& charging, bool& discharging) {
     return false;
 }
 

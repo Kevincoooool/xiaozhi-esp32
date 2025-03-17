@@ -1,6 +1,7 @@
 import sys
 import os
 import json
+import zipfile
 
 # 切换到项目根目录
 os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -35,9 +36,8 @@ def zip_bin(board_type, project_version):
     output_path = f"releases/v{project_version}_{board_type}.zip"
     if os.path.exists(output_path):
         os.remove(output_path)
-    if os.system(f"zip -j {output_path} build/merged-binary.bin") != 0:
-        print("zip bin failed")
-        sys.exit(1)
+    with zipfile.ZipFile(output_path, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
+        zipf.write("build/merged-binary.bin", arcname="merged-binary.bin")
     print(f"zip bin to {output_path} done")
     
 
@@ -106,6 +106,10 @@ def release(board_type, board_config):
             f.write("\n")
             for append in sdkconfig_append:
                 f.write(f"{append}\n")
+        # Build with macro BOARD_NAME defined to name
+        if os.system(f"idf.py -DBOARD_NAME={name} build") != 0:
+            print("build failed")
+            sys.exit(1)
         # Call merge-bin
         if os.system("idf.py merge-bin") != 0:
             print("merge-bin failed")
