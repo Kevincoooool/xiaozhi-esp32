@@ -187,41 +187,49 @@ void CircularStrip::OnStateChanged() {
     auto device_state = app.GetDeviceState();
     switch (device_state) {
         case kDeviceStateStarting: {
+            // 启动状态：蓝色呼吸灯效果
             StripColor low = { 0, 0, 0 };
-            StripColor high = { low_brightness_, low_brightness_, default_brightness_ };
+            StripColor high = { 0, 0, default_brightness_ };  // 纯蓝色
             Scroll(low, high, 3, 100);
             break;
         }
         case kDeviceStateWifiConfiguring: {
-            StripColor color = { low_brightness_, low_brightness_, default_brightness_ };
+            // 配网状态：蓝色闪烁
+            StripColor color = { 0, 0, default_brightness_ };  // 纯蓝色
             Blink(color, 500);
             break;
         }
         case kDeviceStateIdle:
+            // 空闲状态：渐隐
             FadeOut(50);
             break;
         case kDeviceStateConnecting: {
-            StripColor color = { low_brightness_, low_brightness_, default_brightness_ };
+            // 连接状态：蓝色常亮
+            StripColor color = { 0, 0, default_brightness_ };  // 纯蓝色
             SetAllColor(color);
             break;
         }
         case kDeviceStateListening: {
-            StripColor color = { default_brightness_, low_brightness_, low_brightness_ };
+            // 录音状态：鲜红色
+            StripColor color = { default_brightness_, 0, 0 };  // 纯红色
             SetAllColor(color);
             break;
         }
         case kDeviceStateSpeaking: {
-            StripColor color = { low_brightness_, default_brightness_, low_brightness_ };
+            // 播放状态：鲜绿色
+            StripColor color = { 0, default_brightness_, 0 };  // 纯绿色
             SetAllColor(color);
             break;
         }
         case kDeviceStateUpgrading: {
-            StripColor color = { low_brightness_, default_brightness_, low_brightness_ };
+            // 升级状态：黄色快闪
+            StripColor color = { default_brightness_, default_brightness_, 0 };  // 黄色
             Blink(color, 100);
             break;
         }
         case kDeviceStateActivating: {
-            StripColor color = { low_brightness_, default_brightness_, low_brightness_ };
+            // 激活状态：绿色慢闪
+            StripColor color = { 0, default_brightness_, 0 };  // 纯绿色
             Blink(color, 500);
             break;
         }

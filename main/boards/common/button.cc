@@ -1,7 +1,7 @@
 #include "button.h"
 
 #include <esp_log.h>
-
+#include <esp_timer.h>
 static const char* TAG = "Button";
 #if CONFIG_SOC_ADC_SUPPORTED
 Button::Button(const button_adc_config_t& adc_cfg) {
@@ -45,6 +45,58 @@ Button::~Button() {
     }
 }
 
+void Button::OnMultiClick(uint8_t clicks, std::function<void()> callback) {
+    if (button_handle_ == nullptr) {
+        return;
+    }
+    
+    required_clicks_ = clicks;
+    on_multi_click_ = callback;
+    
+    // 注册单击回调来统计点击次数
+    iot_button_register_cb(button_handle_, BUTTON_PRESS_UP, [](void* handle, void* usr_data) {
+        Button* button = static_cast<Button*>(usr_data);
+        int64_t current_time = esp_timer_get_time() / 1000; // 转换为毫秒
+        
+        // 消抖处理：忽略太快的连续点击
+        if (current_time - button->last_click_time_ < 50) { // 50ms消抖时间
+            return;
+        }
+        
+        // 如果距离上次点击超过timeout,重置计数
+        if (current_time - button->last_click_time_ > MULTI_CLICK_TIMEOUT_MS) {
+            button->click_count_ = 0;
+        }
+        
+        button->last_click_time_ = current_time;
+        button->click_count_++;
+        
+        ESP_LOGI(TAG, "Button clicked, count: %d", button->click_count_);
+        
+        // 启动一个定时器，在超时后检查点击次数
+        esp_timer_create_args_t timer_args = {
+            .callback = [](void* arg) {
+                Button* button = static_cast<Button*>(arg);
+                if (button->click_count_ == button->required_clicks_) {
+                    if (button->on_multi_click_) {
+                        button->on_multi_click_();
+                    }
+                }
+                button->click_count_ = 0;
+            },
+            .arg = button,
+            .dispatch_method = ESP_TIMER_TASK,
+            .name = "multi_click_timer",
+            .skip_unhandled_events = true,
+        };
+        
+        esp_timer_handle_t timer;
+        if (esp_timer_create(&timer_args, &timer) == ESP_OK) {
+            esp_timer_start_once(timer, MULTI_CLICK_TIMEOUT_MS * 1000); // 转换为微秒
+        }
+        
+    }, this);
+}
 void Button::OnPressDown(std::function<void()> callback) {
     if (button_handle_ == nullptr) {
         return;

@@ -12,6 +12,7 @@
 #include <esp_efuse_table.h>
 #include <driver/i2c_master.h>
 #include "power_save_timer.h"
+#include "assets/lang_config.h"
 
 #define TAG "KevinBoxBoard"
 
@@ -23,7 +24,7 @@ private:
     PowerSaveTimer* power_save_timer_;
 
     void InitializePowerSaveTimer() {
-        power_save_timer_ = new PowerSaveTimer(-1, -1, 60);
+        power_save_timer_ = new PowerSaveTimer(-1, -1, 600);
         power_save_timer_->OnShutdownRequest([this]() {
             gpio_set_level(GPIO_NUM_11, 0);
         });
@@ -54,16 +55,23 @@ private:
             }
             else
             {
-                Application::GetInstance().ToggleChatState();
+                // Application::GetInstance().ToggleChatState();
             }
         });
-        boot_button_.OnDoubleClick([this]() {
+        // boot_button_.OnDoubleClick([this]() {
+        //     auto& app = Application::GetInstance();
+        //     if (app.GetDeviceState() == kDeviceStateStarting && !WifiStation::GetInstance().IsConnected()) {
+        //         ResetWifiConfiguration();
+        //     }
+        // });
+
+        boot_button_.OnMultiClick(5, [this]() {
+            ESP_LOGI(TAG, "Detected 5 clicks, entering WiFi configuration mode");
             auto& app = Application::GetInstance();
-            if (app.GetDeviceState() == kDeviceStateStarting && !WifiStation::GetInstance().IsConnected()) {
-                ResetWifiConfiguration();
-            }
+            ResetWifiConfiguration();
+            // app.Alert(Lang::Strings::WIFI_CONFIG_MODE, "", "", Lang::Sounds::P3_WIFICONFIG);
+    
         });
-        
         boot_button_.OnPressDown([this]() {
             Application::GetInstance().StartListening();
         });

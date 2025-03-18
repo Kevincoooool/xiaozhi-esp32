@@ -7,7 +7,7 @@
 
 int LedStripControl::LevelToBrightness(int level) const {
     if (level < 0) level = 0;
-    if (level > 8) level = 8;
+    if (level > 4) level = 4;
     return (1 << level) - 1;  // 2^n - 1
 }
 
@@ -22,7 +22,7 @@ StripColor LedStripControl::RGBToColor(int red, int green, int blue) {
 }
 
 LedStripControl::LedStripControl(CircularStrip* led_strip) 
-    : Thing("LedStripControl", "LED 灯带控制，一共有8个灯珠"), led_strip_(led_strip) {
+    : Thing("LedStripControl", "LED 灯带控制，一共有4个灯珠"), led_strip_(led_strip) {
     // 从设置中读取亮度等级
     Settings settings("led_strip");
     brightness_level_ = settings.GetInt("brightness", 4);  // 默认等级4
