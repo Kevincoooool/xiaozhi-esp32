@@ -1,6 +1,5 @@
 // #include "ml307_board.h"
 #include "wifi_board.h"
-
 #include "audio_codecs/es8311_audio_codec.h"
 #include "display/lcd_display.h"
 #include "application.h"
@@ -10,7 +9,6 @@
 #include "iot/thing_manager.h"
 #include "led/single_led.h"
 #include "power_save_timer.h"
-#include "axp2101.h"
 #include <esp_log.h>
 #include <esp_spiffs.h>
 #include <driver/gpio.h>
@@ -18,6 +16,9 @@
 #include <driver/spi_common.h>
 #include <esp_timer.h>
 #include <esp_lcd_panel_vendor.h>
+#include <wifi_station.h>
+#include "assets/lang_config.h"
+
 #define TAG "Yuying1_9LCD"
 class Pmic : public Axp2101 {
     public:
@@ -46,7 +47,40 @@ class Pmic : public Axp2101 {
             WriteReg(0x50, 0x14); // set TS pin to EXTERNAL input (not temperature)
         }
     };
-    
+
+class Cst816s : public I2cDevice {
+public:
+    struct TouchPoint_t {
+        int num = 0;
+        int x = -1;
+        int y = -1;
+    };
+    Cst816s(i2c_master_bus_handle_t i2c_bus, uint8_t addr) : I2cDevice(i2c_bus, addr) {
+        uint8_t chip_id = ReadReg(0xA3);
+        ESP_LOGI(TAG, "Get chip ID: 0x%02X", chip_id);
+        read_buffer_ = new uint8_t[6];
+    }
+
+    ~Cst816s() {
+        delete[] read_buffer_;
+    }
+
+    void UpdateTouchPoint() {
+        ReadRegs(0x02, read_buffer_, 6);
+        tp_.num = read_buffer_[0] & 0x0F;
+        tp_.x = ((read_buffer_[1] & 0x0F) << 8) | read_buffer_[2];
+        tp_.y = ((read_buffer_[3] & 0x0F) << 8) | read_buffer_[4];
+    }
+
+    const TouchPoint_t& GetTouchPoint() {
+        return tp_;
+    }
+
+private:
+    uint8_t* read_buffer_ = nullptr;
+    TouchPoint_t tp_;
+};
+
 LV_FONT_DECLARE(font_puhui_20_4);
 LV_FONT_DECLARE(font_awesome_20_4);
 //Ml307Board WifiBoard
@@ -54,13 +88,15 @@ class Yuying1_9LCD : public WifiBoard {
 private:
     i2c_master_bus_handle_t codec_i2c_bus_;
     Axp2101* axp2101_ = nullptr;
-    Button boot_button_;
+    // Button boot_button_;
     Button volume_up_button_;
+    Button volume_down_button_;
     Button voice_button_;
     LcdDisplay* display_;
     PowerSaveTimer* power_save_timer_;
     Pmic* pmic_ = nullptr;
-
+    Cst816s* cst816s_;
+    esp_timer_handle_t touchpad_timer_;
     void InitializePowerSaveTimer() {
         power_save_timer_ = new PowerSaveTimer(-1, -1, 600);
         power_save_timer_->OnShutdownRequest([this]() {
@@ -158,9 +194,9 @@ private:
         ESP_ERROR_CHECK(spi_bus_initialize(SPI3_HOST, &buscfg, SPI_DMA_CH_AUTO));
     }
     void InitializeButtons() {
-        boot_button_.OnClick([this]() {
-            Application::GetInstance().ToggleChatState();
-        });
+        // boot_button_.OnClick([this]() {
+        //     Application::GetInstance().ToggleChatState();
+        // });
         // boot_button_.OnPressUp([this]() {
         //     Application::GetInstance().StopListening();
         // });
@@ -172,18 +208,37 @@ private:
         });
 
         volume_up_button_.OnClick([this]() {
+            power_save_timer_->WakeUp();
             auto codec = GetAudioCodec();
             auto volume = codec->output_volume() + 10;
             if (volume > 100) {
                 volume = 100;
             }
             codec->SetOutputVolume(volume);
-            GetDisplay()->ShowNotification("音量 " + std::to_string(volume));
+            GetDisplay()->ShowNotification(Lang::Strings::VOLUME + std::to_string(volume));
         });
 
         volume_up_button_.OnLongPress([this]() {
+            power_save_timer_->WakeUp();
             GetAudioCodec()->SetOutputVolume(100);
-            GetDisplay()->ShowNotification("最大音量");
+            GetDisplay()->ShowNotification(Lang::Strings::MAX_VOLUME);
+        });
+
+        volume_down_button_.OnClick([this]() {
+            power_save_timer_->WakeUp();
+            auto codec = GetAudioCodec();
+            auto volume = codec->output_volume() - 10;
+            if (volume < 0) {
+                volume = 0;
+            }
+            codec->SetOutputVolume(volume);
+            GetDisplay()->ShowNotification(Lang::Strings::VOLUME + std::to_string(volume));
+        });
+
+        volume_down_button_.OnLongPress([this]() {
+            power_save_timer_->WakeUp();
+            GetAudioCodec()->SetOutputVolume(0);
+            GetDisplay()->ShowNotification(Lang::Strings::MUTED);
         });
 
     }
@@ -195,6 +250,55 @@ private:
         thing_manager.AddThing(iot::CreateThing("Backlight"));
         thing_manager.AddThing(iot::CreateThing("Battery"));
     }
+    static void touchpad_timer_callback(void* arg) {
+        auto& board = (Yuying1_9LCD&)Board::GetInstance();
+        auto touchpad = board.GetTouchpad();
+        static bool was_touched = false;
+        static int64_t touch_start_time = 0;
+        const int64_t TOUCH_THRESHOLD_MS = 500;  // 触摸时长阈值，超过500ms视为长按
+        
+        touchpad->UpdateTouchPoint();
+        auto touch_point = touchpad->GetTouchPoint();
+        
+        // 检测触摸开始
+        if (touch_point.num > 0 && !was_touched) {
+            was_touched = true;
+            touch_start_time = esp_timer_get_time() / 1000; // 转换为毫秒
+        } 
+        // 检测触摸释放
+        else if (touch_point.num == 0 && was_touched) {
+            was_touched = false;
+            int64_t touch_duration = (esp_timer_get_time() / 1000) - touch_start_time;
+            
+            // 只有短触才触发
+            if (touch_duration < TOUCH_THRESHOLD_MS) {
+                auto& app = Application::GetInstance();
+                if (app.GetDeviceState() == kDeviceStateStarting && 
+                    !WifiStation::GetInstance().IsConnected()) {
+                    board.ResetWifiConfiguration();
+                }
+                app.ToggleChatState();
+            }
+        }
+    }
+
+    void InitializeCst816sTouchPad() {
+        ESP_LOGI(TAG, "Init Cst816s");
+        cst816s_ = new Cst816s(codec_i2c_bus_, 0x15);
+        
+        // 创建定时器，10ms 间隔
+        esp_timer_create_args_t timer_args = {
+            .callback = touchpad_timer_callback,
+            .arg = NULL,
+            .dispatch_method = ESP_TIMER_TASK,
+            .name = "touchpad_timer",
+            .skip_unhandled_events = true,
+        };
+        
+        ESP_ERROR_CHECK(esp_timer_create(&timer_args, &touchpad_timer_));
+        ESP_ERROR_CHECK(esp_timer_start_periodic(touchpad_timer_, 10 * 1000)); // 10ms = 10000us
+    }
+
     void I2cDetect() {
             uint8_t address;
             printf("     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f\r\n");
@@ -218,14 +322,15 @@ private:
 public:
     Yuying1_9LCD() : 
     // Ml307Board(ML307_TX_PIN, ML307_RX_PIN, 4096),
-        boot_button_(BOOT_BUTTON_GPIO),
+        // boot_button_(BOOT_BUTTON_GPIO),
         volume_up_button_(VOLUME_UP_BUTTON_GPIO),
+        volume_down_button_(VOLUME_DOWN_BUTTON_GPIO),
         voice_button_(VOICE_BUTTON_GPIO)
-        // volume_down_button_(VOLUME_DOWN_BUTTON_GPIO) 
         {
         
         InitializeCodecI2c();
         I2cDetect();
+        InitializeCst816sTouchPad();
         pmic_ = new Pmic(codec_i2c_bus_, AXP2101_I2C_ADDR);
         InitializeSpi();
         InitializeSt7789Display();
@@ -265,6 +370,9 @@ public:
     virtual Backlight* GetBacklight() override {
         static PwmBacklight backlight(DISPLAY_BACKLIGHT_PIN, DISPLAY_BACKLIGHT_OUTPUT_INVERT);
         return &backlight;
+    }
+    Cst816s* GetTouchpad() {
+        return cst816s_;
     }
 };
 
