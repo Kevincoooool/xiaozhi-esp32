@@ -38,42 +38,42 @@ SpiLcdDisplay::SpiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_h
     port_cfg.task_priority = 1;
     lvgl_port_init(&port_cfg);
 
-    ESP_LOGI(TAG, "Adding LCD screen");
-    const lvgl_port_display_cfg_t display_cfg = {
-        .io_handle = panel_io_,
-        .panel_handle = panel_,
-        .control_handle = nullptr,
-        .buffer_size = static_cast<uint32_t>(width_ * 10),
-        .double_buffer = false,
-        .trans_size = 0,
-        .hres = static_cast<uint32_t>(width_),
-        .vres = static_cast<uint32_t>(height_),
-        .monochrome = false,
-        .rotation = {
-            .swap_xy = swap_xy,
-            .mirror_x = mirror_x,
-            .mirror_y = mirror_y,
-        },
-        .color_format = LV_COLOR_FORMAT_RGB565,
-        .flags = {
-            .buff_dma = 1,
-            .buff_spiram = 0,
-            .sw_rotate = 0,
-            .swap_bytes = 1,
-            .full_refresh = 0,
-            .direct_mode = 0,
-        },
-    };
+    // ESP_LOGI(TAG, "Adding LCD screen");
+    // const lvgl_port_display_cfg_t display_cfg = {
+    //     .io_handle = panel_io_,
+    //     .panel_handle = panel_,
+    //     .control_handle = nullptr,
+    //     .buffer_size = static_cast<uint32_t>(width_ * 10),
+    //     .double_buffer = false,
+    //     .trans_size = 0,
+    //     .hres = static_cast<uint32_t>(width_),
+    //     .vres = static_cast<uint32_t>(height_),
+    //     .monochrome = false,
+    //     .rotation = {
+    //         .swap_xy = swap_xy,
+    //         .mirror_x = mirror_x,
+    //         .mirror_y = mirror_y,
+    //     },
+    //     .color_format = LV_COLOR_FORMAT_RGB565,
+    //     .flags = {
+    //         .buff_dma = 1,
+    //         .buff_spiram = 0,
+    //         .sw_rotate = 0,
+    //         .swap_bytes = 1,
+    //         .full_refresh = 0,
+    //         .direct_mode = 0,
+    //     },
+    // };
 
-    display_ = lvgl_port_add_disp(&display_cfg);
-    if (display_ == nullptr) {
-        ESP_LOGE(TAG, "Failed to add display");
-        return;
-    }
+    // display_ = lvgl_port_add_disp(&display_cfg);
+    // if (display_ == nullptr) {
+    //     ESP_LOGE(TAG, "Failed to add display");
+    //     return;
+    // }
 
-    if (offset_x != 0 || offset_y != 0) {
-        lv_display_set_offset(display_, offset_x, offset_y);
-    }
+    // if (offset_x != 0 || offset_y != 0) {
+    //     lv_display_set_offset(display_, offset_x, offset_y);
+    // }
 
     SetupUI();
 }
@@ -96,48 +96,48 @@ RgbLcdDisplay::RgbLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_h
     ESP_LOGI(TAG, "Initialize LVGL library");
     lv_init();
 
-    ESP_LOGI(TAG, "Initialize LVGL port");
-    lvgl_port_cfg_t port_cfg = ESP_LVGL_PORT_INIT_CONFIG();
-    port_cfg.task_priority = 1;
-    lvgl_port_init(&port_cfg);
+    // ESP_LOGI(TAG, "Initialize LVGL port");
+    // lvgl_port_cfg_t port_cfg = ESP_LVGL_PORT_INIT_CONFIG();
+    // port_cfg.task_priority = 1;
+    // lvgl_port_init(&port_cfg);
 
-    ESP_LOGI(TAG, "Adding LCD screen");
-    const lvgl_port_display_cfg_t display_cfg = {
-        .io_handle = panel_io_,
-        .panel_handle = panel_,
-        .buffer_size = static_cast<uint32_t>(width_ * 10),
-        .double_buffer = true,
-        .hres = static_cast<uint32_t>(width_),
-        .vres = static_cast<uint32_t>(height_),
-        .rotation = {
-            .swap_xy = swap_xy,
-            .mirror_x = mirror_x,
-            .mirror_y = mirror_y,
-        },
-        .flags = {
-            .buff_dma = 1,
-            .swap_bytes = 0,
-            .full_refresh = 1,
-            .direct_mode = 1,
-        },
-    };
+    // ESP_LOGI(TAG, "Adding LCD screen");
+    // const lvgl_port_display_cfg_t display_cfg = {
+    //     .io_handle = panel_io_,
+    //     .panel_handle = panel_,
+    //     .buffer_size = static_cast<uint32_t>(width_ * 10),
+    //     .double_buffer = true,
+    //     .hres = static_cast<uint32_t>(width_),
+    //     .vres = static_cast<uint32_t>(height_),
+    //     .rotation = {
+    //         .swap_xy = swap_xy,
+    //         .mirror_x = mirror_x,
+    //         .mirror_y = mirror_y,
+    //     },
+    //     .flags = {
+    //         .buff_dma = 1,
+    //         .swap_bytes = 0,
+    //         .full_refresh = 1,
+    //         .direct_mode = 1,
+    //     },
+    // };
 
-    const lvgl_port_display_rgb_cfg_t rgb_cfg = {
-        .flags = {
-            .bb_mode = true,
-            .avoid_tearing = true,
-        }
-    };
+    // const lvgl_port_display_rgb_cfg_t rgb_cfg = {
+    //     .flags = {
+    //         .bb_mode = true,
+    //         .avoid_tearing = true,
+    //     }
+    // };
     
-    display_ = lvgl_port_add_disp_rgb(&display_cfg, &rgb_cfg);
-    if (display_ == nullptr) {
-        ESP_LOGE(TAG, "Failed to add RGB display");
-        return;
-    }
+    // display_ = lvgl_port_add_disp_rgb(&display_cfg, &rgb_cfg);
+    // if (display_ == nullptr) {
+    //     ESP_LOGE(TAG, "Failed to add RGB display");
+    //     return;
+    // }
     
-    if (offset_x != 0 || offset_y != 0) {
-        lv_display_set_offset(display_, offset_x, offset_y);
-    }
+    // if (offset_x != 0 || offset_y != 0) {
+    //     lv_display_set_offset(display_, offset_x, offset_y);
+    // }
 
     SetupUI();
 }
@@ -157,7 +157,7 @@ LcdDisplay::~LcdDisplay() {
         lv_obj_del(container_);
     }
     if (display_ != nullptr) {
-        lv_display_delete(display_);
+        // lv_display_delete(display_);
     }
 
     if (panel_ != nullptr) {
@@ -179,7 +179,7 @@ void LcdDisplay::Unlock() {
 void LcdDisplay::SetupUI() {
     DisplayLockGuard lock(this);
 
-    auto screen = lv_screen_active();
+    auto screen = lv_scr_act();
     lv_obj_set_style_text_font(screen, fonts_.text_font, 0);
     lv_obj_set_style_text_color(screen, lv_color_black(), 0);
 

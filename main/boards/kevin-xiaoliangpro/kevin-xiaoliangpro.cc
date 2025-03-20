@@ -1,28 +1,34 @@
 #include "wifi_board.h"
 #include "audio_codecs/es8311_audio_codec.h"
-#include "display/lcd_display.h"
+#include "display/oled_display.h"
 #include "system_reset.h"
 #include "application.h"
 #include "button.h"
 #include "config.h"
 #include "iot/thing_manager.h"
 #include "led/single_led.h"
+#include "esp_lcd_st7305.h"
 
 #include <esp_log.h>
 #include <esp_lcd_panel_vendor.h>
 #include <driver/i2c_master.h>
 #include <wifi_station.h>
 
-#define TAG "kevin-sp-v4"
+#define TAG "kevin-xiaoliangpro"
 
 LV_FONT_DECLARE(font_puhui_20_4);
 LV_FONT_DECLARE(font_awesome_20_4);
+LV_FONT_DECLARE(font_puhui_14_1);
+LV_FONT_DECLARE(font_awesome_14_1);
+
+LV_FONT_DECLARE(font_puhui_30_4);
+LV_FONT_DECLARE(font_awesome_30_4);
 
 class KEVIN_SP_V4Board : public WifiBoard {
 private:
     i2c_master_bus_handle_t display_i2c_bus_;
     Button boot_button_;
-    LcdDisplay* display_;
+    Display* display_;
     i2c_master_bus_handle_t codec_i2c_bus_;
     void InitializeCodecI2c() {
         // Initialize I2C peripheral
@@ -43,9 +49,9 @@ private:
 
     void InitializeSpi() {
         spi_bus_config_t buscfg = {};
-        buscfg.mosi_io_num = GPIO_NUM_47;
+        buscfg.mosi_io_num = GPIO_NUM_4;
         buscfg.miso_io_num = GPIO_NUM_NC;
-        buscfg.sclk_io_num = GPIO_NUM_21;
+        buscfg.sclk_io_num = GPIO_NUM_5;
         buscfg.quadwp_io_num = GPIO_NUM_NC;
         buscfg.quadhd_io_num = GPIO_NUM_NC;
         buscfg.max_transfer_sz = DISPLAY_WIDTH * DISPLAY_HEIGHT * sizeof(uint16_t);
@@ -67,16 +73,16 @@ private:
         });
     }
 
-    void InitializeSt7789Display() {
+    void InitializeSt7305Display() {
         esp_lcd_panel_io_handle_t panel_io = nullptr;
         esp_lcd_panel_handle_t panel = nullptr;
         // 液晶屏控制IO初始化
         ESP_LOGD(TAG, "Install panel IO");
         esp_lcd_panel_io_spi_config_t io_config = {};
-        io_config.cs_gpio_num = GPIO_NUM_14;
-        io_config.dc_gpio_num = GPIO_NUM_45;
-        io_config.spi_mode = 3;
-        io_config.pclk_hz = 80 * 1000 * 1000;
+        io_config.cs_gpio_num = GPIO_NUM_6;
+        io_config.dc_gpio_num = GPIO_NUM_7;
+        io_config.spi_mode = 0;
+        io_config.pclk_hz = 40 * 1000 * 1000;
         io_config.trans_queue_depth = 10;
         io_config.lcd_cmd_bits = 8;
         io_config.lcd_param_bits = 8;
@@ -85,23 +91,18 @@ private:
         // 初始化液晶屏驱动芯片ST7789
         ESP_LOGD(TAG, "Install LCD driver");
         esp_lcd_panel_dev_config_t panel_config = {};
-        panel_config.reset_gpio_num = GPIO_NUM_NC;
+        panel_config.reset_gpio_num = GPIO_NUM_15;
         panel_config.rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB;
-        panel_config.bits_per_pixel = 16;
-        ESP_ERROR_CHECK(esp_lcd_new_panel_st7789(panel_io, &panel_config, &panel));
+        panel_config.bits_per_pixel = 1;
+        ESP_ERROR_CHECK(esp_lcd_new_panel_st7305(panel_io, &panel_config, &panel));
         ESP_ERROR_CHECK(esp_lcd_panel_reset(panel));
         ESP_ERROR_CHECK(esp_lcd_panel_init(panel));
         ESP_ERROR_CHECK(esp_lcd_panel_swap_xy(panel, DISPLAY_SWAP_XY));
         ESP_ERROR_CHECK(esp_lcd_panel_mirror(panel, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y));
         ESP_ERROR_CHECK(esp_lcd_panel_invert_color(panel, true));
 
-        display_ = new SpiLcdDisplay(panel_io, panel,
-                            DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY,
-                            {
-                                .text_font = &font_puhui_20_4,
-                                .icon_font = &font_awesome_20_4,
-                                .emoji_font = font_emoji_64_init(),
-                            });
+        display_ = new OledDisplay(panel_io, panel, DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y,
+            {&font_puhui_30_4, &font_awesome_30_4});
     }
 
     // 物联网初始化，添加对 AI 可见设备
@@ -114,20 +115,20 @@ private:
 
 public:
     KEVIN_SP_V4Board() :  boot_button_(BOOT_BUTTON_GPIO) {
-        ESP_LOGI(TAG, "Initializing KEVIN SP V4 Board");
+        ESP_LOGI(TAG, "Initializing KEVIN XIAOLIANGPRO Board");
         InitializeCodecI2c();
         InitializeSpi();
         InitializeButtons();
-        InitializeSt7789Display();  
+        InitializeSt7305Display();  
         InitializeIot();
-        GetBacklight()->RestoreBrightness();
+        // GetBacklight()->RestoreBrightness();
     }
     
 
-    virtual Led* GetLed() override {
-        static SingleLed led(BUILTIN_LED_GPIO);
-        return &led;
-    }
+    // virtual Led* GetLed() override {
+    //     static SingleLed led(BUILTIN_LED_GPIO);
+    //     return &led;
+    // }
 
     virtual AudioCodec* GetAudioCodec() override {
         static Es8311AudioCodec audio_codec(codec_i2c_bus_, I2C_NUM_0, AUDIO_INPUT_SAMPLE_RATE, AUDIO_OUTPUT_SAMPLE_RATE,
@@ -140,10 +141,10 @@ public:
         return display_;
     }
     
-    virtual Backlight* GetBacklight() override {
-        static PwmBacklight backlight(DISPLAY_BACKLIGHT_PIN, DISPLAY_BACKLIGHT_OUTPUT_INVERT);
-        return &backlight;
-    }
+    // virtual Backlight* GetBacklight() override {
+    //     static PwmBacklight backlight(DISPLAY_BACKLIGHT_PIN, DISPLAY_BACKLIGHT_OUTPUT_INVERT);
+    //     return &backlight;
+    // }
 };
 
 DECLARE_BOARD(KEVIN_SP_V4Board);
