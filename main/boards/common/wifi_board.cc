@@ -107,6 +107,82 @@ void WifiBoard::StartNetwork() {
         EnterWifiConfigMode();
         return;
     }
+
+    // 连接成功后获取API地址
+    const int MAX_RETRY = 3;
+    int retry_count = 0;
+    while (!FetchApiUrl()) {
+        retry_count++;
+        if (retry_count >= MAX_RETRY) {
+            ESP_LOGE(TAG, "Failed to get API URL after %d retries", MAX_RETRY);
+            auto& app = Application::GetInstance();
+            app.Alert(Lang::Strings::ERROR, "Failed to get API URL", "sad");
+            break;
+        }
+        ESP_LOGW(TAG, "Retrying to get API URL in 5 seconds (%d/%d)", retry_count, MAX_RETRY);
+        vTaskDelay(pdMS_TO_TICKS(5000));
+    }
+}
+
+bool WifiBoard::FetchApiUrl() {
+    ESP_LOGI(TAG, "Fetching API URL...");
+    
+    if (CONFIG_API_URL_ENDPOINT == nullptr || strlen(CONFIG_API_URL_ENDPOINT) < 10) {
+        ESP_LOGE(TAG, "API URL endpoint is not properly set");
+        return false;
+    }
+
+    auto http = Board::GetInstance().CreateHttp();
+    if (!http) {
+        ESP_LOGE(TAG, "Failed to create HTTP client");
+        return false;
+    }
+
+    // 设置请求头
+    http->SetHeader("Device-Id", SystemInfo::GetMacAddress());
+    http->SetHeader("Client-Id", GetUuid());
+    http->SetHeader("Content-Type", "application/json");
+    auto& board = Board::GetInstance();
+    // Check if there is a new firmware version available
+    post_data_= board.GetJson();
+    // 发送GET请求
+    if (!http->Open("GET", CONFIG_API_URL_ENDPOINT, post_data_)) {
+        ESP_LOGE(TAG, "Failed to open HTTP connection");
+        delete http;
+        return false;
+    }
+
+    // 读取响应内容
+    auto response = http->GetBody();
+    http->Close();
+    delete http;
+
+    // 解析JSON响应
+    cJSON *root = cJSON_Parse(response.c_str());
+    if (!root) {
+        ESP_LOGE(TAG, "Failed to parse JSON response");
+        return false;
+    }
+
+    // 获取API URL
+    cJSON *url = cJSON_GetObjectItem(root, "data");
+    if (!url || !url->valuestring) {
+        ESP_LOGE(TAG, "No api_url field in response");
+        cJSON_Delete(root);
+        return false;
+    }
+
+    api_url_ = url->valuestring;
+    ESP_LOGI(TAG, "Got API URL: %s", api_url_.c_str());
+
+    // 可选：获取其他配置信息
+    cJSON *config = cJSON_GetObjectItem(root, "config");
+    if (config) {
+        // 处理其他配置项...
+    }
+
+    cJSON_Delete(root);
+    return true;
 }
 
 Http* WifiBoard::CreateHttp() {
@@ -115,7 +191,8 @@ Http* WifiBoard::CreateHttp() {
 
 WebSocket* WifiBoard::CreateWebSocket() {
 #ifdef CONFIG_CONNECTION_TYPE_WEBSOCKET
-    std::string url = CONFIG_WEBSOCKET_URL;
+    // 使用获取到的API地址
+    std::string url = api_url_.empty() ? CONFIG_WEBSOCKET_URL : api_url_;
     if (url.find("wss://") == 0) {
         return new WebSocket(new TlsTransport());
     } else {

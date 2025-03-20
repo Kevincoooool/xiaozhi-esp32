@@ -5,7 +5,11 @@ config OTA_VERSION_URL
     default "https://api.tenclass.net/xiaozhi/ota/"
     help
         The application will access this URL to check for updates.
-
+config API_URL_ENDPOINT
+    string "API URL Endpoint"
+    default "https://ws.tdstar.net/api"
+    help
+        The endpoint URL to fetch the WebSocket API URL.
 
 choice
     prompt "语言选择"

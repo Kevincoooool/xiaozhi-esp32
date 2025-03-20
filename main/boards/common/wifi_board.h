@@ -6,7 +6,11 @@
 class WifiBoard : public Board {
 protected:
     bool wifi_config_mode_ = false;
-
+    std::string api_url_;  // 存储API地址
+    std::string post_data_;
+    
+    // 新增获取API地址的函数
+    bool FetchApiUrl();
     WifiBoard();
     void EnterWifiConfigMode();
     virtual std::string GetBoardJson() override;
