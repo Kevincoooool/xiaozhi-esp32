@@ -458,9 +458,18 @@ void Application::Start() {
         }
     });
     protocol_->Start();
-
+    // 优先使用从服务器获取的 OTA URL
+    std::string ota_url = board.GetOtaUrl();
+    if (ota_url.empty()) {
+        ota_url = CONFIG_OTA_VERSION_URL;
+        ESP_LOGW(TAG, "Using default OTA URL: %s", ota_url.c_str());
+    } else {
+        ESP_LOGI(TAG, "Using server provided OTA URL: %s", ota_url.c_str());
+    }
+    
+    ota_.SetCheckVersionUrl(ota_url);
     // Check for new firmware version or get the MQTT broker address
-    ota_.SetCheckVersionUrl(CONFIG_OTA_VERSION_URL);
+    // ota_.SetCheckVersionUrl(CONFIG_OTA_VERSION_URL);
     ota_.SetHeader("Device-Id", SystemInfo::GetMacAddress().c_str());
     ota_.SetHeader("Client-Id", board.GetUuid());
     ota_.SetHeader("Accept-Language", Lang::CODE);

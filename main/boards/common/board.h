@@ -25,7 +25,7 @@ protected:
 
     // 软件生成的设备唯一标识
     std::string uuid_;
-
+    std::string ota_url_;  // 添加 OTA URL 存储
 public:
     static Board& GetInstance() {
         static Board* instance = static_cast<Board*>(create_board());
@@ -48,6 +48,7 @@ public:
     virtual bool GetBatteryLevel(int &level, bool& charging, bool& discharging);
     virtual std::string GetJson();
     virtual void SetPowerSaveMode(bool enabled) = 0;
+    virtual const std::string& GetOtaUrl() { return ota_url_; }
 };
 
 #define DECLARE_BOARD(BOARD_CLASS_NAME) \

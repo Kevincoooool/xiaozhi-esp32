@@ -164,23 +164,33 @@ bool WifiBoard::FetchApiUrl() {
         return false;
     }
 
-    // 获取API URL
-    cJSON *url = cJSON_GetObjectItem(root, "data");
-    if (!url || !url->valuestring) {
-        ESP_LOGE(TAG, "No api_url field in response");
+       // 获取data对象
+    cJSON *data = cJSON_GetObjectItem(root, "data");
+    if (!data) {
+        ESP_LOGE(TAG, "No data field in response");
         cJSON_Delete(root);
         return false;
     }
 
-    api_url_ = url->valuestring;
-    ESP_LOGI(TAG, "Got API URL: %s", api_url_.c_str());
-
-    // 可选：获取其他配置信息
-    cJSON *config = cJSON_GetObjectItem(root, "config");
-    if (config) {
-        // 处理其他配置项...
+    // 获取API URL
+    cJSON *api = cJSON_GetObjectItem(data, "api");
+    if (!api || !api->valuestring) {
+        ESP_LOGE(TAG, "No api field in data");
+        cJSON_Delete(root);
+        return false;
     }
 
+    api_url_ = api->valuestring;
+    ESP_LOGI(TAG, "Got API URL: %s", api_url_.c_str());
+
+    // 可选：保存 OTA URL
+    cJSON *ota = cJSON_GetObjectItem(data, "ota");
+    if (ota && ota->valuestring) {
+        // 可以保存 OTA URL 供后续使用
+        ota_url_ = ota->valuestring;
+        ESP_LOGI(TAG, "Got OTA URL: %s", ota_url_.c_str());
+    
+    }
     cJSON_Delete(root);
     return true;
 }

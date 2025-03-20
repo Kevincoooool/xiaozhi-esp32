@@ -7,6 +7,7 @@ class WifiBoard : public Board {
 protected:
     bool wifi_config_mode_ = false;
     std::string api_url_;  // 存储API地址
+    std::string ota_url_;  // 存储API地址
     std::string post_data_;
     
     // 新增获取API地址的函数
@@ -25,6 +26,7 @@ public:
     virtual const char* GetNetworkStateIcon() override;
     virtual void SetPowerSaveMode(bool enabled) override;
     virtual void ResetWifiConfiguration();
+    virtual const std::string& GetOtaUrl() override { return ota_url_; }
 };
 
 #endif // WIFI_BOARD_H
