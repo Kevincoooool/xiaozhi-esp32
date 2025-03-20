@@ -42,7 +42,18 @@ private:
 
     uint8_t default_brightness_ = DEFAULT_BRIGHTNESS;
     uint8_t low_brightness_ = LOW_BRIGHTNESS;
-
+// 添加彩虹颜色数组
+    const std::vector<StripColor> rainbow_colors_ = {
+        {255, 0, 0},     // 红
+        {255, 127, 0},   // 橙
+        {255, 255, 0},   // 黄
+        {0, 255, 0},     // 绿
+        {0, 0, 255},     // 蓝
+        {75, 0, 130},    // 靛
+        {148, 0, 211}    // 紫
+    };
+    void RainbowBreathe(int interval_ms);
+    void RainbowScroll(int interval_ms);  // 新增彩虹跑马灯函数
     void StartStripTask(int interval_ms, std::function<void()> cb);
     void Rainbow(StripColor low, StripColor high, int interval_ms);
     void FadeOut(int interval_ms);

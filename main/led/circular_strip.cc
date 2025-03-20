@@ -182,6 +182,82 @@ void CircularStrip::SetBrightness(uint8_t default_brightness, uint8_t low_bright
     OnStateChanged();
 }
 
+void CircularStrip::RainbowScroll(int interval_ms) {
+    StartStripTask(interval_ms, [this]() {
+        static int offset = 0;
+        
+        for (int i = 0; i < max_leds_; i++) {
+            // 计算当前LED对应的彩虹颜色索引
+            int color_index = (i + offset) % rainbow_colors_.size();
+            const auto& color = rainbow_colors_[color_index];
+            
+            // 应用亮度调整
+            uint8_t r = color.red * default_brightness_ / 255;
+            uint8_t g = color.green * default_brightness_ / 255;
+            uint8_t b = color.blue * default_brightness_ / 255;
+            
+            // 设置LED颜色
+            led_strip_set_pixel(led_strip_, i, r, g, b);
+        }
+        
+        // 刷新LED显示
+        led_strip_refresh(led_strip_);
+        
+        // 更新偏移量，实现跑马灯效果
+        offset = (offset + 1) % rainbow_colors_.size();
+    });
+}
+void CircularStrip::RainbowBreathe(int interval_ms) {
+    StartStripTask(interval_ms, [this]() {
+        static int brightness = 0;
+        static bool increasing = true;
+        static int current_index = 0;
+        static float transition_progress = 0.0f;  // 颜色过渡进度(0.0-1.0)
+        
+        // 获取当前颜色和下一个颜色
+        const auto& current_color = rainbow_colors_[current_index];
+        const auto& next_color = rainbow_colors_[(current_index + 1) % rainbow_colors_.size()];
+        
+        // 计算当前亮度
+        if (increasing) {
+            brightness += 2;
+            if (brightness >= default_brightness_) {
+                brightness = default_brightness_;
+                increasing = false;
+                
+                // 开始颜色过渡
+                transition_progress += 0.02f;  // 每次增加2%的过渡进度
+                
+                // 当过渡完成时,切换到下一个颜色
+                if (transition_progress >= 1.0f) {
+                    transition_progress = 0.0f;
+                    current_index = (current_index + 1) % rainbow_colors_.size();
+                }
+            }
+        } else {
+            brightness -= 2;
+            if (brightness <= 0) {
+                brightness = 0;
+                increasing = true;
+            }
+        }
+        
+        // 计算过渡后的颜色
+        uint8_t r = (current_color.red * (1.0f - transition_progress) + 
+                    next_color.red * transition_progress) * brightness / 255;
+        uint8_t g = (current_color.green * (1.0f - transition_progress) + 
+                    next_color.green * transition_progress) * brightness / 255;
+        uint8_t b = (current_color.blue * (1.0f - transition_progress) + 
+                    next_color.blue * transition_progress) * brightness / 255;
+        
+        // 设置所有LED为相同颜色
+        for (int i = 0; i < max_leds_; i++) {
+            led_strip_set_pixel(led_strip_, i, r, g, b);
+        }
+        
+        led_strip_refresh(led_strip_);
+    });
+}
 void CircularStrip::OnStateChanged() {
     auto& app = Application::GetInstance();
     auto device_state = app.GetDeviceState();
@@ -199,9 +275,14 @@ void CircularStrip::OnStateChanged() {
             Blink(color, 500);
             break;
         }
-        case kDeviceStateIdle:
+        case kDeviceStateIdle: {
             // 空闲状态：渐隐
             FadeOut(50);
+            // 空闲状态：淡白光常亮
+            uint8_t dim_white = default_brightness_ / 8;  // 降低亮度为正常的1/8
+            StripColor color = { dim_white, dim_white, dim_white };  // RGB均衡的白光
+            SetAllColor(color);
+            }
             break;
         case kDeviceStateConnecting: {
             // 连接状态：蓝色常亮
@@ -211,14 +292,17 @@ void CircularStrip::OnStateChanged() {
         }
         case kDeviceStateListening: {
             // 录音状态：鲜红色
-            StripColor color = { default_brightness_, 0, 0 };  // 纯红色
-            SetAllColor(color);
+            // StripColor color = { default_brightness_, 0, 0 };  // 纯红色
+            // SetAllColor(color);
+            RainbowBreathe(50);  // 每20ms更新一次亮度
             break;
         }
         case kDeviceStateSpeaking: {
             // 播放状态：鲜绿色
-            StripColor color = { 0, default_brightness_, 0 };  // 纯绿色
-            SetAllColor(color);
+            // StripColor color = { 0, default_brightness_, 0 };  // 纯绿色
+            // SetAllColor(color);
+            RainbowScroll(100);  // 每50ms更新一次，速度更快
+
             break;
         }
         case kDeviceStateUpgrading: {
