@@ -279,7 +279,7 @@ void CircularStrip::OnStateChanged() {
             // 空闲状态：渐隐
             FadeOut(50);
             // 空闲状态：淡白光常亮
-            uint8_t dim_white = default_brightness_ / 8;  // 降低亮度为正常的1/8
+            uint8_t dim_white = default_brightness_ / 3;  // 降低亮度为正常的1/8
             StripColor color = { dim_white, dim_white, dim_white };  // RGB均衡的白光
             SetAllColor(color);
             }

@@ -263,6 +263,8 @@ void WifiBoard::ResetWifiConfiguration() {
     {
         Settings settings("wifi", true);
         settings.SetInt("force_ap", 1);
+        // 添加重启原因标记
+        settings.SetInt("current_reason", 1);
     }
     GetDisplay()->ShowNotification(Lang::Strings::ENTERING_WIFI_CONFIG_MODE);
     vTaskDelay(pdMS_TO_TICKS(1000));
