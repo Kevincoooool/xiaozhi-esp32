@@ -160,7 +160,7 @@ public:
         InitializeCodecI2c();
         pmic_ = new Pmic(codec_i2c_bus_, AXP2101_I2C_ADDR);
 
-        InitializeSpi();
+        // InitializeSpi();
         InitializeButtons();
         InitializePowerSaveTimer();
         InitializeIot();
@@ -180,10 +180,23 @@ public:
         return &audio_codec;
     }
 
-    // virtual Backlight* GetBacklight() override {
-    //     static PwmBacklight backlight(DISPLAY_BACKLIGHT_PIN, DISPLAY_BACKLIGHT_OUTPUT_INVERT);
-    //     return &backlight;
-    // }
+    virtual bool GetBatteryLevel(int &level, bool& charging) override {
+        static bool last_charging = false;
+        charging = pmic_->IsCharging();
+        if (charging != last_charging) {
+            power_save_timer_->WakeUp();
+            last_charging = charging;
+        }
+
+        level = pmic_->GetBatteryLevel();
+
+        if (pmic_->IsDischarging()) {
+            power_save_timer_->SetEnabled(true);
+        } else {
+            power_save_timer_->SetEnabled(false);
+        }
+        return true;
+    }
 };
 
 DECLARE_BOARD(SHIKAI_TOY);

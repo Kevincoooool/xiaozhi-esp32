@@ -12,7 +12,7 @@ namespace iot {
 
 class Motor : public Thing {
 private:
-    static constexpr gpio_num_t GPIO_NUM = GPIO_NUM_38;    // 电机控制GPIO
+    static constexpr gpio_num_t GPIO_NUM = GPIO_NUM_47;    // 电机控制GPIO
     static constexpr uint32_t FREQ_HZ = 20000;            // PWM频率25KHz
     static constexpr ledc_timer_t TIMER_NUM = LEDC_TIMER_0;
     static constexpr ledc_channel_t CHANNEL = LEDC_CHANNEL_0;
