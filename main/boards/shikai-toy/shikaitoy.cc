@@ -26,7 +26,8 @@ class Pmic : public Axp2101 {
             // ** EFUSE defaults **
             WriteReg(0x22, 0b110); // PWRON > OFFLEVEL as POWEROFF Source enable
             WriteReg(0x27, 0x10);  // hold 4s to power off
-        
+            WriteReg(0x30, 0x11);  // hold 4s to power off
+
             WriteReg(0x93, 0x1C); // 配置 aldo2 输出为 3.3V
         
             uint8_t value = ReadReg(0x90); // XPOWERS_AXP2101_LDO_ONOFF_CTRL0
@@ -148,10 +149,10 @@ private:
     void InitializeIot() {
         auto& thing_manager = iot::ThingManager::GetInstance();
         thing_manager.AddThing(iot::CreateThing("Speaker"));
-        thing_manager.AddThing(iot::CreateThing("Motor"));
+        thing_manager.AddThing(iot::CreateThing("Intensity"));
         thing_manager.AddThing(iot::CreateThing("Battery"));
-        // thing_manager.AddThing(iot::CreateThing("Lamp"));
-        // thing_manager.AddThing(iot::CreateThing("Backlight"));
+        thing_manager.AddThing(iot::CreateThing("Pump"));
+        thing_manager.AddThing(iot::CreateThing("Vibration"));
     }
 
 public:
@@ -162,7 +163,7 @@ public:
 
         // InitializeSpi();
         InitializeButtons();
-        InitializePowerSaveTimer();
+        // InitializePowerSaveTimer();
         InitializeIot();
         // GetBacklight()->RestoreBrightness();
     }

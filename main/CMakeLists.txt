@@ -20,7 +20,6 @@ set(SOURCES "audio_codecs/audio_codec.cc"
             "main.cc"
             )
 
-        
 set(INCLUDE_DIRS "." "display" "audio_codecs" "protocols" "audio_processing")
 
 # 添加 IOT 相关文件

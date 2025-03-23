@@ -6,11 +6,11 @@
 #include <esp_log.h>
 #include <algorithm>
 
-#define TAG "Motor"
+#define TAG "Intensity"
 
 namespace iot {
 
-class Motor : public Thing {
+class Intensity : public Thing {
 private:
     static constexpr gpio_num_t GPIO_NUM = GPIO_NUM_47;    // 电机控制GPIO
     static constexpr uint32_t FREQ_HZ = 20000;            // PWM频率25KHz
@@ -52,40 +52,27 @@ private:
 
 
 public:
-    Motor() : Thing("Motor", "可调力度") {
+    Intensity() : Thing("Intensity", "可调强度，强度由小号1号电机控制") {
         InitializePwm();
 
-        properties_.AddNumberProperty("Speed", "力度 (0-100)", [this]() -> double {
+        properties_.AddNumberProperty("Intensity", "强度 (0-100)", [this]() -> double {
             return (speed_ * 100.0) / DUTY_MAX;
         });
 
-        // 定义启动电机的方法
-        methods_.AddMethod("Start", "大力一点", ParameterList(), [this](const ParameterList& parameters) {
-            running_ = true;
-            ESP_LOGI(TAG, "Motor started");
-        });
-
-        // 定义停止电机的方法
-        methods_.AddMethod("Stop", "小点力", ParameterList(), [this](const ParameterList& parameters) {
-            running_ = false;
-
-            ESP_LOGI(TAG, "Motor stopped");
-        });
-
         // 可以修改代码中的映射关系
-        methods_.AddMethod("SetSpeed", "设置力度", ParameterList({
-            Parameter("Speed", "0到100之间的整数",kValueTypeNumber,  true)
+        methods_.AddMethod("SetIntensity", "设置强度", ParameterList({
+            Parameter("Intensity", "0到100之间的整数",kValueTypeNumber,  true)
             }), [this](const ParameterList& parameters) {
-                double speed = static_cast<uint8_t>(parameters["Speed"].number());
+                double speed = static_cast<uint8_t>(parameters["Intensity"].number());
                 // 将输入范围重新映射到70-100%
-                uint32_t duty_cycle = 650 + ((1023 - 650) * speed) / 100; // 717约等于70%*1023
-                ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty_cycle);
-                ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
-                ESP_LOGI(TAG, "Set motor speed to %.1f%%, duty: %lu", speed, duty_cycle);
+                uint32_t duty_cycle = 600 + ((980 - 600) * speed) / 100; // 717约等于70%*1023
+                ledc_set_duty(LEDC_LOW_SPEED_MODE, CHANNEL, duty_cycle);
+                ledc_update_duty(LEDC_LOW_SPEED_MODE, CHANNEL);
+                ESP_LOGI(TAG, "Set Intensity speed to %.1f%%, duty: %lu", speed, duty_cycle);
             });
     }
 
-    ~Motor() {
+    ~Intensity() {
         // 停止电机并清理资源
         running_ = false;
         ledc_stop(SPEED_MODE, CHANNEL, 0);
@@ -95,4 +82,4 @@ public:
 
 } // namespace iot
 
-DECLARE_THING(Motor);
+DECLARE_THING(Intensity);
