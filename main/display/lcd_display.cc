@@ -25,15 +25,24 @@
 #define DARK_LOW_BATTERY_COLOR      lv_color_hex(0xFF0000)     // Red for dark mode
 
 // Color definitions for light theme
-#define LIGHT_BACKGROUND_COLOR       lv_color_white()           // White background
-#define LIGHT_TEXT_COLOR             lv_color_black()           // Black text
-#define LIGHT_CHAT_BACKGROUND_COLOR  lv_color_hex(0xE0E0E0)     // Light gray background
+// #define LIGHT_BACKGROUND_COLOR       lv_color_white()           // White background
+// #define LIGHT_TEXT_COLOR             lv_color_black()           // Black text
+// #define LIGHT_CHAT_BACKGROUND_COLOR  lv_color_hex(0xE0E0E0)     // Light gray background
+// #define LIGHT_USER_BUBBLE_COLOR      lv_color_hex(0x95EC69)     // WeChat green
+// #define LIGHT_ASSISTANT_BUBBLE_COLOR lv_color_white()           // White
+// #define LIGHT_SYSTEM_BUBBLE_COLOR    lv_color_hex(0xE0E0E0)     // Light gray
+// #define LIGHT_SYSTEM_TEXT_COLOR      lv_color_hex(0x666666)     // Dark gray text
+// #define LIGHT_BORDER_COLOR           lv_color_hex(0xE0E0E0)     // Light gray border
+// #define LIGHT_LOW_BATTERY_COLOR      lv_color_black()           // Black for light mode
+#define LIGHT_BACKGROUND_COLOR       lv_color_black()           // White background
+#define LIGHT_TEXT_COLOR             lv_color_white()           // Black text
+#define LIGHT_CHAT_BACKGROUND_COLOR  lv_color_black()     // Light gray background
 #define LIGHT_USER_BUBBLE_COLOR      lv_color_hex(0x95EC69)     // WeChat green
-#define LIGHT_ASSISTANT_BUBBLE_COLOR lv_color_white()           // White
-#define LIGHT_SYSTEM_BUBBLE_COLOR    lv_color_hex(0xE0E0E0)     // Light gray
-#define LIGHT_SYSTEM_TEXT_COLOR      lv_color_hex(0x666666)     // Dark gray text
-#define LIGHT_BORDER_COLOR           lv_color_hex(0xE0E0E0)     // Light gray border
-#define LIGHT_LOW_BATTERY_COLOR      lv_color_black()           // Black for light mode
+#define LIGHT_ASSISTANT_BUBBLE_COLOR lv_color_black()           // White
+#define LIGHT_SYSTEM_BUBBLE_COLOR    lv_color_black()     // Light gray
+#define LIGHT_SYSTEM_TEXT_COLOR      lv_color_white()     // Dark gray text
+#define LIGHT_BORDER_COLOR           lv_color_black()     // Light gray border
+#define LIGHT_LOW_BATTERY_COLOR      lv_color_white()           // Black for light mode
 
 // Theme color structure
 struct ThemeColors {
@@ -247,6 +256,21 @@ LcdDisplay::~LcdDisplay() {
     if (panel_io_ != nullptr) {
         esp_lcd_panel_io_del(panel_io_);
     }
+
+    
+    if (eye_canvas_) {
+        lv_obj_del(eye_canvas_);
+    }
+    
+    // if (eye_draw_buf_) {
+    //     free(eye_draw_buf_);
+    // }
+    
+    if (eye_canvas_buf_) {
+        free(eye_canvas_buf_);
+    }
+    
+    delete eye_animation_;
 }
 
 bool LcdDisplay::Lock(int timeout_ms) {
@@ -536,6 +560,90 @@ void LcdDisplay::SetChatMessage(const char* role, const char* content) {
     }
 }
 #else
+void LcdDisplay::SetupEyeCanvas() {
+    DisplayLockGuard lock(this);
+    
+    // 创建眼球动画实例
+    eye_animation_ = new EyeAnimation();
+    eye_animation_->begin();
+    eye_animation_->setEyelidGap(0);
+    
+    // 创建画布缓冲区
+    eye_canvas_buf_ = heap_caps_malloc(REAL_SCREEN_WIDTH * REAL_SCREEN_HEIGHT * 2, MALLOC_CAP_SPIRAM);
+    if (eye_canvas_buf_ == nullptr) {
+        ESP_LOGE(TAG, "Failed to allocate eye canvas buffer");
+        return;
+    }
+    
+    // 创建LVGL绘图缓冲区
+    // eye_draw_buf_ = (lv_draw_buf_t*)heap_caps_malloc(sizeof(lv_draw_buf_t), MALLOC_CAP_DMA);
+    // if (eye_draw_buf_ == nullptr) {
+    //     ESP_LOGE(TAG, "Failed to allocate eye draw buffer");
+    //     free(eye_canvas_buf_);
+    //     return;
+    // }
+    
+    // 初始化画布
+    eye_canvas_ = lv_canvas_create(content_);
+    if (eye_canvas_ == nullptr) {
+        ESP_LOGE(TAG, "Failed to create eye canvas");
+        // free(eye_draw_buf_);
+        free(eye_canvas_buf_);
+        return;
+    }
+    
+    // 设置画布大小和缓冲区
+    lv_canvas_set_buffer(eye_canvas_, eye_canvas_buf_, 
+        REAL_SCREEN_WIDTH, REAL_SCREEN_HEIGHT, LV_COLOR_FORMAT_RGB565);
+                        
+    // 设置画布位置
+    lv_obj_align(eye_canvas_, LV_ALIGN_CENTER, 0, 0);
+    
+    // 创建esp定时器
+    const esp_timer_create_args_t timer_args = {
+        .callback = &LcdDisplay::EyeTimerCallback,
+        .arg = this,
+        .dispatch_method = ESP_TIMER_TASK,
+        .name = "eye_timer",
+        .skip_unhandled_events = true
+    };
+    
+    ESP_ERROR_CHECK(esp_timer_create(&timer_args, &eye_timer_));
+}
+
+void LcdDisplay::EyeTimerCallback(void* arg) {
+    LcdDisplay* display = static_cast<LcdDisplay*>(arg);
+    
+    if (display->eye_animation_ && display->eye_canvas_) {
+        // 获取锁以更新UI
+        if (display->Lock(10)) {
+            display->eye_animation_->update();
+            
+            // 将动画缓冲区复制到画布
+            memcpy(display->eye_canvas_buf_, 
+                   display->eye_animation_->getScaledBuffer(),
+                   REAL_SCREEN_WIDTH * REAL_SCREEN_HEIGHT * 2);
+                   
+            // 刷新画布
+            lv_obj_invalidate(display->eye_canvas_);
+            
+            display->Unlock();
+        }
+    }
+}
+
+void LcdDisplay::StartEyeAnimation() {
+    if (eye_timer_) {
+        // 启动定时器,33ms间隔(约30fps)
+        esp_timer_start_periodic(eye_timer_, 10 * 1000);  // 微秒为单位
+    }
+}
+
+void LcdDisplay::StopEyeAnimation() {
+    if (eye_timer_) {
+        esp_timer_stop(eye_timer_);
+    }
+}
 void LcdDisplay::SetupUI() {
     DisplayLockGuard lock(this);
 
@@ -574,11 +682,15 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_flex_flow(content_, LV_FLEX_FLOW_COLUMN); // 垂直布局（从上到下）
     lv_obj_set_flex_align(content_, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_SPACE_EVENLY); // 子对象居中对齐，等距分布
 
+
     emotion_label_ = lv_label_create(content_);
     lv_obj_set_style_text_font(emotion_label_, &font_awesome_30_4, 0);
     lv_obj_set_style_text_color(emotion_label_, current_theme.text, 0);
     lv_label_set_text(emotion_label_, FONT_AWESOME_AI_CHIP);
-
+    lv_obj_add_flag(emotion_label_, LV_OBJ_FLAG_HIDDEN);
+    // 初始化眼球动画
+    SetupEyeCanvas();
+    StartEyeAnimation();
     chat_message_label_ = lv_label_create(content_);
     lv_label_set_text(chat_message_label_, "");
     lv_obj_set_width(chat_message_label_, LV_HOR_RES * 0.9); // 限制宽度为屏幕宽度的 90%
@@ -633,6 +745,7 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_text_color(low_battery_label, lv_color_white(), 0);
     lv_obj_center(low_battery_label);
     lv_obj_add_flag(low_battery_popup_, LV_OBJ_FLAG_HIDDEN);
+    
 }
 #endif
 

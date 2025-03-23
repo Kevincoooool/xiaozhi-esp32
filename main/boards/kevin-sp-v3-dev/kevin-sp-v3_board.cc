@@ -87,7 +87,7 @@ private:
                             {
                                 .text_font = &font_puhui_20_4,
                                 .icon_font = &font_awesome_20_4,
-                                .emoji_font = font_emoji_64_init(),
+                                .emoji_font = font_emoji_32_init(),
                             });
     }
 

@@ -6,6 +6,7 @@
 #include <esp_lcd_panel_io.h>
 #include <esp_lcd_panel_ops.h>
 #include <font_emoji.h>
+#include <EyeAnimation.h>
 
 #include <atomic>
 
@@ -30,9 +31,23 @@ protected:
     // 添加protected构造函数
     LcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_t panel, DisplayFonts fonts)
         : panel_io_(panel_io), panel_(panel), fonts_(fonts) {}
+private:
+    // ...existing code...
     
+    // 眼球动画相关
+    lv_obj_t* eye_canvas_ = nullptr;
+    lv_draw_buf_t* eye_draw_buf_ = nullptr;
+    void* eye_canvas_buf_ = nullptr;
+    EyeAnimation* eye_animation_ = nullptr;
+    esp_timer_handle_t eye_timer_ = nullptr;
+
+    static void UpdateEyeAnimation(lv_timer_t* timer);
+    void SetupEyeCanvas();
+    static void EyeTimerCallback(void* arg);
 public:
     ~LcdDisplay();
+    void StartEyeAnimation();
+    void StopEyeAnimation();
     virtual void SetEmotion(const char* emotion) override;
     virtual void SetIcon(const char* icon) override;
 #if CONFIG_USE_WECHAT_MESSAGE_STYLE
