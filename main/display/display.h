@@ -4,6 +4,7 @@
 #include <lvgl.h>
 #include <esp_timer.h>
 #include <esp_log.h>
+#include <esp_pm.h>
 
 #include <string>
 
@@ -24,17 +25,17 @@ public:
     virtual void SetEmotion(const char* emotion);
     virtual void SetChatMessage(const char* role, const char* content);
     virtual void SetIcon(const char* icon);
-    virtual void SetBacklight(uint8_t brightness);
+    virtual void SetTheme(const std::string& theme_name);
+    virtual std::string GetTheme() { return current_theme_name_; }
 
     inline int width() const { return width_; }
     inline int height() const { return height_; }
-    inline uint8_t brightness() const { return brightness_; }
 
 protected:
     int width_ = 0;
     int height_ = 0;
-    uint8_t brightness_ = 0;
-
+    
+    esp_pm_lock_handle_t pm_lock_ = nullptr;
     lv_display_t *display_ = nullptr;
 
     lv_obj_t *emotion_label_ = nullptr;
@@ -44,9 +45,12 @@ protected:
     lv_obj_t *mute_label_ = nullptr;
     lv_obj_t *battery_label_ = nullptr;
     lv_obj_t* chat_message_label_ = nullptr;
+    lv_obj_t* low_battery_popup_ = nullptr;
+
     const char* battery_icon_ = nullptr;
     const char* network_icon_ = nullptr;
     bool muted_ = false;
+    std::string current_theme_name_;
 
     esp_timer_handle_t notification_timer_ = nullptr;
     esp_timer_handle_t update_timer_ = nullptr;
@@ -72,6 +76,14 @@ public:
 
 private:
     Display *display_;
+};
+
+class NoDisplay : public Display {
+private:
+    virtual bool Lock(int timeout_ms = 0) override {
+        return true;
+    }
+    virtual void Unlock() override {}
 };
 
 #endif

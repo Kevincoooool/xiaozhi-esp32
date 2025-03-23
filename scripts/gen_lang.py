@@ -8,6 +8,10 @@ HEADER_TEMPLATE = """// Auto-generated language config
 
 #include <string_view>
 
+#ifndef {lang_code_for_font}
+    #define {lang_code_for_font}  // 預設語言
+#endif
+
 namespace Lang {{
     // 语言元数据
     constexpr const char* CODE = "{lang_code}";
@@ -52,10 +56,23 @@ def generate_header(input_path, output_path):
         static_cast<const char*>(p3_{base_name}_start),
         static_cast<size_t>(p3_{base_name}_end - p3_{base_name}_start)
         }};''')
+    
+    # 生成公共音效
+    for file in os.listdir(os.path.join(os.path.dirname(output_path), 'common')):
+        if file.endswith('.p3'):
+            base_name = os.path.splitext(file)[0]
+            sounds.append(f'''
+        extern const char p3_{base_name}_start[] asm("_binary_{base_name}_p3_start");
+        extern const char p3_{base_name}_end[] asm("_binary_{base_name}_p3_end");
+        static const std::string_view P3_{base_name.upper()} {{
+        static_cast<const char*>(p3_{base_name}_start),
+        static_cast<size_t>(p3_{base_name}_end - p3_{base_name}_start)
+        }};''')
 
     # 填充模板
     content = HEADER_TEMPLATE.format(
         lang_code=lang_code,
+        lang_code_for_font=lang_code.replace('-', '_').lower(),
         strings="\n".join(sorted(strings)),
         sounds="\n".join(sorted(sounds))
     )

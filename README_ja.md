@@ -18,7 +18,7 @@
 
 プロジェクトの開発と改善には誰でも参加できます。アイデアや提案がありましたら、Issue を立てるかチャットグループにご参加ください。
 
-学習・交流 QQ グループ：946599635
+学習・交流 QQ グループ：376893254
 
 ## 実装済みの機能
 
@@ -60,6 +60,7 @@ Feishu ドキュメントチュートリアルをご覧ください：
 - <a href="https://github.com/Xinyuan-LilyGO/T-Circle-S3" target="_blank" title="LILYGO T-Circle-S3">LILYGO T-Circle-S3</a>
 - <a href="https://oshwhub.com/tenclass01/xmini_c3" target="_blank" title="XiaGe Mini C3">XiaGe Mini C3</a>
 - <a href="https://oshwhub.com/movecall/moji-xiaozhi-ai-derivative-editi" target="_blank" title="Movecall Moji ESP32S3">Moji シャオジー AI 派生版</a>
+- <a href="https://www.seeedstudio.com/SenseCAP-Watcher-W1-A-p-5979.html" target="_blank" title="SenseCAP Watcher">SenseCAP Watcher</a>
 
 <div style="display: flex; justify-content: space-between;">
   <a href="docs/v1/lichuang-s3.jpg" target="_blank" title="LiChuang ESP32-S3 開発ボード">
@@ -88,6 +89,9 @@ Feishu ドキュメントチュートリアルをご覧ください：
   </a>
   <a href="docs/v1/movecall-moji-esp32s3.jpg" target="_blank" title="Moji">
     <img src="docs/v1/movecall-moji-esp32s3.jpg" width="240" />
+  </a>
+  <a href="docs/v1/sensecap_watcher.jpg" target="_blank" title="SenseCAP Watcher">
+    <img src="docs/v1/sensecap_watcher.jpg" width="240" />
   </a>
 </div>
 
