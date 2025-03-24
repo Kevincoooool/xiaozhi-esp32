@@ -4,7 +4,6 @@
 #include "display/lcd_display.h"
 #include "application.h"
 #include "button.h"
-#include "axp2101.h"
 #include "config.h"
 #include "i2c_device.h"
 #include "iot/thing_manager.h"
@@ -14,12 +13,40 @@
 #include <driver/i2c_master.h>
 #include <driver/spi_common.h>
 #include <wifi_station.h>
-
+#include "power_save_timer.h"
+#include "axp2101.h"
 #define TAG "kevin_box_2_0_lcd"
 
 LV_FONT_DECLARE(font_puhui_20_4);
 LV_FONT_DECLARE(font_awesome_20_4);
 
+class Pmic : public Axp2101 {
+public:
+    Pmic(i2c_master_bus_handle_t i2c_bus, uint8_t addr) : Axp2101(i2c_bus, addr) {
+        // ** EFUSE defaults **
+        WriteReg(0x22, 0b110); // PWRON > OFFLEVEL as POWEROFF Source enable
+        WriteReg(0x27, 0x10);  // hold 4s to power off
+    
+        WriteReg(0x93, 0x1C); // 配置 aldo2 输出为 3.3V
+    
+        uint8_t value = ReadReg(0x90); // XPOWERS_AXP2101_LDO_ONOFF_CTRL0
+        value = value | 0x02; // set bit 1 (ALDO2)
+        WriteReg(0x90, value);  // and power channels now enabled
+    
+        WriteReg(0x64, 0x03); // CV charger voltage setting to 4.2V
+        
+        WriteReg(0x61, 0x05); // set Main battery precharge current to 125mA
+        WriteReg(0x62, 0x0A); // set Main battery charger current to 400mA ( 0x08-200mA, 0x09-300mA, 0x0A-400mA )
+        WriteReg(0x63, 0x15); // set Main battery term charge current to 125mA
+    
+        WriteReg(0x14, 0x00); // set minimum system voltage to 4.1V (default 4.7V), for poor USB cables
+        WriteReg(0x15, 0x00); // set input voltage limit to 3.88v, for poor USB cables
+        WriteReg(0x16, 0x05); // set input current limit to 2000mA
+    
+        WriteReg(0x24, 0x01); // set Vsys for PWROFF threshold to 3.2V (default - 2.6V and kill battery)
+        WriteReg(0x50, 0x14); // set TS pin to EXTERNAL input (not temperature)
+    }
+};
 class Ft6336 : public I2cDevice {
     public:
         struct TouchPoint_t {
@@ -60,41 +87,17 @@ private:
     Button boot_button_;
     i2c_master_bus_handle_t i2c_bus_;
     LcdDisplay* display_;
-    esp_timer_handle_t power_save_timer_ = nullptr;
-    Axp2101* axp2101_ = nullptr;
+    Pmic* pmic_ = nullptr;
     Ft6336* ft6336_;
     esp_timer_handle_t touchpad_timer_;
+    PowerSaveTimer* power_save_timer_;
+    
     void InitializePowerSaveTimer() {
-        esp_timer_create_args_t power_save_timer_args = {
-            .callback = [](void *arg) {
-                auto board = static_cast<kevin_box_2_0_lcd*>(arg);
-                board->PowerSaveCheck();
-            },
-            .arg = this,
-            .dispatch_method = ESP_TIMER_TASK,
-            .name = "Power Save Timer",
-            .skip_unhandled_events = false,
-        };
-        ESP_ERROR_CHECK(esp_timer_create(&power_save_timer_args, &power_save_timer_));
-        ESP_ERROR_CHECK(esp_timer_start_periodic(power_save_timer_, 1000000));
-    }
-    void PowerSaveCheck() {
-        // 电池放电模式下，如果待机超过一定时间，则自动关机
-        const int seconds_to_shutdown = 600;
-        static int seconds = 0;
-        if (Application::GetInstance().GetDeviceState() != kDeviceStateIdle) {
-            seconds = 0;
-            return;
-        }
-        if (!axp2101_->IsDischarging()) {
-            seconds = 0;
-            return;
-        }
-        
-        seconds++;
-        if (seconds >= seconds_to_shutdown) {
-            axp2101_->PowerOff();
-        }
+        power_save_timer_ = new PowerSaveTimer(-1, -1, 600);
+        power_save_timer_->OnShutdownRequest([this]() {
+            pmic_->PowerOff();
+        });
+        power_save_timer_->SetEnabled(true);
     }
     void InitializeI2c() {
         // Initialize I2C peripheral
@@ -244,13 +247,13 @@ private:
         ESP_ERROR_CHECK(esp_lcd_panel_mirror(panel, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y));
         ESP_ERROR_CHECK(esp_lcd_panel_invert_color(panel, true));
 
-        display_ = new LcdDisplay(panel_io, panel, DISPLAY_BACKLIGHT_PIN, DISPLAY_BACKLIGHT_OUTPUT_INVERT,
-                                     DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY,
-                                     {
-                                         .text_font = &font_puhui_20_4,
-                                         .icon_font = &font_awesome_20_4,
-                                         .emoji_font = font_emoji_64_init(),
-                                     });
+        display_ = new SpiLcdDisplay(panel_io, panel,
+                            DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY,
+                            {
+                                .text_font = &font_puhui_20_4,
+                                .icon_font = &font_awesome_20_4,
+                                .emoji_font = font_emoji_32_init(),
+                            });
     }
 
     // 物联网初始化，添加对 AI 可见设备
@@ -269,14 +272,16 @@ public:
         ESP_LOGI(TAG, "Initializing kevin_box_2_0_lcd Board");
         InitializeI2c();
         I2cDetect();
-        axp2101_ = new Axp2101(i2c_bus_, AXP2101_I2C_ADDR);
+        pmic_ = new Pmic(i2c_bus_, AXP2101_I2C_ADDR);
         // Enable4GModule();
         InitializeSpi();
         InitializeButtons();
         InitializeSt7789Display();  
-        InitializeIot();
+        // InitializeIot();
         
         InitializeFt6336TouchPad();
+        InitializePowerSaveTimer();
+        GetBacklight()->RestoreBrightness();
     }
 
     virtual AudioCodec* GetAudioCodec() override {
@@ -296,24 +301,27 @@ public:
         return &audio_codec;
     }
 
-    virtual Display *GetDisplay() override
-    {
+    virtual Display *GetDisplay() override {
         return display_;
     }
-    virtual bool GetBatteryLevel(int &level, bool& charging) override {
-        static int last_level = 0;
-        static bool last_charging = false;
-        level = axp2101_->GetBatteryLevel();
-        charging = axp2101_->IsCharging();
-        if (level != last_level || charging != last_charging) {
-            last_level = level;
-            last_charging = charging;
-            ESP_LOGI(TAG, "Battery level: %d, charging: %d", level, charging);
+    virtual bool GetBatteryLevel(int &level, bool& charging, bool& discharging) override {
+        static bool last_discharging = false;
+        charging = pmic_->IsCharging();
+        discharging = pmic_->IsDischarging();
+        if (discharging != last_discharging) {
+            power_save_timer_->SetEnabled(discharging);
+            last_discharging = discharging;
         }
+
+        level = pmic_->GetBatteryLevel();
         return true;
     }
     Ft6336* GetTouchpad() {
         return ft6336_;
+    }
+    virtual Backlight* GetBacklight() override {
+        static PwmBacklight backlight(DISPLAY_BACKLIGHT_PIN, DISPLAY_BACKLIGHT_OUTPUT_INVERT);
+        return &backlight;
     }
 };
 
