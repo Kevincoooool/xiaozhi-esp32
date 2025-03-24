@@ -35,6 +35,8 @@ public:
     ~LcdDisplay();
     virtual void SetEmotion(const char* emotion) override;
     virtual void SetIcon(const char* icon) override;
+    virtual void SetSittingPostureText(const char* postureText) override;// 声明设置坐姿文字显示的函数
+
 };
 
 // RGB LCD显示器

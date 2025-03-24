@@ -224,7 +224,22 @@ void OledDisplay::SetChatMessage(const char* role, const char* content) {
         }
     }
 }
-
+void OledDisplay::SetSittingPostureText(const char* postureText) {
+    DisplayLockGuard lock(this);
+    if (sit_label_ == nullptr) {
+        return;
+    }
+    // 设置坐姿文字到标签上
+    lv_label_set_text(sit_label_, postureText);
+}
+void OledDisplay::SetSittingHandText(const char* postureText) {
+    DisplayLockGuard lock(this);
+    if (hand_label_ == nullptr) {
+        return;
+    }
+    // 设置坐姿文字到标签上
+    lv_label_set_text(hand_label_, postureText);
+}
 void OledDisplay::SetupUI_128x64() {
     DisplayLockGuard lock(this);
 
@@ -456,7 +471,14 @@ void OledDisplay::SetupUI() {
     lv_obj_set_width(chat_message_label_, LV_HOR_RES * 0.9); // 限制宽度为屏幕宽度的 90%
     lv_label_set_long_mode(chat_message_label_, LV_LABEL_LONG_WRAP); // 设置为自动换行模式
     lv_obj_set_style_text_align(chat_message_label_, LV_TEXT_ALIGN_CENTER, 0); // 设置文本居中对齐
-
+    hand_label_= lv_label_create(content_);
+    lv_label_set_text(hand_label_, "good");
+    lv_obj_set_width(hand_label_, LV_HOR_RES * 0.9); // 限制宽度为屏幕宽度的 90%
+    lv_obj_set_style_text_align(hand_label_, LV_TEXT_ALIGN_CENTER, 0); // 设置文本居中对齐
+    sit_label_= lv_label_create(content_);
+    lv_label_set_text(sit_label_, "good");
+    lv_obj_set_width(sit_label_, LV_HOR_RES * 0.9); // 限制宽度为屏幕宽度的 90%
+    lv_obj_set_style_text_align(sit_label_, LV_TEXT_ALIGN_CENTER, 0); // 设置文本居中对齐
     /* Status bar */
     lv_obj_set_flex_flow(status_bar_, LV_FLEX_FLOW_ROW);
     lv_obj_set_style_pad_all(status_bar_, 0, 0);

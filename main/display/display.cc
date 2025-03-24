@@ -249,3 +249,19 @@ void Display::SetChatMessage(const char* role, const char* content) {
     }
     lv_label_set_text(chat_message_label_, content);
 }
+void Display::SetSittingHandText(const char* postureText) {
+    DisplayLockGuard lock(this);
+    if (hand_label_ == nullptr) {
+        return;
+    }
+    // 设置坐姿文字到标签上
+    lv_label_set_text(hand_label_, postureText);
+}
+void Display::SetSittingPostureText(const char* postureText) {
+    DisplayLockGuard lock(this);
+    if (sit_label_ == nullptr) {
+        return;
+    }
+    // 设置坐姿文字到标签上
+    lv_label_set_text(sit_label_, postureText);
+}
