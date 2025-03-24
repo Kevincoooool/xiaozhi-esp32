@@ -29,8 +29,10 @@ private:
 public:
     OledDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_t panel, int width, int height, bool mirror_x, bool mirror_y,
                 DisplayFonts fonts);
-    ~OledDisplay();
+    ~OledDisplay();    
+    virtual void SetSittingHandText(const char* postureText) override;// 声明设置坐姿文字显示的函数
 
+    virtual void SetSittingPostureText(const char* postureText) override;// 声明设置坐姿文字显示的函数
     virtual void SetChatMessage(const char* role, const char* content) override;
 };
 

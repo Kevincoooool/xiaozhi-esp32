@@ -588,6 +588,11 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_text_align(chat_message_label_, LV_TEXT_ALIGN_CENTER, 0); // 设置文本居中对齐
     lv_obj_set_style_text_color(chat_message_label_, current_theme.text, 0);
 
+    
+    sit_label_= lv_label_create(content_);
+    lv_label_set_text(sit_label_, "good");
+    lv_obj_set_width(sit_label_, LV_HOR_RES * 0.9); // 限制宽度为屏幕宽度的 90%
+    lv_obj_set_style_text_align(sit_label_, LV_TEXT_ALIGN_CENTER, 0); // 设置文本居中对齐
     /* Status bar */
     lv_obj_set_flex_flow(status_bar_, LV_FLEX_FLOW_ROW);
     lv_obj_set_style_pad_all(status_bar_, 0, 0);
@@ -930,4 +935,20 @@ void LcdDisplay::SetTheme(const std::string& theme_name) {
 
     // No errors occurred. Save theme to settings
     Display::SetTheme(theme_name);
+}
+void LcdDisplay::SetSittingPostureText(const char* postureText) {
+    DisplayLockGuard lock(this);
+    if (sit_label_ == nullptr) {
+        return;
+    }
+    // 设置坐姿文字到标签上
+    lv_label_set_text(sit_label_, postureText);
+}
+void LcdDisplay::SetSittingHandText(const char* postureText) {
+    DisplayLockGuard lock(this);
+    if (hand_label_ == nullptr) {
+        return;
+    }
+    // 设置坐姿文字到标签上
+    lv_label_set_text(hand_label_, postureText);
 }

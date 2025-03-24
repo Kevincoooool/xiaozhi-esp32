@@ -29,6 +29,8 @@ public:
 
     virtual void SetTheme(const std::string& theme_name);
     virtual std::string GetTheme() { return current_theme_name_; }
+    virtual void SetSittingPostureText(const char* postureText);// 声明设置坐姿文字显示的函数
+    virtual void SetSittingHandText(const char* postureText);// 声明设置坐姿文字显示的函数
 
     inline int width() const { return width_; }
     inline int height() const { return height_; }
@@ -48,6 +50,8 @@ protected:
     lv_obj_t *battery_label_ = nullptr;
     lv_obj_t* chat_message_label_ = nullptr;
     lv_obj_t *avi_image = nullptr;
+    lv_obj_t* hand_label_ = nullptr;
+    lv_obj_t* sit_label_ = nullptr;
     lv_obj_t* low_battery_popup_ = nullptr;
 
     const char* battery_icon_ = nullptr;

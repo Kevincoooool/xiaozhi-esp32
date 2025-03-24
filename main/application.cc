@@ -14,6 +14,7 @@
 #include <esp_log.h>
 #include <cJSON.h>
 #include <driver/gpio.h>
+#include <driver/uart.h>
 #include <arpa/inet.h>
 #include "avi_player_port.h"
 #include <esp_app_desc.h>
@@ -35,9 +36,133 @@ static const char* const STATE_STRINGS[] = {
     "invalid_state"
 };
 
+typedef enum
+{
+	SPD_HAND_DROP        = 0,
+	SPD_HAND_HOLD_FACE   = 1,
+	SPD_HAND_NORMAL      = 2,
+	SPD_HAND_COUNT,
+}SPD_HAND_STAT;
+
+typedef enum
+{
+	SPD_BODY_LAYONTABLE  = 0,
+	SPD_BODY_TILTED      = 1,
+	SPD_BODY_HUNCHBACK   = 2,
+	SPD_BODY_NORMAL      = 3,
+	SPD_BODY_LEAVE       = 4,
+	SPD_BODY_COUNT,
+}SPD_BODY_STAT;
+
 Application::Application() {
     event_group_ = xEventGroupCreate();
     background_task_ = new BackgroundTask(4096 * 8);
+    // 初始化串口配置
+    uart_config_t uart_config = {
+        .baud_rate = 115200,
+        .data_bits = UART_DATA_8_BITS,
+        .parity = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .source_clk = UART_SCLK_APB,
+    };
+    // 安装串口驱动
+    uart_driver_install(UART_NUM_1, 1024 * 2, 0, 0, NULL, 0);
+    // 配置串口引脚
+    uart_set_pin(UART_NUM_1, UART_PIN_NO_CHANGE, 41, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+    // 应用串口配置
+    uart_param_config(UART_NUM_1, &uart_config);
+// 创建串口接收任务
+    xTaskCreate([](void* arg) {
+        Application* app = (Application*)arg;
+        uint8_t buffer[8]; // 用于存储 8 字节数据
+        int buffer_index = 0;
+
+        while (true) {
+            uint8_t data;
+            int len = uart_read_bytes(UART_NUM_1, &data, 1, pdMS_TO_TICKS(100));
+            if (len > 0) {
+                if (buffer_index == 0 && data == 0xAA) {
+                    buffer[buffer_index++] = data;
+                } else if (buffer_index == 1 && data == 0xAF) {
+                    buffer[buffer_index++] = data;
+                } else if (buffer_index > 1 && buffer_index < 8) {
+                    buffer[buffer_index++] = data;
+                }
+
+                if (buffer_index == 8) {
+                    // 检查包尾
+                    if (buffer[6] == 0xAF && buffer[7] == 0xFF) {
+                        // 解析第三个字节的数值
+                        uint8_t hand_byte_value = buffer[2];
+                        uint8_t body_byte_value = buffer[3];
+                        // ESP_LOGI(TAG, "Parsed third byte value: 0x%02X", third_byte_value);
+                        // 可以根据解析结果执行相应操作
+                        // 例如，根据不同数值调用不同方法
+                        // switch (hand_byte_value) {
+                        //     case 0x01:
+                        //         // app->StartListening();
+                        //         break;
+                        //     case 0x02:
+                        //         // app->StopListening();
+                        //         break;
+                        //     default:
+                        //         ESP_LOGI(TAG, "Unknown third byte value: 0x%02X", hand_byte_value);
+                        //         break;
+                        // }
+
+                        switch (hand_byte_value)
+                            {
+                            case SPD_HAND_DROP:
+                                printf("下垂\r\n");
+                                Board::GetInstance().GetDisplay()->SetSittingHandText("手：下垂");
+                                break;
+                            case SPD_HAND_HOLD_FACE:
+                                printf("撑脸\r\n");
+                                Board::GetInstance().GetDisplay()->SetSittingHandText("手：撑脸");
+                                break;
+                            case SPD_HAND_NORMAL:
+                                Board::GetInstance().GetDisplay()->SetSittingHandText("手：正常");
+                                printf("正常\r\n");
+                                break;
+
+                            default:
+                                break;
+                            }
+                            switch (body_byte_value)
+                            {
+                            case SPD_BODY_LAYONTABLE:
+                                printf("趴桌\r\n");
+                                Board::GetInstance().GetDisplay()->SetSittingPostureText("身体：趴桌");
+                                break;
+                            case SPD_BODY_TILTED:
+                                printf("倾斜\r\n");
+                                Board::GetInstance().GetDisplay()->SetSittingPostureText("身体：倾斜");
+                                break;
+                            case SPD_BODY_HUNCHBACK:
+                                printf("驼背\r\n");
+                                Board::GetInstance().GetDisplay()->SetSittingPostureText("身体：驼背");
+                                break;
+                            case SPD_BODY_LEAVE:
+                                printf("离席\r\n");
+                                Board::GetInstance().GetDisplay()->SetSittingPostureText("身体：离席");
+                                break;
+                            case SPD_BODY_NORMAL:
+                                printf("正常\r\n");
+                                Board::GetInstance().GetDisplay()->SetSittingPostureText("身体：正常");
+                                break;
+
+                            default:
+                                break;
+                            }
+                    } else {
+                        ESP_LOGW(TAG, "Invalid packet tail, discard the packet.");
+                    }
+                    buffer_index = 0; // 重置缓冲区索引
+                }
+            }
+        }
+    }, "uart_receive_task", 4096, this, 2, nullptr);
 
     esp_timer_create_args_t clock_timer_args = {
         .callback = [](void* arg) {
