@@ -28,7 +28,7 @@ protected:
     bool colon_visible_ = true;
     DisplayFonts fonts_;
 
-    virtual void SetupUI();
+    void SetupUI();
     virtual bool Lock(int timeout_ms = 0) override;
     virtual void Unlock() override;
     static void UpdateClock(lv_timer_t* timer);
@@ -43,6 +43,12 @@ public:
     virtual void SetEmotion(const char* emotion) override;
     virtual void SetIcon(const char* icon) override;
     virtual void ShowClockView(bool show) override;
+#if CONFIG_USE_WECHAT_MESSAGE_STYLE
+    virtual void SetChatMessage(const char* role, const char* content) override; 
+#endif  
+
+    // Add theme switching function
+    virtual void SetTheme(const std::string& theme_name) override;
 };
 
 // RGB LCD显示器
