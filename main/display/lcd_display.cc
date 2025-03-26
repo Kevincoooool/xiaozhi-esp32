@@ -307,17 +307,17 @@ void LcdDisplay::ShowClockView(bool show) {
     DisplayLockGuard lock(this);
     
     if (show) {
-        lv_obj_clear_flag(clock_container_, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(chat_messages_container_, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(emotion_label_, LV_OBJ_FLAG_HIDDEN);
+        if(clock_container_ != nullptr) lv_obj_clear_flag(clock_container_, LV_OBJ_FLAG_HIDDEN);
+        // if(chat_messages_container_ != nullptr) (chat_messages_container_, LV_OBJ_FLAG_HIDDEN);
+        // if(emotion_label_ != nullptr) lv_obj_add_flag(emotion_label_, LV_OBJ_FLAG_HIDDEN);
         
         // 使用 ESP 定时器，每秒更新一次
         esp_timer_start_periodic(clock_update_timer_, 500 * 1000); 
         UpdateClockDisplay();  // 立即更新一次
     } else {
-        lv_obj_add_flag(clock_container_, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_clear_flag(chat_messages_container_, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_clear_flag(emotion_label_, LV_OBJ_FLAG_HIDDEN);
+        if(clock_container_ != nullptr) lv_obj_add_flag(clock_container_, LV_OBJ_FLAG_HIDDEN);
+        // if(chat_messages_container_ != nullptr) lv_obj_clear_flag(chat_messages_container_, LV_OBJ_FLAG_HIDDEN);
+        // if(emotion_label_ != nullptr) lv_obj_clear_flag(emotion_label_, LV_OBJ_FLAG_HIDDEN);
         
         esp_timer_stop(clock_update_timer_);
     }
@@ -366,7 +366,25 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_flex_flow(content_, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(content_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
     lv_obj_set_style_pad_row(content_, 10, 0); // Space between messages
+// 创建时钟容器
+    clock_container_ = lv_obj_create(content_);
+    lv_obj_set_size(clock_container_, LV_HOR_RES - 10, LV_VER_RES - 10);  // 固定高度
+    lv_obj_set_style_bg_opa(clock_container_, LV_OPA_0, 0);  // 透明背景
+    lv_obj_set_style_border_width(clock_container_, 0, 0);   // 无边框
+    lv_obj_center(clock_container_);
+    lv_obj_add_flag(clock_container_, LV_OBJ_FLAG_HIDDEN);  // 默认隐藏
 
+    // 创建时钟标签
+    clock_label_ = lv_label_create(clock_container_);
+    static lv_style_t style_clock;
+    lv_style_init(&style_clock);
+    lv_style_set_text_font(&style_clock, &font_dingding);  // 使用大号字体
+    lv_style_set_text_color(&style_clock, lv_color_black());
+    lv_obj_add_style(clock_label_, &style_clock, 0);
+    lv_obj_center(clock_label_);
+
+    // 创建时钟更新定时器
+    InitClockTimer();
     // We'll create chat messages dynamically in SetChatMessage
     chat_message_label_ = nullptr;
 
