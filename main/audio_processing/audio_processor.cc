@@ -23,16 +23,21 @@ void AudioProcessor::Initialize(int channels, bool reference) {
         input_format.push_back('R');
     }
 
-    afe_config_t* afe_config = afe_config_init(input_format.c_str(), NULL, AFE_TYPE_VC, AFE_MODE_HIGH_PERF);
-    afe_config->aec_init = false;
-    afe_config->aec_mode = AEC_MODE_VOIP_HIGH_PERF;
+    srmodel_list_t *models = esp_srmodel_init("model");
+    char* ns_model_name = esp_srmodel_filter(models, ESP_NSNET_PREFIX, NULL);
+
+    afe_config_t* afe_config = afe_config_init(input_format.c_str(), NULL, AFE_TYPE_VC, AFE_MODE_LOW_COST);
+    afe_config->aec_init = true;
+    afe_config->aec_mode = AEC_MODE_VOIP_LOW_COST;
     afe_config->ns_init = true;
-    afe_config->vad_init = true;
+    afe_config->ns_model_name = ns_model_name;
+    afe_config->afe_ns_mode = AFE_NS_MODE_NET;
+    afe_config->vad_init = false;
     afe_config->vad_mode = VAD_MODE_0;
     afe_config->vad_min_noise_ms = 100;
     afe_config->afe_perferred_core = 1;
     afe_config->afe_perferred_priority = 1;
-    afe_config->agc_init = true;
+    afe_config->agc_init = false;
     afe_config->agc_mode = AFE_AGC_MODE_WEBRTC;
     afe_config->agc_compression_gain_db = 10;
     afe_config->memory_alloc_mode = AFE_MEMORY_ALLOC_MORE_PSRAM;

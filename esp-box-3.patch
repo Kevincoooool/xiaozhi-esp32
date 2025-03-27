@@ -1,0 +1,150 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 706938d..939c313 100755
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -4,7 +4,7 @@
+ # CMakeLists in this exact order for cmake to work correctly
+ cmake_minimum_required(VERSION 3.16)
+ 
+-set(PROJECT_VER "1.5.2")
++set(PROJECT_VER "1.5.3")
+ 
+ # Add this line to disable the specific warning
+ add_compile_options(-Wno-missing-field-initializers)
+diff --git a/main/application.cc b/main/application.cc
+index 56a0475..1251d86 100644
+--- a/main/application.cc
++++ b/main/application.cc
+@@ -321,7 +321,7 @@ void Application::Start() {
+     /* Setup the audio codec */
+     auto codec = board.GetAudioCodec();
+     opus_decode_sample_rate_ = codec->output_sample_rate();
+-    opus_decoder_ = std::make_unique<OpusDecoderWrapper>(opus_decode_sample_rate_, 1);
++    opus_decoder_ = std::make_unique<OpusDecoderWrapper>(opus_decode_sample_rate_, 1, OPUS_FRAME_DURATION_MS);
+     opus_encoder_ = std::make_unique<OpusEncoderWrapper>(16000, 1, OPUS_FRAME_DURATION_MS);
+     // For ML307 boards, we use complexity 5 to save bandwidth
+     // For other boards, we use complexity 3 to save CPU
+@@ -329,8 +329,8 @@ void Application::Start() {
+         ESP_LOGI(TAG, "ML307 board detected, setting opus encoder complexity to 5");
+         opus_encoder_->SetComplexity(5);
+     } else {
+-        ESP_LOGI(TAG, "WiFi board detected, setting opus encoder complexity to 3");
+-        opus_encoder_->SetComplexity(3);
++        ESP_LOGI(TAG, "WiFi board detected, setting opus encoder complexity to 0");
++        opus_encoder_->SetComplexity(0);
+     }
+ 
+     if (codec->input_sample_rate() != 16000) {
+@@ -372,7 +372,7 @@ void Application::Start() {
+     });
+     protocol_->OnIncomingAudio([this](std::vector<uint8_t>&& data) {
+         std::lock_guard<std::mutex> lock(mutex_);
+-        if (device_state_ == kDeviceStateSpeaking) {
++        if (device_state_ == kDeviceStateSpeaking || true) {
+             audio_decode_queue_.emplace_back(std::move(data));
+         }
+     });
+@@ -406,13 +406,16 @@ void Application::Start() {
+             if (strcmp(state->valuestring, "start") == 0) {
+                 Schedule([this]() {
+                     aborted_ = false;
+-                    if (device_state_ == kDeviceStateIdle || device_state_ == kDeviceStateListening) {
+-                        SetDeviceState(kDeviceStateSpeaking);
+-                    }
++                    ResetDecoder();
++                    auto codec = Board::GetInstance().GetAudioCodec();
++                    codec->EnableOutput(true);
++                    // if (device_state_ == kDeviceStateIdle || device_state_ == kDeviceStateListening) {
++                    //     SetDeviceState(kDeviceStateSpeaking);
++                    // }
+                 });
+             } else if (strcmp(state->valuestring, "stop") == 0) {
+                 Schedule([this]() {
+-                    if (device_state_ == kDeviceStateSpeaking) {
++                    if (device_state_ == kDeviceStateIdle || device_state_ == kDeviceStateSpeaking) {
+                         background_task_->WaitForCompletion();
+                         if (keep_listening_) {
+                             protocol_->SendStartListening(kListeningModeAutoStop);
+@@ -437,6 +440,7 @@ void Application::Start() {
+                 ESP_LOGI(TAG, ">> %s", text->valuestring);
+                 Schedule([this, display, message = std::string(text->valuestring)]() {
+                     display->SetChatMessage("user", message.c_str());
++                    protocol_->SendStartListening(kListeningModeAutoStop);
+                 });
+             }
+         } else if (strcmp(type->valuestring, "llm") == 0) {
+@@ -541,7 +545,7 @@ void Application::OnClockTimer() {
+ 
+     // Print the debug info every 10 seconds
+     if (clock_ticks_ % 10 == 0) {
+-        // SystemInfo::PrintRealTimeStats(pdMS_TO_TICKS(1000));
++        SystemInfo::PrintRealTimeStats(pdMS_TO_TICKS(1000));
+         int free_sram = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+         int min_free_sram = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
+         ESP_LOGI(TAG, "Free internal: %u minimal internal: %u", free_sram, min_free_sram);
+@@ -619,7 +623,7 @@ void Application::OutputAudio() {
+         return;
+     }
+ 
+-    if (device_state_ == kDeviceStateListening) {
++    if (device_state_ == kDeviceStateListening && false) {
+         audio_decode_queue_.clear();
+         return;
+     }
+@@ -785,7 +789,7 @@ void Application::SetDecodeSampleRate(int sample_rate) {
+ 
+     opus_decode_sample_rate_ = sample_rate;
+     opus_decoder_.reset();
+-    opus_decoder_ = std::make_unique<OpusDecoderWrapper>(opus_decode_sample_rate_, 1);
++    opus_decoder_ = std::make_unique<OpusDecoderWrapper>(opus_decode_sample_rate_, 1, OPUS_FRAME_DURATION_MS);
+ 
+     auto codec = Board::GetInstance().GetAudioCodec();
+     if (opus_decode_sample_rate_ != codec->output_sample_rate()) {
+diff --git a/main/audio_processing/audio_processor.cc b/main/audio_processing/audio_processor.cc
+index 5447ab4..0b68fec 100644
+--- a/main/audio_processing/audio_processor.cc
++++ b/main/audio_processing/audio_processor.cc
+@@ -23,16 +23,21 @@ void AudioProcessor::Initialize(int channels, bool reference) {
+         input_format.push_back('R');
+     }
+ 
+-    afe_config_t* afe_config = afe_config_init(input_format.c_str(), NULL, AFE_TYPE_VC, AFE_MODE_HIGH_PERF);
+-    afe_config->aec_init = false;
+-    afe_config->aec_mode = AEC_MODE_VOIP_HIGH_PERF;
++    srmodel_list_t *models = esp_srmodel_init("model");
++    char* ns_model_name = esp_srmodel_filter(models, ESP_NSNET_PREFIX, NULL);
++
++    afe_config_t* afe_config = afe_config_init(input_format.c_str(), NULL, AFE_TYPE_VC, AFE_MODE_LOW_COST);
++    afe_config->aec_init = true;
++    afe_config->aec_mode = AEC_MODE_VOIP_LOW_COST;
+     afe_config->ns_init = true;
+-    afe_config->vad_init = true;
++    afe_config->ns_model_name = ns_model_name;
++    afe_config->afe_ns_mode = AFE_NS_MODE_NET;
++    afe_config->vad_init = false;
+     afe_config->vad_mode = VAD_MODE_0;
+     afe_config->vad_min_noise_ms = 100;
+     afe_config->afe_perferred_core = 1;
+     afe_config->afe_perferred_priority = 1;
+-    afe_config->agc_init = true;
++    afe_config->agc_init = false;
+     afe_config->agc_mode = AFE_AGC_MODE_WEBRTC;
+     afe_config->agc_compression_gain_db = 10;
+     afe_config->memory_alloc_mode = AFE_MEMORY_ALLOC_MORE_PSRAM;
+diff --git a/main/background_task.cc b/main/background_task.cc
+index 750d46c..db320e2 100644
+--- a/main/background_task.cc
++++ b/main/background_task.cc
+@@ -6,10 +6,10 @@
+ #define TAG "BackgroundTask"
+ 
+ BackgroundTask::BackgroundTask(uint32_t stack_size) {
+-    xTaskCreate([](void* arg) {
++    xTaskCreatePinnedToCore([](void* arg) {
+         BackgroundTask* task = (BackgroundTask*)arg;
+         task->BackgroundTaskLoop();
+-    }, "background_task", stack_size, this, 2, &background_task_handle_);
++    }, "background_task", stack_size, this, 2, &background_task_handle_, 1);
+ }
+ 
+ BackgroundTask::~BackgroundTask() {
