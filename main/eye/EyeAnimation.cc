@@ -81,7 +81,11 @@ void IRAM_ATTR EyeAnimation::scaleBuffer() {
     const int src_height = SCREEN_HEIGHT;
     const int dst_width = REAL_SCREEN_WIDTH;
     const int dst_height = REAL_SCREEN_HEIGHT;
-    
+    // 如果源尺寸和目标尺寸相同，直接复制数据
+    if (src_width == dst_width && src_height == dst_height) {
+        memcpy(scaled_buffer_, render_buffer_, src_width * src_height * sizeof(uint16_t));
+        return;
+    }
     // 使用SIMD寄存器处理4个像素
     const int pixels_per_simd = 4;
     alignas(16) uint16_t temp_pixels[4];
