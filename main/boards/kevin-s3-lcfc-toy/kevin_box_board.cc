@@ -15,6 +15,7 @@
 #include <driver/i2c_master.h>
 #include <esp_lcd_panel_ops.h>
 #include <esp_lcd_panel_vendor.h>
+#include <wifi_station.h>
 
 #define TAG "KevinLCFCBoard"
 
@@ -86,6 +87,12 @@ private:
     }
 
     void InitializeButtons() {
+        boot_button_.OnClick([this]() {
+            auto& app = Application::GetInstance();
+            if (app.GetDeviceState() == kDeviceStateStarting && !WifiStation::GetInstance().IsConnected()) {
+                ResetWifiConfiguration();
+            }
+        });
         boot_button_.OnPressDown([this]() {
             power_save_timer_->WakeUp();
             Application::GetInstance().StartListening();

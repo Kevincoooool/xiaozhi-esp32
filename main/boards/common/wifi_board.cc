@@ -21,6 +21,8 @@
 #include <wifi_configuration_ap.h>
 #include <ssid_manager.h>
 
+#include "blufi_manager.hpp"
+
 static const char *TAG = "WifiBoard";
 
 WifiBoard::WifiBoard() {
@@ -36,7 +38,53 @@ std::string WifiBoard::GetBoardType() {
     return "wifi";
 }
 
+#if WIFI_CONFIG_MODE == WIFI_CONFIG_MODE_BLUFI
+void WifiBoard::StartBlufiConfig() {
+    auto& application = Application::GetInstance();
+    application.SetDeviceState(kDeviceStateWifiConfiguring);
+
+    // 初始化 BluFi
+    auto& blufi = BlufiManager::GetInstance();
+    esp_err_t ret = blufi.Initialize();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "BluFi initialize failed");
+        return;
+    }
+
+    // 显示蓝牙配网提示
+    std::string hint = Lang::Strings::CONNECT_VIA_BLUETOOTH;
+    hint += "\n";
+    hint += SystemInfo::GetMacAddress();
+    hint += "\n\n";
+    
+    // 播报配置 WiFi 的提示
+    application.Alert(Lang::Strings::WIFI_CONFIG_MODE, hint.c_str(), "", Lang::Sounds::P3_WIFICONFIG);
+    
+    // 等待配网完成
+    while (!blufi.IsConnected() || blufi.GetStaSsid().empty()) {
+        int free_sram = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+        int min_free_sram = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
+        ESP_LOGI(TAG, "Free internal: %u minimal internal: %u", free_sram, min_free_sram);
+        vTaskDelay(pdMS_TO_TICKS(10000));
+    }
+
+    // 保存 WiFi 配置
+    auto& ssid_manager = SsidManager::GetInstance();
+    ssid_manager.AddSsid(blufi.GetStaSsid(), blufi.GetStaPassword());
+    // ssid_manager.Save();
+
+    // 清理资源
+    blufi.Deinitialize();
+
+    // 重启设备以连接新的 WiFi
+    esp_restart();
+}
+#endif
+
 void WifiBoard::EnterWifiConfigMode() {
+    #if WIFI_CONFIG_MODE == WIFI_CONFIG_MODE_BLUFI
+    StartBlufiConfig();
+    #else
     auto& application = Application::GetInstance();
     application.SetDeviceState(kDeviceStateWifiConfiguring);
 
@@ -62,6 +110,7 @@ void WifiBoard::EnterWifiConfigMode() {
         ESP_LOGI(TAG, "Free internal: %u minimal internal: %u", free_sram, min_free_sram);
         vTaskDelay(pdMS_TO_TICKS(10000));
     }
+    #endif
 }
 
 void WifiBoard::StartNetwork() {
