@@ -279,7 +279,7 @@ public:
         InitializeSt7789Display();  
         // InitializeIot();
         
-        InitializeFt6336TouchPad();
+        // InitializeFt6336TouchPad();
         InitializePowerSaveTimer();
         GetBacklight()->RestoreBrightness();
     }
