@@ -635,7 +635,7 @@ void LcdDisplay::EyeTimerCallback(void* arg) {
 void LcdDisplay::StartEyeAnimation() {
     if (eye_timer_) {
         // 启动定时器,33ms间隔(约30fps)
-        esp_timer_start_periodic(eye_timer_, 10 * 1000);  // 微秒为单位
+        esp_timer_start_periodic(eye_timer_, 30 * 1000);  // 微秒为单位
     }
 }
 

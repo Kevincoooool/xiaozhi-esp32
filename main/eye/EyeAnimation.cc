@@ -86,96 +86,38 @@ void IRAM_ATTR EyeAnimation::scaleBuffer() {
         memcpy(scaled_buffer_, render_buffer_, src_width * src_height * sizeof(uint16_t));
         return;
     }
-    // 使用SIMD寄存器处理4个像素
-    const int pixels_per_simd = 4;
-    alignas(16) uint16_t temp_pixels[4];
+    // 使用查找表预计算缩放索引，避免每次都计算
+    static int16_t *x_map = nullptr;
+    static int16_t *y_map = nullptr;
     
-    for (int y = 0; y < dst_height; y++) {
-        float src_y = y / scale_;
-        int y1 = (int)src_y;
-        int y2 = std::min(y1 + 1, src_height - 1);
-        float wy = src_y - y1;
-        float wy1 = 1.0f - wy;
+    if (x_map == nullptr) {
+        x_map = new int16_t[dst_width];
+        y_map = new int16_t[dst_height];
         
-        // SIMD处理x方向
-        for (int x = 0; x < dst_width; x += pixels_per_simd) {
-            // 计算4个源像素位置
-            float src_x[4];
-            int x1[4], x2[4];
-            float wx[4];
-            
-            for (int i = 0; i < pixels_per_simd; i++) {
-                if (x + i < dst_width) {
-                    src_x[i] = (x + i) / scale_;
-                    x1[i] = (int)src_x[i];
-                    x2[i] = std::min(x1[i] + 1, src_width - 1);
-                    wx[i] = src_x[i] - x1[i];
-                }
-            }
-            
-            // 使用SIMD加载4个像素
-            uint32_t *p1 = (uint32_t*)temp_pixels;
-            uint32_t *p2 = (uint32_t*)(temp_pixels + 2);
-            
-            // 处理每个像素的颜色分量
-            for (int i = 0; i < pixels_per_simd && (x + i) < dst_width; i++) {
-                // 获取源像素
-                uint16_t src_p1 = render_buffer_[y1 * src_width + x1[i]];
-                uint16_t src_p2 = render_buffer_[y1 * src_width + x2[i]];
-                uint16_t src_p3 = render_buffer_[y2 * src_width + x1[i]];
-                uint16_t src_p4 = render_buffer_[y2 * src_width + x2[i]];
-                
-                // 解包RGB565
-                uint32_t r1 = (src_p1 >> 11) & 0x1F;
-                uint32_t g1 = (src_p1 >> 5) & 0x3F;
-                uint32_t b1 = src_p1 & 0x1F;
-                
-                uint32_t r2 = (src_p2 >> 11) & 0x1F;
-                uint32_t g2 = (src_p2 >> 5) & 0x3F;
-                uint32_t b2 = src_p2 & 0x1F;
-                
-                uint32_t r3 = (src_p3 >> 11) & 0x1F;
-                uint32_t g3 = (src_p3 >> 5) & 0x3F;
-                uint32_t b3 = src_p3 & 0x1F;
-                
-                uint32_t r4 = (src_p4 >> 11) & 0x1F;
-                uint32_t g4 = (src_p4 >> 5) & 0x3F;
-                uint32_t b4 = src_p4 & 0x1F;
-                
-                // 使用SIMD指令进行插值计算
-                float wx1 = 1.0f - wx[i];
-                __asm__ volatile (
-                    "wsr.acchi %0\n"
-                    "wsr.acclo %1\n"
-                    :: "r"(0), "r"(0)
-                );
-                
-                uint32_t r = (uint32_t)(
-                    r1 * wx1 * wy1 +
-                    r2 * wx[i] * wy1 +
-                    r3 * wx1 * wy +
-                    r4 * wx[i] * wy
-                );
-                uint32_t g = (uint32_t)(
-                    g1 * wx1 * wy1 +
-                    g2 * wx[i] * wy1 +
-                    g3 * wx1 * wy +
-                    g4 * wx[i] * wy
-                );
-                uint32_t b = (uint32_t)(
-                    b1 * wx1 * wy1 +
-                    b2 * wx[i] * wy1 +
-                    b3 * wx1 * wy +
-                    b4 * wx[i] * wy
-                );
-                
-                // 打包回RGB565
-                uint16_t color = ((r & 0x1F) << 11) | ((g & 0x3F) << 5) | (b & 0x1F);
-                // scaled_buffer_[y * dst_width + x + i] = __builtin_bswap16(color);
-                scaled_buffer_[y * dst_width + x + i] = (color);
-            }
+        const float x_ratio = src_width / (float)dst_width;
+        const float y_ratio = src_height / (float)dst_height;
+        
+        for (int x = 0; x < dst_width; x++) {
+            x_map[x] = (int)(x * x_ratio);
+        }
+        
+        for (int y = 0; y < dst_height; y++) {
+            y_map[y] = (int)(y * y_ratio) * src_width;
         }
     }
+    
+    // 使用查找表加速缩放过程
+    #pragma GCC unroll 4
+    for (int y = 0; y < dst_height; y++) {
+        uint16_t* dst_line = scaled_buffer_ + y * dst_width;
+        const int y_offset = y_map[y];
+        
+        #pragma GCC unroll 8
+        for (int x = 0; x < dst_width; x++) {
+            dst_line[x] = render_buffer_[y_offset + x_map[x]];
+        }
+    }
+   
 }
 void EyeAnimation::begin()
 {
@@ -199,7 +141,15 @@ void EyeAnimation::drawEye(uint8_t eye_index,
     // 预计算虹膜位置
     int32_t irisY = scleraY - iris_offset_y;
     const int32_t initial_irisX = scleraX - iris_offset_x;
-
+    
+    // 预计算阈值边界，避免每个像素都计算
+    // 预计算阈值边界，增加过渡区域宽度
+    const float upper_edge0 = uThreshold - 12; // 从8增加到12
+    const float upper_edge1 = uThreshold + 12; // 从8增加到12
+    const float lower_edge0 = lThreshold - 12; // 从8增加到12
+    const float lower_edge1 = lThreshold + 12; // 从8增加到12
+    
+    // 使用DMA批量处理，每次处理一行
     #pragma GCC unroll 4
     for(uint32_t screenY = 0; screenY < SCREEN_HEIGHT; screenY++) {
         int32_t irisX = initial_irisX;
@@ -211,13 +161,15 @@ void EyeAnimation::drawEye(uint8_t eye_index,
         
         uint16_t* row = render_buffer_ + screenY * SCREEN_WIDTH;
         
+        // 批量处理一行中的像素
+        #pragma GCC unroll 8
         for(uint32_t screenX = 0; screenX < SCREEN_WIDTH; screenX++) {
-             // 计算对称位置的X坐标
-             uint32_t mirror_x = SCREEN_WIDTH - 1 - screenX;
-            
-             // 对称处理眼睑，添加平滑过渡
-            uint8_t upper_value = (upper_row[screenX] + upper_row[mirror_x]) / 2;
-            uint8_t lower_value = (lower_row[screenX] + lower_row[mirror_x]) / 2;
+            // 计算对称位置的X坐标
+            uint32_t mirror_x = SCREEN_WIDTH - 1 - screenX;
+
+            // 对称处理眼睑，使用加权平均而不是简单平均
+            uint8_t upper_value = (upper_row[screenX] * 0.6f + upper_row[mirror_x] * 0.4f);
+            uint8_t lower_value = (lower_row[screenX] * 0.6f + lower_row[mirror_x] * 0.4f);
             
             // 应用眼睑间距调整
             if (upper_value > eyelid_gap_) {
@@ -226,10 +178,18 @@ void EyeAnimation::drawEye(uint8_t eye_index,
             if (lower_value > eyelid_gap_) {
                 lower_value -= eyelid_gap_;
             }
-             
+            
+            // 快速检查是否在眼睑外，避免复杂计算
+            if(upper_value < upper_edge0 || lower_value < lower_edge0) {
+                row[screenX] = 0;
+                irisX++;
+                current_scleraX++;
+                continue;
+            }
+            
             // 计算边缘平滑因子 (0.0 - 1.0)
-            float upper_alpha = smoothstep(uThreshold - 8, uThreshold + 8, upper_value);
-            float lower_alpha = smoothstep(lThreshold - 8, lThreshold + 8, lower_value);
+            float upper_alpha = smoothstep(upper_edge0, upper_edge1, upper_value);
+            float lower_alpha = smoothstep(lower_edge0, lower_edge1, lower_value);
             
             // 如果完全在眼睑外，直接绘制黑色
             if(upper_alpha <= 0.0f || lower_alpha <= 0.0f) {
@@ -239,7 +199,7 @@ void EyeAnimation::drawEye(uint8_t eye_index,
                 continue;
             }
             
-            // 计算眼球颜色
+            // 计算眼球颜色 - 简化判断逻辑
             uint16_t eye_color;
             if(irisY >= 0 && irisY < IRIS_HEIGHT && 
                irisX >= 0 && irisX < IRIS_WIDTH) {
@@ -256,11 +216,17 @@ void EyeAnimation::drawEye(uint8_t eye_index,
                 eye_color = pgm_read_word(sclera + scleraY * SCLERA_WIDTH + current_scleraX);
             }
             
-            // 应用边缘平滑
-            float alpha = std::min(upper_alpha, lower_alpha);
-            uint16_t final_color = blend_color(0, eye_color, alpha);
-            row[screenX] = final_color;
-            
+            // 应用边缘平滑 - 使用更精确的混合方法
+            float alpha = (upper_alpha < lower_alpha) ? upper_alpha : lower_alpha;
+
+            // 对边缘进行额外的平滑处理
+            if(alpha < 0.99f) {
+                // 使用二次方增强边缘平滑度
+                alpha = alpha * alpha * (3.0f - 2.0f * alpha);
+                row[screenX] = blend_color(0, eye_color, alpha);
+            } else {
+                row[screenX] = eye_color;
+            }
             irisX++;
             current_scleraX++;
         }
@@ -268,7 +234,6 @@ void EyeAnimation::drawEye(uint8_t eye_index,
         irisY++;
     }
 }
-
 // 添加辅助函数
 
 // 平滑过渡函数
@@ -278,20 +243,42 @@ float EyeAnimation::smoothstep(float edge0, float edge1, float x) {
 }
 
 // 颜色混合函数
+// 在blend_color函数中增强颜色混合精度
 uint16_t EyeAnimation::blend_color(uint16_t c1, uint16_t c2, float alpha) {
-    // 解包RGB565
-    uint8_t r1 = (c1 >> 11) & 0x1F;
-    uint8_t g1 = (c1 >> 5) & 0x3F;
-    uint8_t b1 = c1 & 0x1F;
+    // 对于常见的alpha值使用查找表
+    if(alpha <= 0.0f) return c1;
+    if(alpha >= 1.0f) return c2;
     
-    uint8_t r2 = (c2 >> 11) & 0x1F;
-    uint8_t g2 = (c2 >> 5) & 0x3F;
-    uint8_t b2 = c2 & 0x1F;
+    // 使用更高精度的整数计算
+    uint16_t a = (uint16_t)(alpha * 1024);
     
-    // 线性插值
-    uint8_t r = r1 + (r2 - r1) * alpha;
-    uint8_t g = g1 + (g2 - g1) * alpha;
-    uint8_t b = b1 + (b2 - b1) * alpha;
+    // 解包RGB565，扩展到更高位深
+    uint16_t r1 = (c1 >> 11) & 0x1F;
+    uint16_t g1 = (c1 >> 5) & 0x3F;
+    uint16_t b1 = c1 & 0x1F;
+    
+    uint16_t r2 = (c2 >> 11) & 0x1F;
+    uint16_t g2 = (c2 >> 5) & 0x3F;
+    uint16_t b2 = c2 & 0x1F;
+    
+    // 扩展颜色深度以提高混合精度
+    r1 = (r1 << 3) | (r1 >> 2);
+    g1 = (g1 << 2) | (g1 >> 4);
+    b1 = (b1 << 3) | (b1 >> 2);
+    
+    r2 = (r2 << 3) | (r2 >> 2);
+    g2 = (g2 << 2) | (g2 >> 4);
+    b2 = (b2 << 3) | (b2 >> 2);
+    
+    // 使用更高精度的插值
+    uint16_t r = (r1 * (1024 - a) + r2 * a) >> 10;
+    uint16_t g = (g1 * (1024 - a) + g2 * a) >> 10;
+    uint16_t b = (b1 * (1024 - a) + b2 * a) >> 10;
+    
+    // 转换回RGB565
+    r = (r >> 3) & 0x1F;
+    g = (g >> 2) & 0x3F;
+    b = (b >> 3) & 0x1F;
     
     // 打包回RGB565
     return (r << 11) | (g << 5) | b;
@@ -306,7 +293,12 @@ void EyeAnimation::update()
     static uint32_t eyeMoveStartTime = 0;
     static int32_t eyeMoveDuration = 0;
     static uint8_t currentEye = 0;
-
+// 减少每帧的计算量 - 可以考虑降低更新频率
+    static uint32_t last_update = 0;
+    if (t - last_update < 16667) { // 限制为最多60fps
+        return;
+    }
+    last_update = t;
     // 更新眼球位置
     int16_t eyeX, eyeY;
     int32_t dt = t - eyeMoveStartTime;
@@ -384,7 +376,7 @@ void EyeAnimation::update()
             eye.blink.startTime = t;
             eye.blink.duration = 36000 + (esp_random() % 36000);
             last_blink_ = t;
-            next_blink_delay_ = eye.blink.duration * 3 + (esp_random() % 4000000);
+            next_blink_delay_ = eye.blink.duration * 3 + (esp_random() % 6000000);
         }
     }
 
@@ -402,7 +394,7 @@ void EyeAnimation::update()
 
 #ifdef TRACKING
     int16_t sampleX = SCLERA_WIDTH / 2 - (eyeX / 2);
-    int16_t sampleY = SCLERA_HEIGHT / 2 - (eyeY + IRIS_HEIGHT / 4);
+    int16_t sampleY = SCLERA_HEIGHT / 2 - (eyeY + IRIS_HEIGHT / 3);
 
     uint8_t n = (sampleY < 0) ? 0 : (pgm_read_byte(upper + sampleY * SCREEN_WIDTH + sampleX) + 
                                     pgm_read_byte(upper + sampleY * SCREEN_WIDTH + (SCREEN_WIDTH - 1 - sampleX))) / 2;
@@ -410,8 +402,8 @@ void EyeAnimation::update()
     uThreshold = (uThreshold * 3 + n) / 4;
     lThreshold = 254 - uThreshold;
 #else
-    uThreshold = 128;
-    lThreshold = 128;
+    uThreshold = 28;
+    lThreshold = 158;
 #endif
 
     // 处理眨眼

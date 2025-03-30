@@ -14,8 +14,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdint.h>
-#define REAL_SCREEN_WIDTH  220
-#define REAL_SCREEN_HEIGHT  220
+#define REAL_SCREEN_WIDTH  230
+#define REAL_SCREEN_HEIGHT  230
 
 // EYE LIST ----------------------------------------------------------------
 #define NUM_EYES 1 // Number of eyes to display (1 or 2)
