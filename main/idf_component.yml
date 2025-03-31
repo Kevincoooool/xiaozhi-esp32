@@ -17,6 +17,7 @@ dependencies:
   espressif/esp-sr: "^2.0.3"
   espressif/button: "^3.3.1"
   espressif/knob: "^1.0.0"
+  espressif/esp32-camera: "^2.0.13"
   lvgl/lvgl: "~9.2.2"
   esp_lvgl_port: "~2.4.4"
   espressif/esp_io_expander_tca95xx_16bit: "^2.0.0"

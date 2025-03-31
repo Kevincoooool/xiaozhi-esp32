@@ -7,6 +7,7 @@
 #include <esp_pm.h>
 
 #include <string>
+#include "esp_camera.h"
 
 struct DisplayFonts {
     const lv_font_t* text_font = nullptr;
@@ -27,6 +28,7 @@ public:
     virtual void SetIcon(const char* icon);
     virtual void SetTheme(const std::string& theme_name);
     virtual std::string GetTheme() { return current_theme_name_; }
+    virtual void UpdateCameraImage(camera_fb_t* fb);
 
     inline int width() const { return width_; }
     inline int height() const { return height_; }
@@ -46,7 +48,7 @@ protected:
     lv_obj_t *battery_label_ = nullptr;
     lv_obj_t* chat_message_label_ = nullptr;
     lv_obj_t* low_battery_popup_ = nullptr;
-
+    lv_obj_t* camera_img_ = nullptr;
     const char* battery_icon_ = nullptr;
     const char* network_icon_ = nullptr;
     bool muted_ = false;

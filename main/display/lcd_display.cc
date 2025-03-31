@@ -257,7 +257,44 @@ bool LcdDisplay::Lock(int timeout_ms) {
 void LcdDisplay::Unlock() {
     lvgl_port_unlock();
 }
+void LcdDisplay::UpdateCameraImage(camera_fb_t* fb) {
+   
 
+    DisplayLockGuard lock(this); 
+    if (!fb || !camera_img_) {
+        if (camera_img_) {
+            lv_obj_add_flag(camera_img_, LV_OBJ_FLAG_HIDDEN);  // 如果没有图像数据，隐藏显示对象
+            lv_img_set_src(camera_img_, NULL);  // 清除图像源
+            lv_obj_invalidate(camera_img_);     // 强制重绘
+            // 强制刷新整个屏幕
+            lv_obj_t* screen = lv_screen_active();
+            lv_obj_invalidate(screen);
+            lv_refr_now(NULL);  // 立即刷新显示
+            lv_refr_now(NULL);  // 立即刷新显示
+            lv_refr_now(NULL);  // 立即刷新显示
+            lv_refr_now(NULL);  // 立即刷新显示
+            lv_refr_now(NULL);  // 立即刷新显示
+        }
+        return;
+    }
+    uint8_t temp = 0;
+    for (int i = 0; i < fb->len; i += 2)
+    {
+        temp = fb->buf[i];
+        fb->buf[i] = fb->buf[i + 1];
+        fb->buf[i + 1] = temp;
+    }
+    static lv_img_dsc_t img_dsc;
+    img_dsc.header.cf = LV_COLOR_FORMAT_RGB565;  // 使用RGB565格式
+    img_dsc.header.w = fb->width;
+    img_dsc.header.h = fb->height;
+    img_dsc.data_size = fb->len;
+    img_dsc.data = fb->buf;
+
+    lv_img_set_src(camera_img_, &img_dsc);
+    lv_obj_clear_flag(camera_img_, LV_OBJ_FLAG_HIDDEN);  // 显示图像
+    lv_obj_invalidate(camera_img_);  // 强制重绘
+}
 #if CONFIG_USE_WECHAT_MESSAGE_STYLE
 void LcdDisplay::SetupUI() {
     DisplayLockGuard lock(this);
@@ -577,7 +614,10 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_text_font(emotion_label_, &font_awesome_30_4, 0);
     lv_obj_set_style_text_color(emotion_label_, current_theme.text, 0);
     lv_label_set_text(emotion_label_, FONT_AWESOME_AI_CHIP);
-
+ // 添加摄像头图像显示区域
+    camera_img_ = lv_img_create(content_);
+    lv_obj_align(camera_img_, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_add_flag(camera_img_, LV_OBJ_FLAG_HIDDEN);  // 初始时隐藏
     chat_message_label_ = lv_label_create(content_);
     lv_label_set_text(chat_message_label_, "");
     lv_obj_set_width(chat_message_label_, LV_HOR_RES * 0.9); // 限制宽度为屏幕宽度的 90%

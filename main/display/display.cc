@@ -259,3 +259,29 @@ void Display::SetTheme(const std::string& theme_name) {
     Settings settings("display", true);
     settings.SetString("theme", theme_name);
 }
+void Display::UpdateCameraImage(camera_fb_t* fb) {
+    if (!fb || !camera_img_) {
+        if (camera_img_) {
+            lv_obj_add_flag(camera_img_, LV_OBJ_FLAG_HIDDEN);  // 如果没有图像数据，隐藏显示对象
+        }
+        return;
+    }
+    uint8_t temp = 0;
+    for (int i = 0; i < fb->len; i += 2)
+    {
+        temp = fb->buf[i];
+        fb->buf[i] = fb->buf[i + 1];
+        fb->buf[i + 1] = temp;
+    }
+    DisplayLockGuard lock(this);
+
+    static lv_img_dsc_t img_dsc;
+    img_dsc.header.cf = LV_COLOR_FORMAT_RGB565;  // 使用RGB565格式
+    img_dsc.header.w = fb->width;
+    img_dsc.header.h = fb->height;
+    img_dsc.data_size = fb->len;
+    img_dsc.data = fb->buf;
+
+    lv_img_set_src(camera_img_, &img_dsc);
+    lv_obj_clear_flag(camera_img_, LV_OBJ_FLAG_HIDDEN);  // 显示图像
+}

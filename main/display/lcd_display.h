@@ -8,6 +8,7 @@
 #include <font_emoji.h>
 
 #include <atomic>
+#include "esp_camera.h"
 
 class LcdDisplay : public Display {
 protected:
@@ -41,6 +42,7 @@ public:
 
     // Add theme switching function
     virtual void SetTheme(const std::string& theme_name) override;
+    virtual void UpdateCameraImage(camera_fb_t* fb) override;
 };
 
 // RGB LCD显示器
