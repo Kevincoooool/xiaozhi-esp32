@@ -12,7 +12,7 @@ namespace iot {
 
 class Pump : public Thing {
 private:
-    static constexpr gpio_num_t GPIO_NUM = GPIO_NUM_38;    // 气泵控制GPIO
+    static constexpr gpio_num_t GPIO_NUM = GPIO_NUM_47;    // 气泵控制GPIO
     static constexpr uint32_t FREQ_HZ = 20000;            // PWM频率25KHz
     static constexpr ledc_timer_t TIMER_NUM = LEDC_TIMER_1;
     static constexpr ledc_channel_t CHANNEL = LEDC_CHANNEL_1;
@@ -25,12 +25,11 @@ private:
     // 循环控制相关参数
     bool is_cycling_ = false;
     uint32_t cycle_interval_ms_ = 1000;  // 循环间隔时间(ms)
-    uint32_t tightness_min_ = 600;       // 最小收紧度(对应松开状态)
+    uint32_t tightness_min_ = 500;       // 最小收紧度(对应松开状态)
     uint32_t tightness_max_ = 1023;      // 最大收紧度
     esp_timer_handle_t cycle_timer_ = nullptr;
     bool is_tightening_ = true;          // 当前是否处于收紧阶段
-    static constexpr uint32_t CYCLE_STEP = 5;        // 每次调整的步进值
-    static constexpr uint32_t TIMER_INTERVAL = 20;   // 定时器间隔(ms)
+
     void InitializePwm() {
         ledc_timer_config_t timer_conf = {
             .speed_mode = SPEED_MODE,
@@ -74,21 +73,32 @@ private:
     }
 
     // 循环定时器回调
+    // 移除固定步进值，改用动态计算
+    static constexpr uint32_t TIMER_INTERVAL = 20;   // 定时器固定间隔(ms)
+    uint32_t current_step_ = 0;  // 当前步进值
+
+    // 循环定时器回调
     void OnCycleTimer() {
         if (!is_cycling_) return;
 
+        // 根据循环间隔和当前范围动态计算步进值
+        uint32_t total_steps = cycle_interval_ms_ / TIMER_INTERVAL;
+        uint32_t range = tightness_max_ - tightness_min_;
+        if(total_steps == 0) total_steps = 1; // 防止除以0
+        current_step_ = (range + total_steps - 1) / total_steps; // 向上取整
+
         if (is_tightening_) {
-            // 收紧阶段 - 使用较小的步进值实现平滑过渡
-            if (speed_ + CYCLE_STEP < tightness_max_) {
-                speed_ += CYCLE_STEP;
+            // 收紧阶段
+            if (speed_ + current_step_ < tightness_max_) {
+                speed_ += current_step_;
             } else {
                 speed_ = tightness_max_;
                 is_tightening_ = false;
             }
         } else {
             // 松开阶段
-            if (speed_ > tightness_min_ + CYCLE_STEP) {
-                speed_ -= CYCLE_STEP;
+            if (speed_ > tightness_min_ + current_step_) {
+                speed_ -= current_step_;
             } else {
                 speed_ = tightness_min_;
                 is_tightening_ = true;
@@ -98,6 +108,7 @@ private:
         ledc_set_duty(SPEED_MODE, CHANNEL, speed_);
         ledc_update_duty(SPEED_MODE, CHANNEL);
     }
+
 public:
     Pump() : Thing("Pump", "可调松紧度的气泵，支持自动循环收紧松开") {
         InitializePwm();
@@ -113,7 +124,7 @@ public:
             }), [this](const ParameterList& parameters) {
                 double speed = static_cast<uint8_t>(parameters["Pump"].number());
                 // 将输入范围重新映射到70-100%
-                speed_ = 600 + ((1023 - 600) * speed) / 100; // 717约等于70%*1023
+                speed_ = 0 + ((1023 - 0) * speed) / 100; // 717约等于70%*1023
                 ledc_set_duty(LEDC_LOW_SPEED_MODE, CHANNEL, speed_);
                 ledc_update_duty(LEDC_LOW_SPEED_MODE, CHANNEL);
                 ESP_LOGI(TAG, "Set Pump speed to %.1f%%, duty: %lu", speed, speed_);
@@ -131,8 +142,8 @@ public:
             double min_tight = parameters["TightnessMin"].number();
             double max_tight = parameters["TightnessMax"].number();
             
-            tightness_min_ = 600 + ((1023 - 600) * min_tight) / 100;
-            tightness_max_ = 600 + ((1023 - 600) * max_tight) / 100;
+            tightness_min_ = 0 + ((1023 - 0) * min_tight) / 100;
+            tightness_max_ = 0 + ((1023 - 0) * max_tight) / 100;
             
             is_cycling_ = true;
             is_tightening_ = true;

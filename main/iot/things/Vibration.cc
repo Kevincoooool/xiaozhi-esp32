@@ -12,7 +12,7 @@ namespace iot {
 
 class Vibration : public Thing {
 private:
-    static constexpr gpio_num_t GPIO_NUM = GPIO_NUM_39;    // 电机控制GPIO
+    static constexpr gpio_num_t GPIO_NUM = GPIO_NUM_38;    // 电机控制GPIO
     static constexpr uint32_t FREQ_HZ = 20000;            // PWM频率25KHz
     static constexpr ledc_timer_t TIMER_NUM = LEDC_TIMER_2;
     static constexpr ledc_channel_t CHANNEL = LEDC_CHANNEL_2;
@@ -65,7 +65,7 @@ public:
             }), [this](const ParameterList& parameters) {
                 double speed = static_cast<uint8_t>(parameters["Vibration"].number());
                 // 将输入范围重新映射到70-100%
-                uint32_t duty_cycle = 650 + ((1023 - 650) * speed) / 100; // 717约等于70%*1023
+                uint32_t duty_cycle = 0 + ((1023 - 0) * speed) / 100; // 717约等于70%*1023
                 ledc_set_duty(LEDC_LOW_SPEED_MODE, CHANNEL, duty_cycle);
                 ledc_update_duty(LEDC_LOW_SPEED_MODE, CHANNEL);
                 ESP_LOGI(TAG, "Set Vibration speed to %.1f%%, duty: %lu", speed, duty_cycle);

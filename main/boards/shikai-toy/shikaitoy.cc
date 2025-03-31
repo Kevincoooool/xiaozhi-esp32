@@ -13,6 +13,7 @@
 #include <esp_lcd_panel_vendor.h>
 #include <driver/i2c_master.h>
 #include <wifi_station.h>
+#include "assets/lang_config.h"
 
 #define TAG "shikai-toy"
 
@@ -52,6 +53,8 @@ class Pmic : public Axp2101 {
 class SHIKAI_TOY : public WifiBoard {
 private:
     Button boot_button_;
+    Button siphon_button_;
+    Button volume_button_;
     LcdDisplay* display_;
     i2c_master_bus_handle_t codec_i2c_bus_;
     PowerSaveTimer* power_save_timer_;
@@ -94,20 +97,41 @@ private:
         boot_button_.OnPressUp([this]() {
             Application::GetInstance().StopListening();
         });
+
+        siphon_button_.OnClick([this]() {
+            static bool is_cycling = false;
+            
+        });
+        volume_button_.OnClick([this]() {
+            static int last_volume = 20;  // 初始音量设为20%
+            auto& app = Application::GetInstance();
+            power_save_timer_->WakeUp();
+            auto codec = GetAudioCodec();
+            last_volume += 20;  // 在上次音量基础上增加20%
+            
+            if (last_volume > 100) {
+                last_volume = 20;  // 超过100%后重置为20%
+            }
+            
+            codec->SetOutputVolume(last_volume);
+            
+            app.PlaySound(Lang::Sounds::P3_SUCCESS);
+        });
     }
 
     // 物联网初始化，添加对 AI 可见设备
     void InitializeIot() {
         auto& thing_manager = iot::ThingManager::GetInstance();
         thing_manager.AddThing(iot::CreateThing("Speaker"));
-        thing_manager.AddThing(iot::CreateThing("Intensity"));
+        // thing_manager.AddThing(iot::CreateThing("Intensity"));
         thing_manager.AddThing(iot::CreateThing("Battery"));
         thing_manager.AddThing(iot::CreateThing("Pump"));
         thing_manager.AddThing(iot::CreateThing("Vibration"));
+        thing_manager.AddThing(iot::CreateThing("Warm"));
     }
 
 public:
-    SHIKAI_TOY() :  boot_button_(BOOT_BUTTON_GPIO) {
+    SHIKAI_TOY() :  boot_button_(BOOT_BUTTON_GPIO),siphon_button_(SIPHON_BUTTON_GPIO),volume_button_(VOLUME_BUTTON_GPIO)  {
         ESP_LOGI(TAG, "Initializing SHIKAI TOY Board");
         InitializeCodecI2c();
         pmic_ = new Pmic(codec_i2c_bus_, AXP2101_I2C_ADDR);

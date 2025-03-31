@@ -6,16 +6,16 @@
 #include <esp_log.h>
 #include <algorithm>
 
-#define TAG "Intensity"
+#define TAG "Warm"
 
 namespace iot {
 
-class Intensity : public Thing {
+class Warm : public Thing {
 private:
-    static constexpr gpio_num_t GPIO_NUM = GPIO_NUM_39;    // 电机控制GPIO
+    static constexpr gpio_num_t GPIO_NUM = GPIO_NUM_48;    // 电机控制GPIO
     static constexpr uint32_t FREQ_HZ = 20000;            // PWM频率25KHz
-    static constexpr ledc_timer_t TIMER_NUM = LEDC_TIMER_0;
-    static constexpr ledc_channel_t CHANNEL = LEDC_CHANNEL_0;
+    static constexpr ledc_timer_t TIMER_NUM = LEDC_TIMER_3;
+    static constexpr ledc_channel_t CHANNEL = LEDC_CHANNEL_3;
     static constexpr ledc_mode_t SPEED_MODE = LEDC_LOW_SPEED_MODE;
     static constexpr uint32_t DUTY_MAX = 1024;            // 13位分辨率
 
@@ -47,32 +47,32 @@ private:
         ESP_ERROR_CHECK(ledc_channel_config(&channel_conf));
 
         // 启用渐变功能实现平滑控制
-        ESP_ERROR_CHECK(ledc_fade_func_install(0));
+        // ESP_ERROR_CHECK(ledc_fade_func_install(0));
     }
 
 
 public:
-    Intensity() : Thing("Intensity", "可调强度，强度由小号1号电机控制") {
+    Warm() : Thing("Warm", "可调温度") {
         InitializePwm();
 
-        properties_.AddNumberProperty("Intensity", "强度 (0-100)", [this]() -> double {
+        properties_.AddNumberProperty("Warm", "温度 (0-100)", [this]() -> double {
             return (speed_ * 100.0) / DUTY_MAX;
         });
 
         // 可以修改代码中的映射关系
-        methods_.AddMethod("SetIntensity", "设置强度", ParameterList({
-            Parameter("Intensity", "0到100之间的整数",kValueTypeNumber,  true)
+        methods_.AddMethod("SetVibration", "设置温度", ParameterList({
+            Parameter("Warm", "0到100之间的整数",kValueTypeNumber,  true)
             }), [this](const ParameterList& parameters) {
-                double speed = static_cast<uint8_t>(parameters["Intensity"].number());
+                double speed = static_cast<uint8_t>(parameters["Warm"].number());
                 // 将输入范围重新映射到70-100%
-                uint32_t duty_cycle = 0 + ((980 - 0) * speed) / 100; // 717约等于70%*1023
+                uint32_t duty_cycle = 0 + ((1023 - 0) * speed) / 100; // 717约等于70%*1023
                 ledc_set_duty(LEDC_LOW_SPEED_MODE, CHANNEL, duty_cycle);
                 ledc_update_duty(LEDC_LOW_SPEED_MODE, CHANNEL);
-                ESP_LOGI(TAG, "Set Intensity speed to %.1f%%, duty: %lu", speed, duty_cycle);
+                ESP_LOGI(TAG, "Set Warm speed to %.1f%%, duty: %lu", speed, duty_cycle);
             });
     }
 
-    ~Intensity() {
+    ~Warm() {
         // 停止电机并清理资源
         running_ = false;
         ledc_stop(SPEED_MODE, CHANNEL, 0);
@@ -82,4 +82,4 @@ public:
 
 } // namespace iot
 
-DECLARE_THING(Intensity);
+DECLARE_THING(Warm);
