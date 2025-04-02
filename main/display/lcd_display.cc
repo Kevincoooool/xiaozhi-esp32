@@ -720,7 +720,7 @@ void LcdDisplay::SetEmotion(const char* emotion) {
      // ... 添加更多情绪对应的视频
      
      // 播放对应的视频文件
-     avi_player_port_play_file(video_path);
+     avi_player_port_play_file("/spiffs/xiaoliang.avi");
 }
 
 void LcdDisplay::SetIcon(const char* icon) {

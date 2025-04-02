@@ -443,7 +443,7 @@ void Application::Start() {
             if (emotion != NULL) {
                 Schedule([this, display, emotion_str = std::string(emotion->valuestring)]() {
                     // display->SetEmotion(emotion_str.c_str());
-                    display->SetEmotion("talk");
+                    // display->SetEmotion("talk");
                 });
             }
         } else if (strcmp(type->valuestring, "iot") == 0) {
@@ -793,7 +793,7 @@ void Application::SetDeviceState(DeviceState state) {
             break;
         case kDeviceStateSpeaking:
             display->SetStatus(Lang::Strings::SPEAKING);
-
+            display->SetEmotion("talk");
             if (listening_mode_ != kListeningModeRealtime) {
 #if CONFIG_USE_AUDIO_PROCESSOR
                 audio_processor_.Stop();
