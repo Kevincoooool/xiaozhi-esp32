@@ -15,6 +15,10 @@
 #define TAG "Display"
 
 Display::Display() {
+    // Load theme from settings
+    Settings settings("display", false);
+    current_theme_name_ = settings.GetString("theme", "light");
+
     // Notification timer
     esp_timer_create_args_t notification_timer_args = {
         .callback = [](void *arg) {
@@ -252,5 +256,11 @@ void Display::SetChatMessage(const char* role, const char* content) {
 
 
 void Display::SetFaceImage(uint8_t* frame_buffer, int width, int height) {
+    DisplayLockGuard lock(this);
+}
     
+void Display::SetTheme(const std::string& theme_name) {
+    current_theme_name_ = theme_name;
+    Settings settings("display", true);
+    settings.SetString("theme", theme_name);
 }
