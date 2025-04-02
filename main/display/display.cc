@@ -254,6 +254,11 @@ void Display::SetChatMessage(const char* role, const char* content) {
     lv_label_set_text(chat_message_label_, content);
 }
 
+
+void Display::SetFaceImage(uint8_t* frame_buffer, int width, int height) {
+    DisplayLockGuard lock(this);
+}
+    
 void Display::SetTheme(const std::string& theme_name) {
     current_theme_name_ = theme_name;
     Settings settings("display", true);
