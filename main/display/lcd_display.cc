@@ -593,6 +593,11 @@ void LcdDisplay::SetupUI() {
     lv_label_set_text(sit_label_, "good");
     lv_obj_set_width(sit_label_, LV_HOR_RES * 0.9); // 限制宽度为屏幕宽度的 90%
     lv_obj_set_style_text_align(sit_label_, LV_TEXT_ALIGN_CENTER, 0); // 设置文本居中对齐
+
+    hand_label_= lv_label_create(content_);
+    lv_label_set_text(hand_label_, "good");
+    lv_obj_set_width(hand_label_, LV_HOR_RES * 0.9); // 限制宽度为屏幕宽度的 90%
+    lv_obj_set_style_text_align(hand_label_, LV_TEXT_ALIGN_CENTER, 0); // 设置文本居中对齐
     /* Status bar */
     lv_obj_set_flex_flow(status_bar_, LV_FLEX_FLOW_ROW);
     lv_obj_set_style_pad_all(status_bar_, 0, 0);

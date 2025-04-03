@@ -42,7 +42,7 @@ public:
     // Add theme switching function
     virtual void SetTheme(const std::string& theme_name) override;
     virtual void SetSittingPostureText(const char* postureText) override;// 声明设置坐姿文字显示的函数
-
+    virtual void SetSittingHandText(const char* postureText) override;
 };
 
 // RGB LCD显示器
