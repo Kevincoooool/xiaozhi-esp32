@@ -1,0 +1,90 @@
+
+#ifndef _BOARD_CONFIG_H_
+#define _BOARD_CONFIG_H_
+
+#include <driver/gpio.h>
+
+#define AUDIO_INPUT_SAMPLE_RATE  24000
+#define AUDIO_OUTPUT_SAMPLE_RATE 24000
+
+#define AUDIO_INPUT_REFERENCE    true
+
+#define AUDIO_I2S_GPIO_MCLK GPIO_NUM_47
+#define AUDIO_I2S_GPIO_WS   GPIO_NUM_48
+#define AUDIO_I2S_GPIO_BCLK GPIO_NUM_21
+#define AUDIO_I2S_GPIO_DIN  GPIO_NUM_45
+#define AUDIO_I2S_GPIO_DOUT GPIO_NUM_14
+
+#define AUDIO_CODEC_PA_PIN       GPIO_NUM_NC
+#define AUDIO_CODEC_I2C_SDA_PIN  GPIO_NUM_39
+#define AUDIO_CODEC_I2C_SCL_PIN  GPIO_NUM_38
+#define AUDIO_CODEC_ES8311_ADDR  ES8311_CODEC_DEFAULT_ADDR
+#define AUDIO_CODEC_ES7210_ADDR  ES7210_CODEC_DEFAULT_ADDR
+
+#define BUILTIN_LED_GPIO        GPIO_NUM_NC
+#define BOOT_BUTTON_GPIO        GPIO_NUM_5
+#define VOLUME_UP_BUTTON_GPIO   GPIO_NUM_NC
+#define VOLUME_DOWN_BUTTON_GPIO GPIO_NUM_NC
+
+#define FUNC_LCD_EN     (1)
+#define LCD_BIT_WIDTH   (8)
+
+#define GPIO_LCD_BL     (GPIO_NUM_NC)
+
+#define GPIO_LCD_RST    (GPIO_NUM_NC)
+#define GPIO_LCD_CS     (GPIO_NUM_NC)
+#define GPIO_LCD_RS     (GPIO_NUM_2)
+#define GPIO_LCD_WR     (GPIO_NUM_42)
+#define GPIO_LCD_RD     (GPIO_NUM_NC)
+
+#define GPIO_LCD_D00    (GPIO_NUM_13)
+#define GPIO_LCD_D01    (GPIO_NUM_12)
+#define GPIO_LCD_D02    (GPIO_NUM_11)
+#define GPIO_LCD_D03    (GPIO_NUM_10)
+#define GPIO_LCD_D04    (GPIO_NUM_9)
+#define GPIO_LCD_D05    (GPIO_NUM_46)
+#define GPIO_LCD_D06    (GPIO_NUM_3)
+#define GPIO_LCD_D07    (GPIO_NUM_8)
+#define GPIO_LCD_D08    (GPIO_NUM_18)
+#define GPIO_LCD_D09    (GPIO_NUM_17)
+#define GPIO_LCD_D10    (GPIO_NUM_16)
+#define GPIO_LCD_D11    (GPIO_NUM_15)
+#define GPIO_LCD_D12    (GPIO_NUM_7)
+#define GPIO_LCD_D13    (GPIO_NUM_6)
+#define GPIO_LCD_D14    (GPIO_NUM_5)
+#define GPIO_LCD_D15    (GPIO_NUM_4)
+
+#define LCD_DIRECTION_LANDSCAPE   (0)  // 1:landscape mode   0:portrait mode
+
+#if LCD_DIRECTION_LANDSCAPE   // landscape mode
+#define LCD_WIDTH       (800)
+#define LCD_HEIGHT      (480)
+#define DISPLAY_WIDTH   800
+#define DISPLAY_HEIGHT  480
+#define DISPLAY_SWAP_XY true
+#define DISPLAY_MIRROR_X false
+#define DISPLAY_MIRROR_Y true
+#define BACKLIGHT_INVERT false
+#else   // portrait mode
+#define LCD_WIDTH       (480)
+#define LCD_HEIGHT      (800)
+#define DISPLAY_WIDTH   480
+#define DISPLAY_HEIGHT  800
+#define DISPLAY_SWAP_XY false
+#define DISPLAY_MIRROR_X false
+#define DISPLAY_MIRROR_Y false
+#define BACKLIGHT_INVERT false
+#endif
+
+#define DISPLAY_SDA_PIN GPIO_NUM_NC
+#define DISPLAY_SCL_PIN GPIO_NUM_NC
+
+
+#define DISPLAY_OFFSET_X  0
+#define DISPLAY_OFFSET_Y  0
+
+
+#define DISPLAY_BACKLIGHT_PIN GPIO_NUM_NC
+#define DISPLAY_BACKLIGHT_OUTPUT_INVERT false
+
+#endif // _BOARD_CONFIG_H_
