@@ -51,6 +51,7 @@ public:
 class Esp32S3Korvo2V3Board : public WifiBoard {
 private:
     Button boot_button_;
+    Button change_button_;
     i2c_master_bus_handle_t i2c_bus_;
     LcdDisplay* display_;
 
@@ -113,6 +114,7 @@ private:
             if (app.GetDeviceState() == kDeviceStateStarting && !WifiStation::GetInstance().IsConnected()) {
                 ResetWifiConfiguration();
             }
+            
         });
         boot_button_.OnPressDown([this]() {
             Application::GetInstance().StartListening();
@@ -120,6 +122,11 @@ private:
         boot_button_.OnPressUp([this]() {
             Application::GetInstance().StopListening();
         });
+        change_button_.OnClick([this]() {
+            auto& board = Board::GetInstance();
+                auto display = board.GetDisplay();
+                display->changeEyeStyle(); 
+            });
     }
 
 
@@ -169,11 +176,12 @@ private:
     void InitializeIot() {
         auto& thing_manager = iot::ThingManager::GetInstance();
         thing_manager.AddThing(iot::CreateThing("Speaker"));
+        thing_manager.AddThing(iot::CreateThing("Eye"));
 
     }
 
 public:
-    Esp32S3Korvo2V3Board() : boot_button_(BOOT_BUTTON_GPIO) {
+    Esp32S3Korvo2V3Board() : boot_button_(BOOT_BUTTON_GPIO),change_button_(CHANGE_BUTTON_GPIO) {
         ESP_LOGI(TAG, "Initializing esp32s3_korvo2_v3 Board");
         InitializeI2c();
         I2cDetect();

@@ -259,3 +259,12 @@ void Display::SetTheme(const std::string& theme_name) {
     Settings settings("display", true);
     settings.SetString("theme", theme_name);
 }
+void Display::changeEyeStyle() {
+    DisplayLockGuard lock(this);
+    
+}
+
+uint8_t Display::getCurrentEyeType(){  
+    DisplayLockGuard lock(this);
+    return 0;
+}

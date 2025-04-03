@@ -48,6 +48,8 @@ public:
     ~LcdDisplay();
     void StartEyeAnimation();
     void StopEyeAnimation();
+    virtual void changeEyeStyle() override;
+    virtual uint8_t getCurrentEyeType() override;
     virtual void SetEmotion(const char* emotion) override;
     virtual void SetIcon(const char* icon) override;
 #if CONFIG_USE_WECHAT_MESSAGE_STYLE

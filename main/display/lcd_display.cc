@@ -34,6 +34,7 @@
 // #define LIGHT_SYSTEM_TEXT_COLOR      lv_color_hex(0x666666)     // Dark gray text
 // #define LIGHT_BORDER_COLOR           lv_color_hex(0xE0E0E0)     // Light gray border
 // #define LIGHT_LOW_BATTERY_COLOR      lv_color_black()           // Black for light mode
+
 #define LIGHT_BACKGROUND_COLOR       lv_color_black()           // White background
 #define LIGHT_TEXT_COLOR             lv_color_white()           // Black text
 #define LIGHT_CHAT_BACKGROUND_COLOR  lv_color_black()     // Light gray background
@@ -643,6 +644,30 @@ void LcdDisplay::StopEyeAnimation() {
     if (eye_timer_) {
         esp_timer_stop(eye_timer_);
     }
+}
+void LcdDisplay::changeEyeStyle() {
+    DisplayLockGuard lock(this);
+    if (eye_animation_ && eye_canvas_) {
+        // 获取当前眼睛类型
+        EyeAnimation::EyeType current_type = eye_animation_->getCurrentEyeType();
+        
+        // 计算下一个类型，使用显式类型转换
+        EyeAnimation::EyeType next_type = static_cast<EyeAnimation::EyeType>(
+            (static_cast<int>(current_type) + 1) % static_cast<int>(EyeAnimation::MAX_EYE_TYPE)
+        );
+        
+        // 切换到新的眼睛类型
+        eye_animation_->switchEyeType(next_type);
+    }
+}
+uint8_t LcdDisplay::getCurrentEyeType() {
+    DisplayLockGuard lock(this);
+    if (eye_animation_ ) {
+        // 获取当前眼睛类型
+        EyeAnimation::EyeType current_type = eye_animation_->getCurrentEyeType();
+        return current_type;
+    }
+    return 0;
 }
 void LcdDisplay::SetupUI() {
     DisplayLockGuard lock(this);
