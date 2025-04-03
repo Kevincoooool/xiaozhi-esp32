@@ -79,6 +79,34 @@ static ThemeColors current_theme = LIGHT_THEME;
 
 
 LV_FONT_DECLARE(font_awesome_30_4);
+static lv_area_t * lv_event_get_invalidated_area(lv_event_t * e)
+{
+    if(lv_event_get_code(e) == LV_EVENT_INVALIDATE_AREA) {
+        return (lv_area_t *)lv_event_get_param(e);
+    }
+    else {
+        LV_LOG_WARN("Not interpreted with this event code");
+        return NULL;
+    }
+}
+
+// 添加在文件开头的定义部分
+void rounder_event_cb(lv_event_t *e)
+{
+    lv_area_t *area = (lv_area_t *)lv_event_get_invalidated_area(e);
+    uint16_t x1 = area->x1;
+    uint16_t x2 = area->x2;
+
+    uint16_t y1 = area->y1;
+    uint16_t y2 = area->y2;
+
+    // round the start of coordinate down to the nearest 2M number
+    area->x1 = (x1 >> 1) << 1;
+    area->y1 = (y1 >> 1) << 1;
+    // round the end of coordinate up to the nearest 2N+1 number
+    area->x2 = ((x2 >> 1) << 1) + 1;
+    area->y2 = ((y2 >> 1) << 1) + 1;
+}
 
 SpiLcdDisplay::SpiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_t panel,
                            int width, int height, int offset_x, int offset_y, bool mirror_x, bool mirror_y, bool swap_xy,
@@ -138,12 +166,12 @@ SpiLcdDisplay::SpiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_h
         ESP_LOGE(TAG, "Failed to add display");
         return;
     }
+    lv_display_add_event_cb(display_, (lv_event_cb_t )rounder_event_cb, LV_EVENT_INVALIDATE_AREA, NULL);
 
     if (offset_x != 0 || offset_y != 0) {
         lv_display_set_offset(display_, offset_x, offset_y);
     }
 
-    // Update the theme
     if (current_theme_name_ == "dark") {
         current_theme = DARK_THEME;
     } else if (current_theme_name_ == "light") {
