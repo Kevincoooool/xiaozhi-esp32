@@ -173,7 +173,7 @@ private:
                                     DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY);
         backlight_ = new CustomBacklight(panel);
         backlight_->RestoreBrightness();
-        // panel_qspi_amoled_set_brightness(panel, 0xFF);
+        panel_qspi_amoled_set_brightness(panel, 0xFF);
     }
 
     // 物联网初始化，添加对 AI 可见设备
