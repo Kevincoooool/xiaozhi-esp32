@@ -13,6 +13,7 @@
 #include <driver/i2c_master.h>
 #include "power_save_timer.h"
 #include "assets/lang_config.h"
+#include "power_manager.h"
 
 #define TAG "KevinBoxBoard"
 
@@ -22,7 +23,17 @@ private:
     Button boot_button_;
     CircularStrip* led_strip_;
     PowerSaveTimer* power_save_timer_;
-
+    PowerManager* power_manager_;
+    void InitializePowerManager() {
+        power_manager_ = new PowerManager(GPIO_NUM_NC);
+        // power_manager_->OnChargingStatusChanged([this](bool is_charging) {
+        //     if (is_charging) {
+        //         power_save_timer_->SetEnabled(false);
+        //     } else {
+        //         power_save_timer_->SetEnabled(true);
+        //     }
+        // });
+    }
     void InitializePowerSaveTimer() {
         power_save_timer_ = new PowerSaveTimer(-1, -1, 600);
         power_save_timer_->OnShutdownRequest([this]() {
@@ -85,6 +96,7 @@ private:
         auto& thing_manager = iot::ThingManager::GetInstance();
         thing_manager.AddThing(iot::CreateThing("Speaker"));
         thing_manager.AddThing(iot::CreateThing("Power"));
+        thing_manager.AddThing(iot::CreateThing("Battery"));
         
         led_strip_ = new CircularStrip(BUILTIN_LED_GPIO, 4);
         auto led_strip_control = new LedStripControl(led_strip_);
@@ -95,7 +107,7 @@ public:
     KevinBoxBoard() : boot_button_(BOOT_BUTTON_GPIO) {  
         // 把 ESP32C3 的 VDD SPI 引脚作为普通 GPIO 口使用
         esp_efuse_write_field_bit(ESP_EFUSE_VDD_SPI_AS_GPIO);
-        
+        InitializePowerManager();
         InitializeCodecI2c();
         InitializeButtons();
         InitializePowerSaveTimer();
@@ -111,6 +123,24 @@ public:
             AUDIO_I2S_GPIO_MCLK, AUDIO_I2S_GPIO_BCLK, AUDIO_I2S_GPIO_WS, AUDIO_I2S_GPIO_DOUT, AUDIO_I2S_GPIO_DIN,
             AUDIO_CODEC_PA_PIN, AUDIO_CODEC_ES8311_ADDR);
         return &audio_codec;
+    }
+    virtual bool GetBatteryLevel(int& level, bool& charging, bool& discharging) override {
+        static bool last_discharging = false;
+        charging = power_manager_->IsCharging();
+        discharging = power_manager_->IsDischarging();
+        if (discharging != last_discharging) {
+            power_save_timer_->SetEnabled(discharging);
+            last_discharging = discharging;
+        }
+        level = power_manager_->GetBatteryLevel();
+        return true;
+    }
+
+    virtual void SetPowerSaveMode(bool enabled) override {
+        if (!enabled) {
+            power_save_timer_->WakeUp();
+        }
+        WifiBoard::SetPowerSaveMode(enabled);
     }
 };
 

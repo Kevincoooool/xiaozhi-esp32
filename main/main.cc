@@ -16,7 +16,7 @@
 
 void power_button_task(void *arg)
 {
-    const TickType_t LONG_PRESS_TIME = pdMS_TO_TICKS(4000); // 4秒
+    const TickType_t LONG_PRESS_TIME = pdMS_TO_TICKS(3000); // 4秒
     TickType_t press_start = 0;
     bool btn_pressed = false;
 
