@@ -65,31 +65,37 @@ private:
         }
         average_adc /= adc_values_.size();
 
-        // 定义电池电量区间
+        // 计算实际电池电压 (mV)
+        // 根据实际测量值进行校准：当 ADC = 2809 时，实际电压为 4120mV
+        // 计算校准系数：4120 / (2809 * 3300 / 4095) / 2 ≈ 0.925
+        const float calibration_factor = 0.925f;
+        float voltage_mv = (average_adc * 3300.0f / 4095.0f) * 2.0f * calibration_factor;
+         
+        // 定义锂电池电压与电量对应关系
         const struct {
-            uint16_t adc;
+            float voltage_mv;
             uint8_t level;
         } levels[] = {
-            {1970, 0},
-            {2062, 20},
-            {2154, 40},
-            {2246, 60},
-            {2338, 80},
-            {2430, 100}
+            {3000.0f, 0},    // 3.0V 对应 0%
+            {3300.0f, 10},   // 3.3V 对应 10%
+            {3500.0f, 30},   // 3.5V 对应 30%
+            {3700.0f, 60},   // 3.7V 对应 60%
+            {3900.0f, 80},   // 3.9V 对应 80%
+            {4150.0f, 100}   // 4.2V 对应 100%
         };
 
         // 低于最低值时
-        if (average_adc < levels[0].adc) {
+        if (voltage_mv < levels[0].voltage_mv) {
             battery_level_ = 0;
         }
         // 高于最高值时
-        else if (average_adc >= levels[5].adc) {
+        else if (voltage_mv >= levels[5].voltage_mv) {
             battery_level_ = 100;
         } else {
             // 线性插值计算中间值
             for (int i = 0; i < 5; i++) {
-                if (average_adc >= levels[i].adc && average_adc < levels[i+1].adc) {
-                    float ratio = static_cast<float>(average_adc - levels[i].adc) / (levels[i+1].adc - levels[i].adc);
+                if (voltage_mv >= levels[i].voltage_mv && voltage_mv < levels[i+1].voltage_mv) {
+                    float ratio = (voltage_mv - levels[i].voltage_mv) / (levels[i+1].voltage_mv - levels[i].voltage_mv);
                     battery_level_ = levels[i].level + ratio * (levels[i+1].level - levels[i].level);
                     break;
                 }
@@ -107,7 +113,8 @@ private:
             }
         }
 
-        ESP_LOGI("PowerManager", "ADC value: %d average: %ld level: %ld", adc_value, average_adc, battery_level_);
+        ESP_LOGI("PowerManager", "ADC value: %d average: %ld voltage: %.2f mV level: %ld%%", 
+                 adc_value, average_adc, voltage_mv, battery_level_);
     }
 
 public:
