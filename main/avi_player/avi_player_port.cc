@@ -9,13 +9,14 @@ static i2s_chan_handle_t i2s_tx_handle = NULL;
 static uint8_t *img_rgb565 = NULL;
 
 static bool is_playing = false;
+static char file_path[128] = {0};
 
 void video_write(frame_data_t *data, void *arg)
 {
     int Rgbsize = 0;
     esp_jpeg_decode_one_picture(data->data, data->data_bytes, &img_rgb565, &Rgbsize);
     // 通过回调函数更新LCD显示
-    if (img_rgb565 != NULL) {
+    if (img_rgb565 != NULL&& Rgbsize > 0) {
         auto display = Board::GetInstance().GetDisplay();
         display->SetFaceImage(img_rgb565, get_rgb_width(), get_rgb_height());
         free(img_rgb565);
@@ -32,6 +33,7 @@ static void play_end_cb(void *arg)
 {
     ESP_LOGI(TAG, "Play end");
     is_playing = false;
+    avi_player_port_play_file(file_path);
 }
 
 esp_err_t avi_player_port_init(avi_player_port_config_t *config)
@@ -78,6 +80,8 @@ esp_err_t avi_player_port_play_file(const char *filepath)
     }
     
     is_playing = true;
+    memset(file_path, 0, sizeof(file_path));
+    strncpy(file_path, filepath, sizeof(file_path) - 1);
     return avi_player_play_from_file(filepath);
 }
 

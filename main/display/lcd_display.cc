@@ -589,15 +589,15 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_text_color(chat_message_label_, current_theme.text, 0);
 
     
-    sit_label_= lv_label_create(content_);
-    lv_label_set_text(sit_label_, "good");
-    lv_obj_set_width(sit_label_, LV_HOR_RES * 0.9); // 限制宽度为屏幕宽度的 90%
-    lv_obj_set_style_text_align(sit_label_, LV_TEXT_ALIGN_CENTER, 0); // 设置文本居中对齐
+    // sit_label_= lv_label_create(content_);
+    // lv_label_set_text(sit_label_, "good");
+    // lv_obj_set_width(sit_label_, LV_HOR_RES * 0.9); // 限制宽度为屏幕宽度的 90%
+    // lv_obj_set_style_text_align(sit_label_, LV_TEXT_ALIGN_CENTER, 0); // 设置文本居中对齐
 
-    hand_label_= lv_label_create(content_);
-    lv_label_set_text(hand_label_, "good");
-    lv_obj_set_width(hand_label_, LV_HOR_RES * 0.9); // 限制宽度为屏幕宽度的 90%
-    lv_obj_set_style_text_align(hand_label_, LV_TEXT_ALIGN_CENTER, 0); // 设置文本居中对齐
+    // hand_label_= lv_label_create(content_);
+    // lv_label_set_text(hand_label_, "good");
+    // lv_obj_set_width(hand_label_, LV_HOR_RES * 0.9); // 限制宽度为屏幕宽度的 90%
+    // lv_obj_set_style_text_align(hand_label_, LV_TEXT_ALIGN_CENTER, 0); // 设置文本居中对齐
     /* Status bar */
     lv_obj_set_flex_flow(status_bar_, LV_FLEX_FLOW_ROW);
     lv_obj_set_style_pad_all(status_bar_, 0, 0);
@@ -696,41 +696,52 @@ void LcdDisplay::SetEmotion(const char* emotion) {
     //     lv_label_set_text(emotion_label_, "😶");
     // }
      // 可以根据emotion选择不同的视频文件
-     const char* video_path = "/spiffs/neutral.avi"; // 默认视频
+    const char* video_path = "/spiffs/xiaoliang_idle.avi"; // 默认视频
     printf("emotion: %s\n", emotion);
-    if (strcmp(emotion, "happy") == 0) {
-        video_path = "/spiffs/happy.avi";
-    } else if (strcmp(emotion, "laughing") == 0) {
-        video_path = "/spiffs/laughing.avi";
-    } else if (strcmp(emotion, "funny") == 0) {
-        video_path = "/spiffs/funny.avi";
-    } else if (strcmp(emotion, "sad") == 0) {
-        video_path = "/spiffs/sad.avi";
-    } else if (strcmp(emotion, "angry") == 0) {
-        video_path = "/spiffs/angry.avi";
-    } else if (strcmp(emotion, "crying") == 0) {
-        video_path = "/spiffs/crying.avi";
-    } else if (strcmp(emotion, "loving") == 0) {
-        video_path = "/spiffs/loving.avi";
-    } else if (strcmp(emotion, "embarrassed") == 0) {
-        video_path = "/spiffs/embarrassed.avi";
-    } else if (strcmp(emotion, "surprised") == 0) {
-        video_path = "/spiffs/surprised.avi";
-    } else if (strcmp(emotion, "thinking") == 0) {
-        video_path = "/spiffs/thinking.avi";
-    } else if (strcmp(emotion, "sleepy") == 0) {
-        video_path = "/spiffs/sleepy.avi";
-    } else if (strcmp(emotion, "cool") == 0) {
-        video_path = "/spiffs/cool.avi";
-    } else if (strcmp(emotion, "confused") == 0) {
-        video_path = "/spiffs/confused.avi";
+
+    if (strcmp(emotion, "ilde") == 0 || strcmp(emotion, "neutral") == 0) {
+        video_path = "/spiffs/xiaoliang_idle.avi";
     } else if (strcmp(emotion, "talk") == 0) {
-        video_path = "/spiffs/talk.avi";
-    }
+        video_path = "/spiffs/xiaoliang_talk.avi";
+    } else if (strcmp(emotion, "listen") == 0) {
+        video_path = "/spiffs/xiaoliang_listen.avi";
+    } 
+    printf("video_path: %s\n", video_path);
+
+    // if (strcmp(emotion, "happy") == 0) {
+    //     video_path = "/spiffs/happy.avi";
+    // } else if (strcmp(emotion, "laughing") == 0) {
+    //     video_path = "/spiffs/laughing.avi";
+    // } else if (strcmp(emotion, "funny") == 0) {
+    //     video_path = "/spiffs/funny.avi";
+    // } else if (strcmp(emotion, "sad") == 0) {
+    //     video_path = "/spiffs/sad.avi";
+    // } else if (strcmp(emotion, "angry") == 0) {
+    //     video_path = "/spiffs/angry.avi";
+    // } else if (strcmp(emotion, "crying") == 0) {
+    //     video_path = "/spiffs/crying.avi";
+    // } else if (strcmp(emotion, "loving") == 0) {
+    //     video_path = "/spiffs/loving.avi";
+    // } else if (strcmp(emotion, "embarrassed") == 0) {
+    //     video_path = "/spiffs/embarrassed.avi";
+    // } else if (strcmp(emotion, "surprised") == 0) {
+    //     video_path = "/spiffs/surprised.avi";
+    // } else if (strcmp(emotion, "thinking") == 0) {
+    //     video_path = "/spiffs/thinking.avi";
+    // } else if (strcmp(emotion, "sleepy") == 0) {
+    //     video_path = "/spiffs/sleepy.avi";
+    // } else if (strcmp(emotion, "cool") == 0) {
+    //     video_path = "/spiffs/cool.avi";
+    // } else if (strcmp(emotion, "confused") == 0) {
+    //     video_path = "/spiffs/confused.avi";
+    // } else if (strcmp(emotion, "talk") == 0) {
+    //     video_path = "/spiffs/talk.avi";
+    // }
      // ... 添加更多情绪对应的视频
      
      // 播放对应的视频文件
-     avi_player_port_play_file("/spiffs/xiaoliang.avi");
+     avi_player_port_play_file(video_path);
+    //  avi_player_port_play_file("/spiffs/xiaoliang.avi");
 }
 
 void LcdDisplay::SetIcon(const char* icon) {

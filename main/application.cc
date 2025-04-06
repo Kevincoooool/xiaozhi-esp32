@@ -72,6 +72,48 @@ Application::Application() {
     uart_set_pin(UART_NUM_1, UART_PIN_NO_CHANGE, 41, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
     // 应用串口配置
     uart_param_config(UART_NUM_1, &uart_config);
+
+    
+    // 初始化串口2配置
+    uart_config_t uart2_config = {
+        .baud_rate = 115200,
+        .data_bits = UART_DATA_8_BITS,
+        .parity = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .source_clk = UART_SCLK_APB,
+    };
+    // 安装串口2驱动
+    uart_driver_install(UART_NUM_2, 1024 * 1, 1024 * 1, 0, NULL, 0);
+    // 配置串口2引脚，RX为GPIO17
+    uart_set_pin(UART_NUM_2, UART_PIN_NO_CHANGE, 17, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+    // 应用串口2配置
+    uart_param_config(UART_NUM_2, &uart2_config);
+    
+     // 创建串口2接收任务
+     xTaskCreate([](void* arg) {
+        Application* app = (Application*)arg;
+        char buffer[256]; // 用于存储接收到的字符
+        int buffer_index = 0;
+        size_t recv_length = 0;
+        while (true) {
+            
+            memset(buffer, 0, sizeof(buffer));
+             uart_get_buffered_data_len(UART_NUM_2, &recv_length);
+            if (recv_length)
+            {
+                ESP_LOGI(TAG, "recv_length:%ld ", recv_length);
+                int len = uart_read_bytes(UART_NUM_2, buffer, recv_length, 10 / portTICK_PERIOD_MS);
+                for (size_t i = 0; i < len; i++)
+                {
+                    printf("%x ", buffer[i]);
+                }
+                ESP_LOGI(TAG, "00001");
+                esp_log_buffer_hex(TAG, buffer, len);
+            }
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
+    }, "uart2_receive_task", 4096, this, 2, nullptr);
 // 创建串口接收任务
     xTaskCreate([](void* arg) {
         Application* app = (Application*)arg;
@@ -875,7 +917,9 @@ void Application::SetDeviceState(DeviceState state) {
         case kDeviceStateUnknown:
         case kDeviceStateIdle:
             display->SetStatus(Lang::Strings::STANDBY);
-            display->SetEmotion("neutral");
+            // display->SetEmotion("neutral");
+            
+            display->SetEmotion("ilde");
 #if CONFIG_USE_AUDIO_PROCESSOR
             audio_processor_.Stop();
 #endif
@@ -885,13 +929,15 @@ void Application::SetDeviceState(DeviceState state) {
             break;
         case kDeviceStateConnecting:
             display->SetStatus(Lang::Strings::CONNECTING);
-            display->SetEmotion("neutral");
+            // display->SetEmotion("neutral");
+            display->SetEmotion("ilde");
             display->SetChatMessage("system", "");
             break;
         case kDeviceStateListening:
             display->SetStatus(Lang::Strings::LISTENING);
-            display->SetEmotion("neutral");
+            // display->SetEmotion("neutral");
 
+            display->SetEmotion("listen");
             // Update the IoT states before sending the start listening command
             UpdateIotStates();
 
@@ -930,6 +976,7 @@ void Application::SetDeviceState(DeviceState state) {
             ResetDecoder();
             break;
         default:
+            // display->SetEmotion("ilde");
             // Do nothing
             break;
     }
