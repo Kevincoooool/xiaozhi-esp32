@@ -59,9 +59,9 @@ bool WebsocketProtocol::OpenAudioChannel() {
     if (websocket_ != nullptr) {
         delete websocket_;
     }
-
+auto& board = Board::GetInstance();
     error_occurred_ = false;
-    std::string url = CONFIG_WEBSOCKET_URL;
+    std::string url = board.GetApiUrl().empty() ? CONFIG_WEBSOCKET_URL : board.GetApiUrl();
     std::string token = "Bearer " + std::string(CONFIG_WEBSOCKET_ACCESS_TOKEN);
     websocket_ = Board::GetInstance().CreateWebSocket();
     websocket_->SetHeader("Authorization", token.c_str());
