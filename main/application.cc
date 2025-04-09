@@ -236,6 +236,15 @@ void Application::PlaySound(const std::string_view& sound) {
         audio_decode_queue_.emplace_back(std::move(opus));
     }
 }
+void Application::SetOfflineMode(bool enabled) {
+    offline_mode_ = enabled;
+    ESP_LOGI(TAG, "Switching to %s mode", enabled ? "offline" : "online");
+#if CONFIG_USE_WAKE_WORD_DETECT
+    if (enabled) {
+        wake_word_detect_.StartDetection();
+    }
+#endif
+}
 
 void Application::ToggleChatState() {
     if (device_state_ == kDeviceStateActivating) {
@@ -252,9 +261,12 @@ void Application::ToggleChatState() {
         Schedule([this]() {
             SetDeviceState(kDeviceStateConnecting);
             if (!protocol_->OpenAudioChannel()) {
+                ESP_LOGI(TAG, "Failed to open audio channel, switching to offline mode");
+                SetOfflineMode(true);
+                SetDeviceState(kDeviceStateIdle);
                 return;
             }
-
+            SetOfflineMode(false);
             keep_listening_ = true;
             protocol_->SendStartListening(kListeningModeAutoStop);
             SetDeviceState(kDeviceStateListening);
@@ -310,7 +322,30 @@ void Application::StopListening() {
         }
     });
 }
+void Application::HandleOfflineCommand(const std::string& command, int command_id) {
+    auto display = Board::GetInstance().GetDisplay();
+    display->SetChatMessage("user", command.c_str());
 
+    // 根据不同的 command_id 执行相应的操作
+    switch (command_id) {
+        case 0:  // 假设这是"打开空调"命令
+            Alert("空调控制", "正在打开空调", "happy", Lang::Sounds::P3_SUCCESS);
+            break;
+        case 1:  // 假设这是"关闭空调"命令
+            Alert("空调控制", "正在关闭空调", "happy", Lang::Sounds::P3_SUCCESS);
+            break;
+        case 2:  // 假设这是"打开电灯"命令
+            Alert("灯光控制", "正在打开电灯", "happy", Lang::Sounds::P3_SUCCESS);
+            break;
+        case 3:  // 假设这是"关闭电灯"命令
+            Alert("灯光控制", "正在关闭电灯", "happy", Lang::Sounds::P3_SUCCESS);
+            break;
+        default:
+            // 未知命令，播放提示音
+            Alert("未知命令", command.c_str(), "confused", Lang::Sounds::P3_EXCLAMATION);
+            break;
+    }
+}
 void Application::Start() {
     auto& board = Board::GetInstance();
     SetDeviceState(kDeviceStateStarting);
@@ -508,10 +543,19 @@ void Application::Start() {
                 wake_word_detect_.EncodeWakeWordData();
 
                 if (!protocol_->OpenAudioChannel()) {
+                    ESP_LOGI(TAG, "Failed to open audio channel, switching to offline mode");
+                    SetOfflineMode(true);
+                    wake_word_detect_.SetOfflineMode(true);
+                    wake_word_detect_.OnCommandDetected([this](const std::string& command, int command_id) {
+                        ESP_LOGI(TAG, "Offline command detected: %s (ID: %d)", command.c_str(), command_id);
+                        HandleOfflineCommand(command, command_id);
+                    });
                     wake_word_detect_.StartDetection();
+                    SetDeviceState(kDeviceStateIdle);
                     return;
                 }
-                
+                SetOfflineMode(false);
+                wake_word_detect_.SetOfflineMode(false);
                 std::vector<uint8_t> opus;
                 // Encode and send the wake word data to the server
                 while (wake_word_detect_.GetWakeWordOpus(opus)) {

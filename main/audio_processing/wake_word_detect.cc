@@ -49,6 +49,11 @@ void WakeWordDetect::Initialize(int channels, bool reference) {
             }
         }
     }
+    char *mn_name = esp_srmodel_filter(models, ESP_MN_PREFIX, ESP_MN_CHINESE);
+    ESP_LOGI(TAG, "Multinet model: %s", mn_name);
+    multinet_ = esp_mn_handle_from_name(mn_name);
+    model_data_ = multinet_->create(mn_name, 5760);
+    esp_mn_commands_update_from_sdkconfig(multinet_, model_data_);
 
     std::string input_format;
     for (int i = 0; i < channels_ - ref_num; i++) {
@@ -107,28 +112,53 @@ void WakeWordDetect::AudioDetectionTask() {
     ESP_LOGI(TAG, "Audio detection task started, feed size: %d fetch size: %d",
         feed_size, fetch_size);
 
-    while (true) {
-        xEventGroupWaitBits(event_group_, DETECTION_RUNNING_EVENT, pdFALSE, pdTRUE, portMAX_DELAY);
-
-        auto res = afe_iface_->fetch_with_delay(afe_data_, portMAX_DELAY);
-        if (res == nullptr || res->ret_value == ESP_FAIL) {
-            continue;;
-        }
-
-        // Store the wake word data for voice recognition, like who is speaking
-        StoreWakeWordData((uint16_t*)res->data, res->data_size / sizeof(uint16_t));
-
-        if (res->wakeup_state == WAKENET_DETECTED) {
-            StopDetection();
-            last_detected_wake_word_ = wake_words_[res->wake_word_index - 1];
-
-            if (wake_word_detected_callback_) {
-                wake_word_detected_callback_(last_detected_wake_word_);
+        while (true) {
+            xEventGroupWaitBits(event_group_, DETECTION_RUNNING_EVENT, pdFALSE, pdTRUE, portMAX_DELAY);
+    
+            auto res = afe_iface_->fetch_with_delay(afe_data_, portMAX_DELAY);
+            if (res == nullptr || res->ret_value == ESP_FAIL) {
+                continue;
+            }
+    
+            // Store the wake word data for voice recognition
+            StoreWakeWordData((uint16_t*)res->data, res->data_size / sizeof(uint16_t));
+    
+            // 处理唤醒词检测
+            if (res->wakeup_state == WAKENET_DETECTED) {
+                last_detected_wake_word_ = wake_words_[res->wake_word_index - 1];
+                ESP_LOGI(TAG, "Wake word detected: %s", last_detected_wake_word_.c_str());
+            
+                if (!offline_mode_) {
+                    if (wake_word_detected_callback_) {
+                        wake_word_detected_callback_(last_detected_wake_word_);
+                    }
+                }
+            }
+    
+            // 离线模式下处理命令识别
+            if (offline_mode_ && multinet_ && model_data_) {
+                esp_mn_state_t mn_state = multinet_->detect(model_data_, res->data);
+                if (mn_state == ESP_MN_STATE_DETECTING) {
+                    continue;
+                }
+                if (mn_state == ESP_MN_STATE_DETECTED) {
+                    esp_mn_results_t *mn_result = multinet_->get_results(model_data_);
+                    ESP_LOGI(TAG, "Command detected in offline mode: %s", mn_result->string);
+                    for (int i = 0; i < mn_result->num; i++) {
+                        printf("TOP %d, command_id: %d, phrase_id: %d, prob: %f\n", 
+                            i+1, mn_result->command_id[i], mn_result->phrase_id[i], mn_result->prob[i]);
+                    }
+                    if (command_detected_callback_) {
+                        command_detected_callback_(mn_result->string, mn_result->command_id[0]);
+                    }
+                }
             }
         }
-    }
 }
-
+void WakeWordDetect::SetOfflineMode(bool enabled) {
+    offline_mode_ = enabled;
+    ESP_LOGI(TAG, "Switching to %s mode", enabled ? "offline" : "online");
+}
 void WakeWordDetect::StoreWakeWordData(uint16_t* data, size_t samples) {
     // store audio data to wake_word_pcm_
     wake_word_pcm_.emplace_back(std::vector<int16_t>(data, data + samples));

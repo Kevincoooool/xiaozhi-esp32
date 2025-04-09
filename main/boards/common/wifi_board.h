@@ -21,6 +21,7 @@ public:
     virtual const char* GetNetworkStateIcon() override;
     virtual void SetPowerSaveMode(bool enabled) override;
     virtual void ResetWifiConfiguration();
+    
 };
 
 #endif // WIFI_BOARD_H

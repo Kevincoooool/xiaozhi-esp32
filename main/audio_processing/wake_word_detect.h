@@ -14,8 +14,12 @@
 #include <functional>
 #include <mutex>
 #include <condition_variable>
-
-
+#include "esp_wn_iface.h"
+#include "esp_wn_models.h"
+#include "esp_afe_sr_iface.h"
+#include "esp_mn_iface.h"
+#include "esp_mn_models.h"
+#include "esp_process_sdkconfig.h"
 class WakeWordDetect {
 public:
     WakeWordDetect();
@@ -30,7 +34,11 @@ public:
     void EncodeWakeWordData();
     bool GetWakeWordOpus(std::vector<uint8_t>& opus);
     const std::string& GetLastDetectedWakeWord() const { return last_detected_wake_word_; }
-
+    void SetOfflineMode(bool enabled);
+    bool IsOfflineMode() const { return offline_mode_; }
+    void OnCommandDetected(std::function<void(const std::string& command, int command_id)> callback) {
+        command_detected_callback_ = callback;
+    }
 private:
     esp_afe_sr_iface_t* afe_iface_ = nullptr;
     esp_afe_sr_data_t* afe_data_ = nullptr;
@@ -50,8 +58,10 @@ private:
     std::list<std::vector<uint8_t>> wake_word_opus_;
     std::mutex wake_word_mutex_;
     std::condition_variable wake_word_cv_;
-
-    void StoreWakeWordData(uint16_t* data, size_t size);
+    bool offline_mode_ = false;
+    esp_mn_iface_t* multinet_ = nullptr;
+    model_iface_data_t* model_data_ = nullptr;
+    std::function<void(const std::string& command, int command_id)> command_detected_callback_;    void StoreWakeWordData(uint16_t* data, size_t size);
     void AudioDetectionTask();
 };
 

@@ -21,9 +21,11 @@ public:
     void CloseAudioChannel() override;
     bool IsAudioChannelOpened() const override;
 
+    bool IsConnected() const { return is_connected_; }
 private:
     EventGroupHandle_t event_group_handle_;
     WebSocket* websocket_ = nullptr;
+    bool is_connected_ = false;  // 添加连接状态标志
 
     void ParseServerHello(const cJSON* root);
     void SendText(const std::string& text) override;

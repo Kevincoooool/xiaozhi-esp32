@@ -70,7 +70,9 @@ public:
     void WakeWordInvoke(const std::string& wake_word);
     void PlaySound(const std::string_view& sound);
     bool CanEnterSleepMode();
-
+    void SetOfflineMode(bool enabled);
+    bool IsOfflineMode() const { return offline_mode_; }
+    void HandleOfflineCommand(const std::string& command, int command_id);
 private:
     Application();
     ~Application();
@@ -105,6 +107,7 @@ private:
     OpusResampler input_resampler_;
     OpusResampler reference_resampler_;
     OpusResampler output_resampler_;
+    bool offline_mode_ = false;  // 添加离线模式标志
 
     void MainLoop();
     void InputAudio();
