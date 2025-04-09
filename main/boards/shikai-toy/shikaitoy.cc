@@ -14,7 +14,9 @@
 #include <driver/i2c_master.h>
 #include <wifi_station.h>
 #include "assets/lang_config.h"
-
+#include "toy_control/vibration_controller.h"
+#include "toy_control/pump_controller.h"
+#include "toy_control/warm_controller.h"
 #define TAG "shikai-toy"
 
 LV_FONT_DECLARE(font_puhui_20_4);
@@ -52,9 +54,13 @@ class Pmic : public Axp2101 {
     
 class SHIKAI_TOY : public WifiBoard {
 private:
-    Button boot_button_;
-    Button siphon_button_;
-    Button volume_button_;
+    Button vibration_button_;  // 原 boot_button_
+    Button pump_button_;       // 原 siphon_button_
+    Button mode_button_;       // 原 volume_button_
+    PumpController& pump_controller_;
+    VibrationController& vibration_controller_;
+    WarmController& warm_controller_;
+    bool is_singing_mode_ = false;  // 
     LcdDisplay* display_;
     i2c_master_bus_handle_t codec_i2c_bus_;
     PowerSaveTimer* power_save_timer_;
@@ -85,40 +91,98 @@ private:
     }
 
     void InitializeButtons() {
-        boot_button_.OnClick([this]() {
+        // 震动按键功能
+        vibration_button_.OnClick([this]() {
+            static uint8_t vibration_level = 0;
             auto& app = Application::GetInstance();
+            
+            // 在未连接WiFi时的配置功能保持不变
             if (app.GetDeviceState() == kDeviceStateStarting && !WifiStation::GetInstance().IsConnected()) {
                 ResetWifiConfiguration();
+                return;
+            }
+
+            // 震动模式循环切换
+            vibration_level = (vibration_level + 1) % 11;  // 0-10循环
+            if (vibration_level == 0) {
+                vibration_controller_.StopVibration();
+                ESP_LOGI(TAG, "Vibration stopped");
+            } else {
+                vibration_controller_.SetLevel(vibration_level - 1);
+                ESP_LOGI(TAG, "Vibration level set to %d", vibration_level - 1);
             }
         });
-        boot_button_.OnPressDown([this]() {
-            Application::GetInstance().StartListening();
-        });
-        boot_button_.OnPressUp([this]() {
-            Application::GetInstance().StopListening();
+
+        vibration_button_.OnLongPress([this]() {
+            // 长按1.5秒启动震动
+            vibration_controller_.SetLevel(0);  // 从最低档开始
+            ESP_LOGI(TAG, "Vibration mode activated");
         });
 
-        siphon_button_.OnClick([this]() {
-            static bool is_cycling = false;
+        // 吸力按键功能
+        pump_button_.OnClick([this]() {
+            static uint8_t pump_mode = 0;  // 0:停止, 1:弱, 2:中, 3:强
             
+            pump_mode = (pump_mode + 1) % 4;
+            switch (pump_mode) {
+                case 0:
+                    pump_controller_.StopPump();
+                    ESP_LOGI(TAG, "Pump stopped");
+                    break;
+                case 1:  // 弱循环模式
+                    pump_controller_.StartCycle(2000, 200, 600);
+                    ESP_LOGI(TAG, "Pump weak mode");
+                    break;
+                case 2:  // 中循环模式
+                    pump_controller_.StartCycle(1500, 300, 800);
+                    ESP_LOGI(TAG, "Pump medium mode");
+                    break;
+                case 3:  // 强循环模式
+                    pump_controller_.StartCycle(1000, 400, 1000);
+                    ESP_LOGI(TAG, "Pump strong mode");
+                    break;
+            }
         });
-        volume_button_.OnClick([this]() {
-            static int last_volume = 20;  // 初始音量设为20%
+
+        pump_button_.OnLongPress([this]() {
+            // 长按2秒进入待机状态
+            pump_controller_.StopPump();
+            vibration_controller_.StopVibration();
+            warm_controller_.StopWarm();
+            ESP_LOGI(TAG, "Entering standby mode");
+        });
+
+        // 模式按键功能
+        mode_button_.OnClick([this]() {
+            static int last_volume = 20;
             auto& app = Application::GetInstance();
             power_save_timer_->WakeUp();
             auto codec = GetAudioCodec();
-            last_volume += 20;  // 在上次音量基础上增加20%
+            last_volume += 20;
             
             if (last_volume > 100) {
-                last_volume = 20;  // 超过100%后重置为20%
+                last_volume = 20;
             }
             
             codec->SetOutputVolume(last_volume);
-            
             app.PlaySound(Lang::Sounds::P3_SUCCESS);
         });
-    }
 
+        mode_button_.OnLongPress([this]() {
+            // 长按1.5秒切换语音对话/哼唱模式
+            is_singing_mode_ = !is_singing_mode_;
+            auto& app = Application::GetInstance();
+            
+            if (is_singing_mode_) {
+                app.StopListening();  // 停止语音对话
+                ESP_LOGI(TAG, "Switching to singing mode");
+                // TODO: 启动哼唱模式
+            } else {
+                ESP_LOGI(TAG, "Switching to voice dialogue mode");
+                app.StartListening();
+            }
+        });
+    }
     // 物联网初始化，添加对 AI 可见设备
     void InitializeIot() {
         auto& thing_manager = iot::ThingManager::GetInstance();
@@ -130,17 +194,62 @@ private:
         thing_manager.AddThing(iot::CreateThing("Warm"));
     }
 
+    void InitializeGPIO() {
+        // 配置 GPIO15 为输入
+        gpio_config_t input_conf = {
+            .pin_bit_mask = (1ULL << 15),
+            .mode = GPIO_MODE_INPUT,
+            .pull_up_en = GPIO_PULLUP_DISABLE,
+            .pull_down_en = GPIO_PULLDOWN_DISABLE,
+            .intr_type = GPIO_INTR_DISABLE
+        };
+        gpio_config(&input_conf);
+
+        // 配置 GPIO4 为输出
+        gpio_config_t output_conf = {
+            .pin_bit_mask = (1ULL << 4),
+            .mode = GPIO_MODE_OUTPUT,
+            .pull_up_en = GPIO_PULLUP_DISABLE,
+            .pull_down_en = GPIO_PULLDOWN_DISABLE,
+            .intr_type = GPIO_INTR_DISABLE
+        };
+        gpio_config(&output_conf);
+
+        // 创建定时器任务来检查 GPIO15 状态
+        esp_timer_create_args_t timer_args = {
+            .callback = [](void* arg) {
+                int level = gpio_get_level(GPIO_NUM_15);
+                gpio_set_level(GPIO_NUM_4, level); // 反转电平
+            },
+            .arg = nullptr,
+            .dispatch_method = ESP_TIMER_TASK,
+            .name = "gpio_check",
+            .skip_unhandled_events = true
+        };
+
+        esp_timer_handle_t gpio_timer;
+        ESP_ERROR_CHECK(esp_timer_create(&timer_args, &gpio_timer));
+        ESP_ERROR_CHECK(esp_timer_start_periodic(gpio_timer, 100000)); // 每100ms检查一次
+    }
+
 public:
-    SHIKAI_TOY() :  boot_button_(BOOT_BUTTON_GPIO),siphon_button_(SIPHON_BUTTON_GPIO),volume_button_(VOLUME_BUTTON_GPIO)  {
+    SHIKAI_TOY() : vibration_button_(VIBRATION_BUTTON_GPIO), 
+                        pump_button_(PUMP_BUTTON_GPIO), 
+                        mode_button_(MODE_BUTTON_GPIO),
+                    pump_controller_(PumpController::GetInstance()),
+                    vibration_controller_(VibrationController::GetInstance()),
+                    warm_controller_(WarmController::GetInstance()) {
         ESP_LOGI(TAG, "Initializing SHIKAI TOY Board");
         InitializeCodecI2c();
         pmic_ = new Pmic(codec_i2c_bus_, AXP2101_I2C_ADDR);
-
-        // InitializeSpi();
+      // 初始化控制器
+        pump_controller_.Initialize(GPIO_NUM_47, GPIO_NUM_39);
+        vibration_controller_.Initialize(GPIO_NUM_38);
+        warm_controller_.Initialize(GPIO_NUM_48);
         InitializeButtons();
         InitializePowerSaveTimer();
         InitializeIot();
-        // GetBacklight()->RestoreBrightness();
+        InitializeGPIO();  // 添加 GPIO 初始化
     }
     
 
