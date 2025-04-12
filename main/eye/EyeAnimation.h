@@ -15,7 +15,20 @@ public:
         TERMINATOR_EYE,
         MAX_EYE_TYPE
     };
+// 情感状态枚举
+    enum EmotionState {
+        EMOTION_NORMAL,    // 正常状态
+        EMOTION_ANGRY,     // 生气
+        EMOTION_SLEEPY,    // 困倦
+        EMOTION_EXCITED,   // 兴奋
+        EMOTION_SAD        // 悲伤
+    };
 
+    // 情感控制函数
+    void setEmotion(EmotionState emotion);
+    void setEyelidGap(uint8_t gap);     // 控制眼睑间距
+    void setIrisScale(uint16_t scale);   // 直接控制瞳孔大小
+    void setBlinkRate(uint32_t rate);    // 控制眨眼频率
     // 眨眼状态常量
     static constexpr uint8_t NOBLINK = 0;
     static constexpr uint8_t ENBLINK = 1;
@@ -34,7 +47,7 @@ public:
     uint16_t getWidth() const { return screen_width_; }
     uint16_t getHeight() const { return screen_height_; }
     // 添加眼睑间距设置方法
-    void setEyelidGap(uint8_t gap) { eyelid_gap_ = gap; }
+    // void setEyelidGap(uint8_t gap) { eyelid_gap_ = gap; }
     uint8_t getEyelidGap() const { return eyelid_gap_; }
     const uint16_t* getScaledBuffer() const { return scaled_buffer_; }
     void setScale(float scale) { scale_ = scale; }
@@ -43,6 +56,9 @@ public:
     uint16_t blend_color(uint16_t c1, uint16_t c2, float alpha);
     float eyelidSmooth(uint8_t value, uint32_t x, uint32_t screenWidth);
 private:
+    EmotionState current_emotion_ = EMOTION_NORMAL;
+    uint8_t eyelid_base_gap_ = 10;      // 基础眼睑间距
+    uint32_t blink_interval_ = 2000000;  // 基础眨眼间隔(微秒)
     struct Eye {
         struct {
             uint8_t state;     // NOBLINK/ENBLINK/DEBLINK
@@ -51,7 +67,7 @@ private:
         } blink;
         int16_t xposition;     // Eye X position 
     };
-
+    inline uint16_t swapRedBlue(uint16_t color);
     void drawEye(uint8_t eye_index, 
                  uint32_t iris_scale,
                  uint32_t sclera_x, 

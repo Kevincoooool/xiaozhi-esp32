@@ -12,7 +12,7 @@
 
 extern "C" void app_main(void)
 {
-    esp_rom_gpio_pad_select_gpio(GPIO_NUM_7); // 打开功放使能
+    esp_rom_gpio_pad_select_gpio(GPIO_NUM_7); // 打开电源控制
     gpio_set_direction(GPIO_NUM_7, GPIO_MODE_OUTPUT);
     gpio_set_level(GPIO_NUM_7, 1);
     // Initialize the default event loop

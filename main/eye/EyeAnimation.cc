@@ -6,6 +6,7 @@
 #include <string.h>
 #include <algorithm> // 添加这行来使用 std::min
 
+
 #define pgm_read_byte(addr) (*(const unsigned char *)(addr))
 #define pgm_read_word(addr) ({        \
     typeof(addr) _addr = (addr);      \
@@ -107,8 +108,8 @@ void EyeAnimation::switchEyeType(EyeType type)
         iris_map_height_ = defaulteye_IRIS_MAP_HEIGHT;
         screen_width_ = defaulteye_SCREEN_WIDTH;
         screen_height_ = defaulteye_SCREEN_HEIGHT;
-        iris_min_ = IRIS_MIN;
-        iris_max_ = IRIS_MAX;
+        iris_min_ = 60;    // 人眼瞳孔最小值
+        iris_max_ = 110;   // 人眼瞳孔最大值
         iris_scale_ = (iris_min_ + iris_max_) / 2;
         break;
     }
@@ -124,9 +125,9 @@ void EyeAnimation::switchEyeType(EyeType type)
         iris_map_height_ = cateye_IRIS_MAP_HEIGHT;
         screen_width_ = cateye_SCREEN_WIDTH;
         screen_height_ = cateye_SCREEN_HEIGHT;
-        iris_min_ = IRIS_MIN;
-        iris_max_ = IRIS_MAX;
-        iris_scale_ = iris_min_ + (iris_max_ - iris_min_) / 2; // 猫眼瞳孔较小
+        iris_min_ = 60;    // 猫眼瞳孔可以收缩得很小
+        iris_max_ = 180;   // 猫眼瞳孔可以放得很大
+        iris_scale_ = iris_min_ + 20; // 默认保持较小的瞳孔
         break;
     }
     case DRAGON_EYE:
@@ -141,8 +142,8 @@ void EyeAnimation::switchEyeType(EyeType type)
         iris_map_height_ = dragoneye_IRIS_MAP_HEIGHT;
         screen_width_ = dragoneye_SCREEN_WIDTH;
         screen_height_ = dragoneye_SCREEN_HEIGHT;
-        iris_min_ = IRIS_MIN;
-        iris_max_ = IRIS_MAX;
+        iris_min_ = 60;   // 龙眼瞳孔始终保持较大
+        iris_max_ = 160;   // 变化范围较小
         iris_scale_ = (iris_min_ + iris_max_) / 2;
         break;
     }
@@ -158,8 +159,8 @@ void EyeAnimation::switchEyeType(EyeType type)
         iris_map_height_ = goateye_IRIS_MAP_HEIGHT;
         screen_width_ = goateye_SCREEN_WIDTH;
         screen_height_ = goateye_SCREEN_HEIGHT;
-        iris_min_ = IRIS_MIN;
-        iris_max_ = IRIS_MAX;
+        iris_min_ = 60;   // 山羊瞳孔最小值
+        iris_max_ = 140;   // 山羊瞳孔最大值
         iris_scale_ = (iris_min_ + iris_max_) / 2;
         break;
     }
@@ -178,9 +179,9 @@ void EyeAnimation::switchEyeType(EyeType type)
         iris_map_height_ = newteye_IRIS_MAP_HEIGHT;
         screen_width_ = newteye_SCREEN_WIDTH;
         screen_height_ = newteye_SCREEN_HEIGHT;
-        iris_min_ = IRIS_MIN;
-        iris_max_ = IRIS_MAX;
-        iris_scale_ = (iris_min_ + iris_max_) / 2;
+        iris_min_ = 70;   // 蝾螈瞳孔较大
+        iris_max_ = 170;   // 可以放得很大
+        iris_scale_ = iris_min_ + 30;
         break;
     }
     case TERMINATOR_EYE:
@@ -198,8 +199,8 @@ void EyeAnimation::switchEyeType(EyeType type)
         iris_map_height_ = terminatoreye_IRIS_MAP_HEIGHT;
         screen_width_ = terminatoreye_SCREEN_WIDTH;
         screen_height_ = terminatoreye_SCREEN_HEIGHT;
-        iris_min_ = IRIS_MIN;
-        iris_max_ = IRIS_MAX;
+        iris_min_ = 80;   // 终结者眼睛保持大瞳孔
+        iris_max_ = 150;   // 变化范围很小
         iris_scale_ = (iris_min_ + iris_max_) / 2;
         break;
     }
@@ -211,7 +212,7 @@ void EyeAnimation::switchEyeType(EyeType type)
 #include "esp_dsp.h"
 #include "esp_attr.h"
 
-// 添加SIMD优化的scaleBuffer实现
+// 移除swapRedBlue函数
 void IRAM_ATTR EyeAnimation::scaleBuffer()
 {
     const int src_width = screen_width_;
@@ -219,199 +220,77 @@ void IRAM_ATTR EyeAnimation::scaleBuffer()
     const int dst_width = REAL_SCREEN_WIDTH;
     const int dst_height = REAL_SCREEN_HEIGHT;
     
-    // 如果源尺寸和目标尺寸相同，直接复制并交换字节
     if (src_width == dst_width && src_height == dst_height)
     {
-        // for (int i = 0; i < src_width * src_height; i++)
-        // {
-        //     uint16_t color = render_buffer_[i];
-        //     scaled_buffer_[i] = (color >> 8) | (color << 8);
-        // }
         memcpy(scaled_buffer_, render_buffer_, src_width * src_height * sizeof(uint16_t));
         return;
     }
 
-    // 使用查找表预计算缩放索引，避免每次都计算
     static int16_t *x_map = nullptr;
     static int16_t *y_map = nullptr;
+    static uint16_t *x_diff = nullptr;
+    static uint16_t *y_diff = nullptr;
 
     if (x_map == nullptr)
     {
         x_map = new int16_t[dst_width];
         y_map = new int16_t[dst_height];
+        x_diff = new uint16_t[dst_width];
+        y_diff = new uint16_t[dst_height];
 
-        const float x_ratio = src_width / (float)dst_width;
-        const float y_ratio = src_height / (float)dst_height;
+        const float x_ratio = (src_width - 1.0f) / dst_width;
+        const float y_ratio = (src_height - 1.0f) / dst_height;
 
         for (int x = 0; x < dst_width; x++)
         {
-            x_map[x] = (int)(x * x_ratio);
+            float fx = x * x_ratio;
+            x_map[x] = (int)fx;
+            x_diff[x] = (uint16_t)((fx - x_map[x]) * 256);
         }
 
         for (int y = 0; y < dst_height; y++)
         {
-            y_map[y] = (int)(y * y_ratio) * src_width;
+            float fy = y * y_ratio;
+            y_map[y] = (int)fy;
+            y_diff[y] = (uint16_t)((fy - y_map[y]) * 256);
         }
     }
 
-// 使用查找表加速缩放过程
 #pragma GCC unroll 4
     for (int y = 0; y < dst_height; y++)
     {
+        const int y1 = y_map[y];
+        const int y2 = (y1 + 1 < src_height) ? y1 + 1 : y1;
+        const uint16_t dy = y_diff[y];
         uint16_t *dst_line = scaled_buffer_ + y * dst_width;
-        const int y_offset = y_map[y];
 
 #pragma GCC unroll 8
         for (int x = 0; x < dst_width; x++)
         {
-            uint16_t color = render_buffer_[y_offset + x_map[x]];
-            // dst_line[x] = (color >> 8) | (color << 8); // 交换高低字节
-            dst_line[x] = color; // 混合颜色
+            const int x1 = x_map[x];
+            const int x2 = (x1 + 1 < src_width) ? x1 + 1 : x1;
+            const uint16_t dx = x_diff[x];
+
+            uint16_t c11 = render_buffer_[y1 * src_width + x1];
+            uint16_t c12 = render_buffer_[y1 * src_width + x2];
+            uint16_t c21 = render_buffer_[y2 * src_width + x1];
+            uint16_t c22 = render_buffer_[y2 * src_width + x2];
+
+            uint32_t r = ((((c11 >> 11) & 0x1F) * (256 - dx) + ((c12 >> 11) & 0x1F) * dx) * (256 - dy) +
+                         (((c21 >> 11) & 0x1F) * (256 - dx) + ((c22 >> 11) & 0x1F) * dx) * dy) >> 16;
+
+            uint32_t g = ((((c11 >> 5) & 0x3F) * (256 - dx) + ((c12 >> 5) & 0x3F) * dx) * (256 - dy) +
+                         (((c21 >> 5) & 0x3F) * (256 - dx) + ((c22 >> 5) & 0x3F) * dx) * dy) >> 16;
+
+            uint32_t b = (((c11 & 0x1F) * (256 - dx) + (c12 & 0x1F) * dx) * (256 - dy) +
+                         ((c21 & 0x1F) * (256 - dx) + (c22 & 0x1F) * dx) * dy) >> 16;
+
+            dst_line[x] = (r << 11) | (g << 5) | b;
         }
     }
 }
-void EyeAnimation::begin()
-{
-    // 创建眼球实例
-    Eye eye;
-    eye.blink.state = NOBLINK;
-    eye.xposition = 0;
-    eyes_.push_back(eye);
-}
 
-void EyeAnimation::drawEye(uint8_t eye_index,
-                           uint32_t iScale,
-                           uint32_t scleraX,
-                           uint32_t scleraY,
-                           uint32_t uThreshold,
-                           uint32_t lThreshold)
-{
-    // 预计算常量值
-    const int32_t iris_offset_x = (sclera_width_ - iris_width_) / 2;
-    const int32_t iris_offset_y = (sclera_height_ - iris_height_) / 2;
-
-    // 预计算虹膜位置
-    int32_t irisY = scleraY - iris_offset_y;
-    const int32_t initial_irisX = scleraX - iris_offset_x;
-
-    // 预计算阈值边界，避免每个像素都计算
-    // 预计算阈值边界，增加过渡区域宽度
-    const float upper_edge0 = uThreshold - 12; // 从8增加到12
-    const float upper_edge1 = uThreshold + 12; // 从8增加到12
-    const float lower_edge0 = lThreshold - 12; // 从8增加到12
-    const float lower_edge1 = lThreshold + 12; // 从8增加到12
-
-// 使用DMA批量处理，每次处理一行
-#pragma GCC unroll 4
-    for (uint32_t screenY = 0; screenY < screen_height_; screenY++)
-    {
-        int32_t irisX = initial_irisX;
-        uint32_t current_scleraX = scleraX;
-
-        // 预取眼睑数据
-        const uint8_t *upper_row = current_upper_ + screenY * screen_width_;
-        const uint8_t *lower_row = current_lower_ + screenY * screen_width_;
-
-        uint16_t *row = render_buffer_ + screenY * screen_width_;
-
-// 批量处理一行中的像素
-#pragma GCC unroll 8
-        for (uint32_t screenX = 0; screenX < screen_width_; screenX++)
-        {
-            // 计算对称位置的X坐标
-            uint32_t mirror_x = screen_width_ - 1 - screenX;
-
-            // 对称处理眼睑，使用加权平均而不是简单平均
-            uint8_t upper_value = (upper_row[screenX] * 0.6f + upper_row[mirror_x] * 0.4f);
-            uint8_t lower_value = (lower_row[screenX] * 0.6f + lower_row[mirror_x] * 0.4f);
-
-            // 应用眼睑间距调整
-            if (upper_value > eyelid_gap_)
-            {
-                upper_value -= eyelid_gap_;
-            }
-            if (lower_value > eyelid_gap_)
-            {
-                lower_value -= eyelid_gap_;
-            }
-
-            // 快速检查是否在眼睑外，避免复杂计算
-            if (upper_value < upper_edge0 || lower_value < lower_edge0)
-            {
-                row[screenX] = 0;
-                irisX++;
-                current_scleraX++;
-                continue;
-            }
-
-            // 计算边缘平滑因子 (0.0 - 1.0)
-            float upper_alpha = smoothstep(upper_edge0, upper_edge1, upper_value);
-            float lower_alpha = smoothstep(lower_edge0, lower_edge1, lower_value);
-
-            // 如果完全在眼睑外，直接绘制黑色
-            if (upper_alpha <= 0.0f || lower_alpha <= 0.0f)
-            {
-                row[screenX] = 0;
-                irisX++;
-                current_scleraX++;
-                continue;
-            }
-
-            // 计算眼球颜色 - 简化判断逻辑
-            uint16_t eye_color;
-            if (irisY >= 0 && irisY < iris_height_ &&
-                irisX >= 0 && irisX < iris_width_)
-            {
-                uint16_t p = pgm_read_word(current_polar_ + irisY * iris_width_ + irisX);
-                uint32_t dist = (iScale * (p & 0x7F)) >> 7;
-
-                if (dist < iris_map_height_)
-                {
-                    uint32_t angle = (iris_map_width_ * (p >> 7)) >> 9;
-                    eye_color = pgm_read_word(current_iris_ + dist * iris_map_width_ + angle);
-                }
-                else
-                {
-                    eye_color = pgm_read_word(current_sclera_ + scleraY * sclera_width_ + current_scleraX);
-                }
-            }
-            else
-            {
-                eye_color = pgm_read_word(current_sclera_ + scleraY * sclera_width_ + current_scleraX);
-            }
-
-            // 应用边缘平滑 - 使用更精确的混合方法
-            float alpha = (upper_alpha < lower_alpha) ? upper_alpha : lower_alpha;
-
-            // 对边缘进行额外的平滑处理
-            if (alpha < 0.99f)
-            {
-                // 使用二次方增强边缘平滑度
-                alpha = alpha * alpha * (3.0f - 2.0f * alpha);
-                row[screenX] = blend_color(0, eye_color, alpha);
-            }
-            else
-            {
-                row[screenX] = eye_color;
-            }
-            irisX++;
-            current_scleraX++;
-        }
-        scleraY++;
-        irisY++;
-    }
-}
-// 添加辅助函数
-
-// 平滑过渡函数
-float EyeAnimation::smoothstep(float edge0, float edge1, float x)
-{
-    x = constrain((x - edge0) / (edge1 - edge0), 0.0f, 1.0f);
-    return x * x * (3 - 2 * x);
-}
-
-// 颜色混合函数
-// 在blend_color函数中增强颜色混合精度
+// 修改blend_color函数，移除颜色字节交换支持
 uint16_t EyeAnimation::blend_color(uint16_t c1, uint16_t c2, float alpha)
 {
     // 对于常见的alpha值使用查找表
@@ -423,7 +302,7 @@ uint16_t EyeAnimation::blend_color(uint16_t c1, uint16_t c2, float alpha)
     // 使用更高精度的整数计算
     uint16_t a = (uint16_t)(alpha * 1024);
 
-    // 解包RGB565，扩展到更高位深
+    // 解包RGB565
     uint16_t r1 = (c1 >> 11) & 0x1F;
     uint16_t g1 = (c1 >> 5) & 0x3F;
     uint16_t b1 = c1 & 0x1F;
@@ -451,8 +330,110 @@ uint16_t EyeAnimation::blend_color(uint16_t c1, uint16_t c2, float alpha)
     g = (g >> 2) & 0x3F;
     b = (b >> 3) & 0x1F;
 
-    // 打包回RGB565
-    return (r << 11) | (g << 5) | b;
+    // 打包回RGB565，保持原始顺序
+    uint16_t result = (r << 11) | (g << 5) | b;
+    return result;
+}
+void EyeAnimation::begin()
+{
+    // 创建眼球实例
+    Eye eye;
+    eye.blink.state = NOBLINK;
+    eye.xposition = 0;
+    eyes_.push_back(eye);
+}
+
+void EyeAnimation::drawEye(uint8_t eye_index,
+                           uint32_t iScale,        // 虹膜缩放比例
+                           uint32_t scleraX,       // 眼球X坐标
+                           uint32_t scleraY,       // 眼球Y坐标
+                           uint32_t uThreshold,    // 上眼睑阈值
+                           uint32_t lThreshold)    // 下眼睑阈值
+{
+    // 计算虹膜在眼白中的偏移量，使虹膜居中
+    const int32_t iris_offset_x = (sclera_width_ - iris_width_) / 2;
+    const int32_t iris_offset_y = (sclera_height_ - iris_height_) / 2;
+
+    // 计算虹膜的起始位置
+    int32_t irisY = scleraY - iris_offset_y;
+    const int32_t initial_irisX = scleraX - iris_offset_x;
+
+    // 使用DMA批量处理每一行像素
+#pragma GCC unroll 4  // 展开循环以提高性能
+    for (uint32_t screenY = 0; screenY < screen_height_; screenY++) {
+        int32_t irisX = initial_irisX;
+        uint32_t current_scleraX = scleraX;
+
+        // 预取当前行的眼睑数据
+        const uint8_t *upper_row = current_upper_ + screenY * screen_width_;
+        const uint8_t *lower_row = current_lower_ + screenY * screen_width_;
+
+        // 获取当前行的渲染缓冲区
+        uint16_t *row = render_buffer_ + screenY * screen_width_;
+
+        // 处理当前行的每个像素
+#pragma GCC unroll 8  // 展开循环以提高性能
+        for (uint32_t screenX = 0; screenX < screen_width_; screenX++) {
+            // 直接使用眼睑值，不做对称处理
+            uint8_t upper_value = upper_row[screenX];
+            uint8_t lower_value = lower_row[screenX];
+
+            // 应用眼睑间距调整
+            if (upper_value > eyelid_gap_) upper_value -= eyelid_gap_;
+            if (lower_value > eyelid_gap_) lower_value -= eyelid_gap_;
+
+            // 简化眼睑判断，直接使用阈值
+            if (upper_value < uThreshold || lower_value < lThreshold) {
+                row[screenX] = 0;  // 眼睑外部设为黑色
+                irisX++;
+                current_scleraX++;
+                continue;
+            }
+
+            // 计算眼球颜色（虹膜或眼白）
+            uint16_t eye_color;
+            if (irisY >= 0 && irisY < iris_height_ &&
+                irisX >= 0 && irisX < iris_width_) {
+                // 在虹膜范围内，计算极坐标映射
+                uint16_t p = pgm_read_word(current_polar_ + irisY * iris_width_ + irisX);
+                
+                // 简化距离计算
+                uint32_t dist = (iScale * (p & 0x7F)) / 128;
+
+                if (dist < iris_map_height_) {
+                    // 简化角度计算
+                    uint32_t angle = (iris_map_width_ * (p >> 7)) / 512;
+                    
+                    // 直接获取虹膜颜色，不进行插值
+                    uint16_t iris_color = pgm_read_word(current_iris_ + dist * iris_map_width_ + angle);
+                    
+                    eye_color = iris_color;
+                } else {
+                    eye_color = pgm_read_word(current_sclera_ + scleraY * sclera_width_ + current_scleraX);
+                }
+            } else {
+                // 在眼白范围内
+                eye_color = pgm_read_word(current_sclera_ + scleraY * sclera_width_ + current_scleraX);
+            }
+
+            // 直接设置像素颜色，不进行平滑处理
+            row[screenX] = eye_color;
+            
+            // 更新位置计数器
+            irisX++;
+            current_scleraX++;
+        }
+        // 更新垂直位置计数器
+        scleraY++;
+        irisY++;
+    }
+}
+// 平滑过渡函数
+float EyeAnimation::smoothstep(float edge0, float edge1, float x) {
+    // 将 x 限制在 [0,1] 范围内
+    x = constrain((x - edge0) / (edge1 - edge0), 0.0f, 1.0f);
+    // 应用平滑插值公式: 3x^2 - 2x^3
+    return x * x * (3.0f - 2.0f * x);
 }
 
 void EyeAnimation::update()
@@ -467,20 +448,49 @@ void EyeAnimation::update()
     static uint32_t last_eye_switch = 0; // 添加眼球切换计时器
 
     // 每2秒切换一次眼球类型
-    // if (t - last_eye_switch >= 3000000)
+    // if (t - last_eye_switch >= 5000000)
     // { // 2000000 微秒 = 2秒
     //     current_eye_type_ = static_cast<EyeType>((static_cast<int>(current_eye_type_) + 1) % MAX_EYE_TYPE);
     //     switchEyeType(current_eye_type_);
     //     last_eye_switch = t;
     //     ESP_LOGI("EyeAnimation", "Switched to eye type: %d", current_eye_type_);
     // }
+
+    // // 添加瞳孔缩放相关变量
+    // static bool iris_changing = false;
+    // static uint32_t iris_change_start = 0;
+    // static uint32_t iris_change_duration = 0;
+    // static uint32_t iris_start_scale = iris_scale_;
+    // static uint32_t iris_target_scale = iris_scale_;
+
+    // // 处理瞳孔大小变化
+    // if (!iris_changing) {
+    //     if (esp_random() % 100 < 20) { // 2%概率开始变化
+    //         iris_changing = true;
+    //         iris_start_scale = iris_scale_;
+    //         iris_target_scale = iris_min_ + (esp_random() % (iris_max_ - iris_min_));
+    //         iris_change_duration = 500000 + (esp_random() % 1000000); // 0.5-1.5秒
+    //         iris_change_start = t;
+    //     }
+    // } else {
+    //     uint32_t elapsed = t - iris_change_start;
+    //     if (elapsed >= iris_change_duration) {
+    //         iris_scale_ = iris_target_scale;
+    //         iris_changing = false;
+    //     } else {
+    //         float progress = (float)elapsed / iris_change_duration;
+    //         progress = smoothstep(0.0f, 1.0f, progress);
+    //         iris_scale_ = iris_start_scale + (iris_target_scale - iris_start_scale) * progress;
+    //     }
+    // }
+
     // 减少每帧的计算量 - 可以考虑降低更新频率
-    static uint32_t last_update = 0;
-    if (t - last_update < 16667)
-    { // 限制为最多60fps
-        return;
-    }
-    last_update = t;
+    // static uint32_t last_update = 0;
+    // if (t - last_update < 16667)
+    // { // 限制为最多60fps
+    //     return;
+    // }
+    // last_update = t;
     // 更新眼球位置
     int16_t eyeX, eyeY;
     int32_t dt = t - eyeMoveStartTime;
@@ -536,16 +546,24 @@ void EyeAnimation::update()
      t = esp_timer_get_time();
     
     // 自动眨眼逻辑
-    if (t - timeOfLastBlink >= timeToNextBlink) // 是否该眨眼了
-    {
+   
+    
+    // 修改眨眼逻辑
+    if (t - timeOfLastBlink >= timeToNextBlink) {
         timeOfLastBlink = t;
-        timeToNextBlink = 2000000 + esp_random() % 4000000; // 2-6 秒后再次眨眼
+        timeToNextBlink = blink_interval_ + esp_random() % 1000000; // 添加随机变化
         
-        // 开始新的眨眼
         for (auto &eye : eyes_) {
             eye.blink.state = ENBLINK;
             eye.blink.startTime = t;
-            eye.blink.duration = 35000 + esp_random() % 35000; // 35-70ms 眨眼持续时间
+            // 根据情感状态调整眨眼持续时间
+            if (current_emotion_ == EMOTION_SLEEPY) {
+                eye.blink.duration = 70000 + esp_random() % 50000; // 较慢的眨眼
+            } else if (current_emotion_ == EMOTION_EXCITED) {
+                eye.blink.duration = 25000 + esp_random() % 20000; // 快速眨眼
+            } else {
+                eye.blink.duration = 35000 + esp_random() % 35000; // 正常眨眼
+            }
         }
     }
     // 处理眨眼
@@ -644,4 +662,54 @@ void EyeAnimation::update()
         frame_count = 0;
         last_fps_update = t;
     }
+}
+// 添加情感控制相关函数实现
+void EyeAnimation::setEmotion(EmotionState emotion) {
+    current_emotion_ = emotion;
+    
+    // 根据情感状态调整眼睑和瞳孔参数
+    switch(emotion) {
+        case EMOTION_ANGRY:
+            eyelid_gap_ = eyelid_base_gap_ - 5;  // 眼睑收紧
+            iris_scale_ = iris_max_ - 20;        // 瞳孔放大
+            blink_interval_ = 1000000;           // 加快眨眼频率
+            break;
+            
+        case EMOTION_SLEEPY:
+            eyelid_gap_ = eyelid_base_gap_ + 15; // 眼睑下垂
+            iris_scale_ = iris_min_ + 30;        // 瞳孔缩小
+            blink_interval_ = 500000;            // 频繁眨眼
+            break;
+            
+        case EMOTION_EXCITED:
+            eyelid_gap_ = eyelid_base_gap_ - 8;  // 眼睑略微收紧
+            iris_scale_ = iris_max_ - 10;        // 瞳孔略微放大
+            blink_interval_ = 3000000;           // 减少眨眼频率
+            break;
+            
+        case EMOTION_SAD:
+            eyelid_gap_ = eyelid_base_gap_ + 10; // 眼睑微垂
+            iris_scale_ = iris_min_ + 20;        // 瞳孔略微缩小
+            blink_interval_ = 4000000;           // 降低眨眼频率
+            break;
+            
+        case EMOTION_NORMAL:
+        default:
+            eyelid_gap_ = eyelid_base_gap_;
+            iris_scale_ = (iris_min_ + iris_max_) / 2;
+            blink_interval_ = 2000000;
+            break;
+    }
+}
+
+void EyeAnimation::setEyelidGap(uint8_t gap) {
+    eyelid_gap_ = constrain(gap, 0, 30);
+}
+
+void EyeAnimation::setIrisScale(uint16_t scale) {
+    iris_scale_ = constrain(scale, iris_min_, iris_max_);
+}
+
+void EyeAnimation::setBlinkRate(uint32_t rate) {
+    blink_interval_ = constrain(rate, 500000, 5000000);
 }
