@@ -204,6 +204,7 @@ WebSocket* WifiBoard::CreateWebSocket() {
     // 使用获取到的API地址
     ESP_LOGI(TAG, "API URL: %s", api_url_.c_str());
     // std::string url = "wss://ws.tdstar.net:443/";
+    // std::string url = CONFIG_WEBSOCKET_URL;
     std::string url = api_url_.empty() ? CONFIG_WEBSOCKET_URL : api_url_;
     if (url.find("wss://") == 0) {
         return new WebSocket(new TlsTransport());

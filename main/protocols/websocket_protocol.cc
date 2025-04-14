@@ -62,6 +62,8 @@ bool WebsocketProtocol::OpenAudioChannel() {
 auto& board = Board::GetInstance();
     error_occurred_ = false;
     std::string url = board.GetApiUrl().empty() ? CONFIG_WEBSOCKET_URL : board.GetApiUrl();
+    // std::string url = "wss://ws.tdstar.net:443/";
+    // std::string url = CONFIG_WEBSOCKET_URL;
     std::string token = "Bearer " + std::string(CONFIG_WEBSOCKET_ACCESS_TOKEN);
     websocket_ = Board::GetInstance().CreateWebSocket();
     websocket_->SetHeader("Authorization", token.c_str());
