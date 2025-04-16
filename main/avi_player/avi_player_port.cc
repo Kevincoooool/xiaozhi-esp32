@@ -10,6 +10,7 @@ static uint8_t *img_rgb565 = NULL;
 
 static bool is_playing = false;
 
+static char current_filepath[256] = {0}; // 添加文件路径存储
 void video_write(frame_data_t *data, void *arg)
 {
     int Rgbsize = 0;
@@ -28,11 +29,18 @@ void audio_write(frame_data_t *data, void *arg)
     // i2s_channel_write(i2s_tx_handle, data->data, data->data_bytes, &bytes_write, 100);
 }
 
+
 static void play_end_cb(void *arg)
 {
-    ESP_LOGI(TAG, "Play end");
+    ESP_LOGI(TAG, "Play end, restart playing: %s", current_filepath);
     is_playing = false;
+    // 重新开始播放
+    if (strlen(current_filepath) > 0) {
+        avi_player_play_from_file(current_filepath);
+        is_playing = true;
+    }
 }
+
 
 esp_err_t avi_player_port_init(avi_player_port_config_t *config)
 {
@@ -76,6 +84,9 @@ esp_err_t avi_player_port_play_file(const char *filepath)
         avi_player_port_stop();
         vTaskDelay(300 / portTICK_PERIOD_MS);
     }
+    // 保存文件路径
+    strncpy(current_filepath, filepath, sizeof(current_filepath) - 1);
+    current_filepath[sizeof(current_filepath) - 1] = '\0';
     
     is_playing = true;
     return avi_player_play_from_file(filepath);
@@ -96,4 +107,6 @@ void avi_player_port_deinit(void)
         free(img_rgb565);
         img_rgb565 = NULL;
     }
+    // 清空保存的文件路径
+    memset(current_filepath, 0, sizeof(current_filepath));
 }

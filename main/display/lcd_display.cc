@@ -25,25 +25,25 @@
 #define DARK_LOW_BATTERY_COLOR      lv_color_hex(0xFF0000)     // Red for dark mode
 
 // Color definitions for light theme
-// #define LIGHT_BACKGROUND_COLOR       lv_color_white()           // White background
-// #define LIGHT_TEXT_COLOR             lv_color_black()           // Black text
-// #define LIGHT_CHAT_BACKGROUND_COLOR  lv_color_hex(0xE0E0E0)     // Light gray background
-// #define LIGHT_USER_BUBBLE_COLOR      lv_color_hex(0x95EC69)     // WeChat green
-// #define LIGHT_ASSISTANT_BUBBLE_COLOR lv_color_white()           // White
-// #define LIGHT_SYSTEM_BUBBLE_COLOR    lv_color_hex(0xE0E0E0)     // Light gray
-// #define LIGHT_SYSTEM_TEXT_COLOR      lv_color_hex(0x666666)     // Dark gray text
-// #define LIGHT_BORDER_COLOR           lv_color_hex(0xE0E0E0)     // Light gray border
-// #define LIGHT_LOW_BATTERY_COLOR      lv_color_black()           // Black for light mode
-
-#define LIGHT_BACKGROUND_COLOR       lv_color_black()           // White background
-#define LIGHT_TEXT_COLOR             lv_color_white()           // Black text
-#define LIGHT_CHAT_BACKGROUND_COLOR  lv_color_black()     // Light gray background
+#define LIGHT_BACKGROUND_COLOR       lv_color_white()           // White background
+#define LIGHT_TEXT_COLOR             lv_color_black()           // Black text
+#define LIGHT_CHAT_BACKGROUND_COLOR  lv_color_hex(0xE0E0E0)     // Light gray background
 #define LIGHT_USER_BUBBLE_COLOR      lv_color_hex(0x95EC69)     // WeChat green
-#define LIGHT_ASSISTANT_BUBBLE_COLOR lv_color_black()           // White
-#define LIGHT_SYSTEM_BUBBLE_COLOR    lv_color_black()     // Light gray
-#define LIGHT_SYSTEM_TEXT_COLOR      lv_color_white()     // Dark gray text
-#define LIGHT_BORDER_COLOR           lv_color_black()     // Light gray border
-#define LIGHT_LOW_BATTERY_COLOR      lv_color_white()           // Black for light mode
+#define LIGHT_ASSISTANT_BUBBLE_COLOR lv_color_white()           // White
+#define LIGHT_SYSTEM_BUBBLE_COLOR    lv_color_hex(0xE0E0E0)     // Light gray
+#define LIGHT_SYSTEM_TEXT_COLOR      lv_color_hex(0x666666)     // Dark gray text
+#define LIGHT_BORDER_COLOR           lv_color_hex(0xE0E0E0)     // Light gray border
+#define LIGHT_LOW_BATTERY_COLOR      lv_color_black()           // Black for light mode
+
+// #define LIGHT_BACKGROUND_COLOR       lv_color_black()           // White background
+// #define LIGHT_TEXT_COLOR             lv_color_white()           // Black text
+// #define LIGHT_CHAT_BACKGROUND_COLOR  lv_color_black()     // Light gray background
+// #define LIGHT_USER_BUBBLE_COLOR      lv_color_hex(0x95EC69)     // WeChat green
+// #define LIGHT_ASSISTANT_BUBBLE_COLOR lv_color_black()           // White
+// #define LIGHT_SYSTEM_BUBBLE_COLOR    lv_color_black()     // Light gray
+// #define LIGHT_SYSTEM_TEXT_COLOR      lv_color_white()     // Dark gray text
+// #define LIGHT_BORDER_COLOR           lv_color_black()     // Light gray border
+// #define LIGHT_LOW_BATTERY_COLOR      lv_color_white()           // Black for light mode
 
 // Theme color structure
 struct ThemeColors {
@@ -659,6 +659,18 @@ void LcdDisplay::changeEyeStyle() {
         // 切换到新的眼睛类型
         eye_animation_->switchEyeType(next_type);
     }
+    if(avi_image) {
+        // 定义眼球视频文件路径数组
+        static const char* eye_videos[] = {
+            "/spiffs/eye1.avi",
+            "/spiffs/eye2.avi"
+        };
+        static int current_eye_index = 0;
+        
+        // 切换到下一个眼球视频
+        current_eye_index = (current_eye_index + 1) % 2;
+        avi_player_port_play_file(eye_videos[current_eye_index]);
+    }
 }
 uint8_t LcdDisplay::getCurrentEyeType() {
     DisplayLockGuard lock(this);
@@ -862,7 +874,7 @@ void LcdDisplay::SetEmotion(const char* emotion) {
         video_path = "/spiffs/talk.avi";
     }
      // ... 添加更多情绪对应的视频
-     
+     video_path = "/spiffs/eye1.avi";
      // 播放对应的视频文件
      avi_player_port_play_file(video_path);
 }
