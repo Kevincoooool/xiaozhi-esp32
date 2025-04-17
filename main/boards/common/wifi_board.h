@@ -7,6 +7,7 @@ class WifiBoard : public Board {
 protected:
     bool wifi_config_mode_ = false;
     std::string post_data_;
+    esp_timer_handle_t config_mode_timer_ = nullptr;  // 添加定时器句柄
    
     // 新增获取API地址的函数
     bool FetchApiUrl();

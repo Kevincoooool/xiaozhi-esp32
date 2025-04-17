@@ -40,6 +40,19 @@ void WifiBoard::EnterWifiConfigMode() {
     auto& application = Application::GetInstance();
     application.SetDeviceState(kDeviceStateWifiConfiguring);
 
+    // 创建配网模式定时器
+    esp_timer_create_args_t timer_args = {
+        .callback = [](void*) {
+            ESP_LOGI(TAG, "Config mode timeout, shutting down...");
+            gpio_set_level(GPIO_NUM_11, 0);  // 关机
+        },
+        .arg = nullptr,
+        .dispatch_method = ESP_TIMER_TASK,
+        .name = "config_mode_timer",
+        .skip_unhandled_events = true
+    };
+    ESP_ERROR_CHECK(esp_timer_create(&timer_args, &config_mode_timer_));
+    ESP_ERROR_CHECK(esp_timer_start_once(config_mode_timer_, 600000000));  // 10分钟 = 600秒 = 600000000微秒
     auto& wifi_ap = WifiConfigurationAp::GetInstance();
     wifi_ap.SetLanguage(Lang::CODE);
     wifi_ap.SetSsidPrefix("CGAI");
@@ -54,7 +67,9 @@ void WifiBoard::EnterWifiConfigMode() {
     
     // 播报配置 WiFi 的提示
     application.Alert(Lang::Strings::WIFI_CONFIG_MODE, hint.c_str(), "", Lang::Sounds::P3_WIFICONFIG);
-    
+     // 在配网模式下也启用省电定时器
+     auto& board = Board::GetInstance();
+     board.SetPowerSaveMode(true);
     // Wait forever until reset after configuration
     while (true) {
         int free_sram = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);

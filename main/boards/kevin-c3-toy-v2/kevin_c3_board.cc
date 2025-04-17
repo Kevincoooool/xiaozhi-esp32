@@ -33,10 +33,15 @@ private:
         //         power_save_timer_->SetEnabled(true);
         //     }
         // });
+        power_save_timer_->SetEnabled(true);
     }
     void InitializePowerSaveTimer() {
+        // Initialize power save timer
+        
+        ESP_LOGW(TAG, "Initialize power save timer...");
         power_save_timer_ = new PowerSaveTimer(-1, -1, 600);
         power_save_timer_->OnShutdownRequest([this]() {
+            ESP_LOGI(TAG, "Shutting down...");
             gpio_set_level(GPIO_NUM_11, 0);
         });
         power_save_timer_->SetEnabled(true);
@@ -76,18 +81,38 @@ private:
         //     }
         // });
 
+        // 添加错误处理到其他按键回调
         boot_button_.OnMultiClick(5, [this]() {
             ESP_LOGI(TAG, "Detected 5 clicks, entering WiFi configuration mode");
-            auto& app = Application::GetInstance();
-            ResetWifiConfiguration();
-            // app.Alert(Lang::Strings::WIFI_CONFIG_MODE, "", "", Lang::Sounds::P3_WIFICONFIG);
-    
+            try {
+                ResetWifiConfiguration();
+            } catch (const std::exception& e) {
+                ESP_LOGE(TAG, "Exception in OnMultiClick: %s", e.what());
+            } catch (...) {
+                ESP_LOGE(TAG, "Unknown exception in OnMultiClick");
+            }
         });
+        
         boot_button_.OnPressDown([this]() {
-            Application::GetInstance().StartListening();
+            ESP_LOGI(TAG, "Boot button pressed down");
+            try {
+                Application::GetInstance().StartListening();
+            } catch (const std::exception& e) {
+                ESP_LOGE(TAG, "Exception in OnPressDown: %s", e.what());
+            } catch (...) {
+                ESP_LOGE(TAG, "Unknown exception in OnPressDown");
+            }
         });
+
         boot_button_.OnPressUp([this]() {
-            Application::GetInstance().StopListening();
+            ESP_LOGI(TAG, "Boot button released");
+            try {
+                Application::GetInstance().StopListening();
+            } catch (const std::exception& e) {
+                ESP_LOGE(TAG, "Exception in OnPressUp: %s", e.what());
+            } catch (...) {
+                ESP_LOGE(TAG, "Unknown exception in OnPressUp");
+            }
         });
     }
 
@@ -107,10 +132,11 @@ public:
     KevinBoxBoard() : boot_button_(BOOT_BUTTON_GPIO) {  
         // 把 ESP32C3 的 VDD SPI 引脚作为普通 GPIO 口使用
         esp_efuse_write_field_bit(ESP_EFUSE_VDD_SPI_AS_GPIO);
-        InitializePowerManager();
+        
         InitializeCodecI2c();
         InitializeButtons();
         InitializePowerSaveTimer();
+        InitializePowerManager();
         InitializeIot();
     }
 

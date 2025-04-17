@@ -13,40 +13,56 @@
 #define TAG "main"
 #define POWER_BTN_GPIO GPIO_NUM_10
 #define POWER_CTRL_GPIO GPIO_NUM_11
+#define REBOOT_REASON_NORMAL 0      // 正常开机
+#define REBOOT_REASON_ENTER_WIFI_CONFIG 1 // 配网模式
+#define REBOOT_REASON_FINISH_WIFI_CONFIG 2 // 配网模式
+#define REBOOT_REASON_FINISH_ONCE 3 // 配网模式
 
 void power_button_task(void *arg)
 {
     const TickType_t LONG_PRESS_TIME = pdMS_TO_TICKS(3000); // 4秒
     TickType_t press_start = 0;
     bool btn_pressed = false;
+  
+    // 添加防抖动处理
+    int debounce_count = 0;
+    int last_level = 1;
 
     while (1)
     {
         int level = gpio_get_level(POWER_BTN_GPIO);
 
-        if (level == 0 && !btn_pressed)
-        { // 按钮按下
+        // 添加按键防抖处理
+        if (level != last_level) {
+            debounce_count = 0;
+            last_level = level;
+        } else if (debounce_count < 3) {
+            debounce_count++;
+        }
+
+        if (level == 0 && !btn_pressed && debounce_count >= 3)
+        { // 按钮按下，确认已防抖
             btn_pressed = true;
             press_start = xTaskGetTickCount();
             ESP_LOGI(TAG, "Power button pressed");
         }
-        else if (level == 1 && btn_pressed)
-        { // 按钮释放
+        else if (level == 1 && btn_pressed && debounce_count >= 3)
+        { // 按钮释放，确认已防抖
             btn_pressed = false;
             TickType_t press_duration = xTaskGetTickCount() - press_start;
 
             if (press_duration >= LONG_PRESS_TIME)
             {
                 ESP_LOGI(TAG, "Long press detected, power on");
-                vTaskDelay(pdMS_TO_TICKS(1000)); // 等待100ms，防止误触发
+                vTaskDelay(pdMS_TO_TICKS(1000)); // 等待1000ms，防止误触发
 
-                gpio_set_level(POWER_CTRL_GPIO, 1); // 长按4秒，拉高电源控制
+                gpio_set_level(POWER_CTRL_GPIO, 1); // 长按，拉高电源控制
                 break;
             }
             else
             {
                 ESP_LOGI(TAG, "Short press detected, power off");
-                vTaskDelay(pdMS_TO_TICKS(1000));    // 等待100ms，防止误触发
+                vTaskDelay(pdMS_TO_TICKS(1000));    // 等待1000ms，防止误触发
                 gpio_set_level(POWER_CTRL_GPIO, 0); // 短按，拉低电源控制
             }
         }
@@ -55,11 +71,6 @@ void power_button_task(void *arg)
     }
     vTaskDelete(NULL);
 }
-#define REBOOT_REASON_NORMAL 0      // 正常开机
-#define REBOOT_REASON_ENTER_WIFI_CONFIG 1 // 配网模式
-#define REBOOT_REASON_FINISH_WIFI_CONFIG 2 // 配网模式
-#define REBOOT_REASON_FINISH_ONCE 3 // 配网模式
-
 
 extern "C" void app_main(void)
 {
@@ -91,13 +102,17 @@ extern "C" void app_main(void)
         settings.SetInt("last_reason", REBOOT_REASON_FINISH_WIFI_CONFIG);  // 将当前状态保存为上次状态
         settings.SetInt("current_reason", REBOOT_REASON_NORMAL);  // 重置当前状态为正常开机
     }
+    // last_reboot = settings.GetInt("last_reason");
+    // current_reboot = settings.GetInt("current_reason");
+    
+    // ESP_LOGI(TAG, "Last reboot: %d, Current reboot: %d", last_reboot, current_reboot);
     // 判断是否需要检测按键
     bool need_button_check = true;
     
     // 只有在从配网模式重启后的第一次启动时跳过按键检测
     if (current_reboot == REBOOT_REASON_ENTER_WIFI_CONFIG || current_reboot == REBOOT_REASON_FINISH_WIFI_CONFIG) {
         need_button_check = false;
-        ESP_LOGI(TAG, "Skip button check: rebooting from wifi config mode");
+        ESP_LOGW(TAG, "Skip button check: rebooting from wifi config mode");
     }
     
     // 初始化GPIO
