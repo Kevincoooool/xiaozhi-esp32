@@ -260,12 +260,12 @@ void Application::ToggleChatState() {
     if (device_state_ == kDeviceStateIdle) {
         Schedule([this]() {
             SetDeviceState(kDeviceStateConnecting);
-            if (!protocol_->OpenAudioChannel()) {
+            // if (!protocol_->OpenAudioChannel()) {
                 ESP_LOGI(TAG, "Failed to open audio channel, switching to offline mode");
                 SetOfflineMode(true);
                 SetDeviceState(kDeviceStateIdle);
                 return;
-            }
+            // }
             SetOfflineMode(false);
             keep_listening_ = true;
             protocol_->SendStartListening(kListeningModeAutoStop);
@@ -328,18 +328,67 @@ void Application::HandleOfflineCommand(const std::string& command, int command_i
 
     // 根据不同的 command_id 执行相应的操作
     switch (command_id) {
-        case 0:  // 假设这是"打开空调"命令
-            Alert("空调控制", "正在打开空调", "happy", Lang::Sounds::P3_SUCCESS);
+        case 0:  
+            Alert("宝贝夹紧", "本地命令", "happy", Lang::Sounds::P3_7_2S);
             break;
-        case 1:  // 假设这是"关闭空调"命令
-            Alert("空调控制", "正在关闭空调", "happy", Lang::Sounds::P3_SUCCESS);
+        case 1: 
+            Alert("再紧一点", "本地命令", "happy", Lang::Sounds::P3_10_15S);
             break;
-        case 2:  // 假设这是"打开电灯"命令
-            Alert("灯光控制", "正在打开电灯", "happy", Lang::Sounds::P3_SUCCESS);
+        case 2:  
+            Alert("骚货再紧一点", "本地命令", "happy", Lang::Sounds::P3_11_3S);
             break;
-        case 3:  // 假设这是"关闭电灯"命令
-            Alert("灯光控制", "正在关闭电灯", "happy", Lang::Sounds::P3_SUCCESS);
+        case 3:  
+            Alert("宝贝不要夹了", "本地命令", "happy", Lang::Sounds::P3_12_3S);
             break;
+        case 4:
+            Alert("声音小一点", "本地命令", "happy", Lang::Sounds::P3_13_4S);
+            break;
+        case 5:
+            Alert("声音大一点", "本地命令", "happy", Lang::Sounds::P3_15_3S);
+            break;
+        case 6:
+            Alert("里面动一下", "本地命令", "happy", Lang::Sounds::P3_18_3S);
+            break;
+        case 7:
+            Alert("再动一下", "本地命令", "happy", Lang::Sounds::P3_19_4S);
+            break;
+        case 8:
+            Alert("里面不要动了", "本地命令", "happy", Lang::Sounds::P3_23_7S);
+            break;
+        case 9:
+            Alert("舒服吗", "本地命令", "happy", Lang::Sounds::P3_24_20S);
+            break;
+        case 10:
+            Alert("叫老公", "本地命令", "happy", Lang::Sounds::P3_27_3S);
+            break;
+        case 11:
+            Alert("我快射了", "本地命令", "happy", Lang::Sounds::P3_31_10S);
+            break;
+        case 12:
+            Alert("我要干死你", "本地命令", "happy", Lang::Sounds::P3_30_9S);
+            break;
+        case 13:
+            Alert("叫爸爸", "本地命令", "happy", Lang::Sounds::P3_37_12S);
+            break;
+        case 14:
+            Alert("好紧啊", "本地命令", "happy", Lang::Sounds::P3_40_12S);
+            break;
+        case 15:
+            Alert("想不想我进去", "本地命令", "happy", Lang::Sounds::P3_42_5S);
+            break;
+        case 16:
+            Alert("爽不爽", "本地命令", "happy", Lang::Sounds::P3_49_6S);
+            break;
+        case 17:
+            Alert("死骚货", "本地命令", "happy", Lang::Sounds::P3_50_13S);
+            break;
+        case 18:
+            Alert("喜欢哥哥的肉棒吗", "本地命令", "happy", Lang::Sounds::P3_54_8S);
+            break;
+        case 19:
+            Alert("我们下次再玩吧！", "本地命令", "happy", Lang::Sounds::P3_57_9S);
+            break;
+        
         default:
             // 未知命令，播放提示音
             Alert("未知命令", command.c_str(), "confused", Lang::Sounds::P3_EXCLAMATION);
@@ -542,7 +591,7 @@ void Application::Start() {
                 SetDeviceState(kDeviceStateConnecting);
                 wake_word_detect_.EncodeWakeWordData();
 
-                if (!protocol_->OpenAudioChannel()) {
+                // if (!protocol_->OpenAudioChannel()) {
                     ESP_LOGI(TAG, "Failed to open audio channel, switching to offline mode");
                     SetOfflineMode(true);
                     wake_word_detect_.SetOfflineMode(true);
@@ -553,7 +602,7 @@ void Application::Start() {
                     wake_word_detect_.StartDetection();
                     SetDeviceState(kDeviceStateIdle);
                     return;
-                }
+                // }
                 SetOfflineMode(false);
                 wake_word_detect_.SetOfflineMode(false);
                 std::vector<uint8_t> opus;

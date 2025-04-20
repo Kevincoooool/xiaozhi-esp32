@@ -55,41 +55,24 @@ void PumpController::InitializeCycleTimer() {
     };
     ESP_ERROR_CHECK(esp_timer_create(&timer_args, &cycle_timer_));
 }
-
 void PumpController::OnCycleTimer(void* arg) {
     auto* self = static_cast<PumpController*>(arg);
     if (!self->is_cycling_) return;
 
-    uint32_t total_steps = self->cycle_interval_ms_ / TIMER_INTERVAL;
-    uint32_t range = self->tightness_max_ - self->tightness_min_;
-    if(total_steps == 0) total_steps = 1;
-    uint32_t current_step = (range + total_steps - 1) / total_steps;
-
+    // 切换工作状态
+    self->is_tightening_ = !self->is_tightening_;
+    
     if (self->is_tightening_) {
-        gpio_set_level(self->status_gpio_, 1);
-        if (self->speed_ + current_step < self->tightness_max_) {
-            self->speed_ += current_step;
-        } else {
-            self->speed_ = self->tightness_max_;
-            self->is_tightening_ = false;
-        }
+        // 工作状态：启动气泵，拉低状态引脚
+        self->speed_ = self->tightness_max_;
+        gpio_set_level(self->status_gpio_, 0);  // 工作时拉低
     } else {
-        gpio_set_level(self->status_gpio_, 0);
-        if (self->speed_ > self->tightness_min_ + current_step) {
-            self->speed_ -= current_step;
-        } else {
-            self->speed_ = self->tightness_min_;
-            self->is_tightening_ = true;
-        }
+        // 不工作状态：停止气泵，拉高状态引脚
+        self->speed_ = 0;  // 完全停止
+        gpio_set_level(self->status_gpio_, 1);  // 不工作时拉高
     }
 
     ledc_set_duty(SPEED_MODE, CHANNEL, self->speed_);
-    ledc_update_duty(SPEED_MODE, CHANNEL);
-}
-
-void PumpController::SetPumpSpeed(uint32_t speed) {
-    speed_ = speed;
-    ledc_set_duty(SPEED_MODE, CHANNEL, speed_);
     ledc_update_duty(SPEED_MODE, CHANNEL);
 }
 
@@ -99,16 +82,15 @@ void PumpController::StartCycle(uint32_t interval_ms, uint32_t min_tight, uint32
     tightness_max_ = max_tight;
     
     is_cycling_ = true;
-    is_tightening_ = true;
-    speed_ = tightness_min_;
+    is_tightening_ = false;  // 初始状态为不工作
+    speed_ = 0;
+    
+    // 初始状态设置
+    gpio_set_level(status_gpio_, 1);  // 初始状态拉高
     
     esp_timer_stop(cycle_timer_);
-    esp_timer_start_periodic(cycle_timer_, TIMER_INTERVAL * 1000);
-}
-
-void PumpController::StopCycle() {
-    is_cycling_ = false;
-    esp_timer_stop(cycle_timer_);
+    // 使用完整的间隔时间作为定时器周期
+    esp_timer_start_periodic(cycle_timer_, cycle_interval_ms_ * 1000);
 }
 
 void PumpController::StopPump() {
@@ -117,8 +99,21 @@ void PumpController::StopPump() {
     speed_ = 0;
     ledc_set_duty(SPEED_MODE, CHANNEL, 0);
     ledc_update_duty(SPEED_MODE, CHANNEL);
-    gpio_set_level(status_gpio_, 0);
+    gpio_set_level(status_gpio_, 1);  // 停止时拉高状态引脚
 }
+
+void PumpController::SetPumpSpeed(uint32_t speed) {
+    speed_ = speed;
+    ledc_set_duty(SPEED_MODE, CHANNEL, speed_);
+    ledc_update_duty(SPEED_MODE, CHANNEL);
+}
+
+void PumpController::StopCycle() {
+    is_cycling_ = false;
+    esp_timer_stop(cycle_timer_);
+}
+
+
 
 PumpController::~PumpController() {
     StopPump();

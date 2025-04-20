@@ -167,21 +167,27 @@ private:
             codec->SetOutputVolume(last_volume);
             app.PlaySound(Lang::Sounds::P3_SUCCESS);
         });
-
-        mode_button_.OnLongPress([this]() {
-            // 长按1.5秒切换语音对话/哼唱模式
-            is_singing_mode_ = !is_singing_mode_;
-            auto& app = Application::GetInstance();
-            
-            if (is_singing_mode_) {
-                app.StopListening();  // 停止语音对话
-                ESP_LOGI(TAG, "Switching to singing mode");
-                // TODO: 启动哼唱模式
-            } else {
-                ESP_LOGI(TAG, "Switching to voice dialogue mode");
-                app.StartListening();
-            }
+        mode_button_.OnPressDown([this]() {
+            power_save_timer_->WakeUp();
+            Application::GetInstance().StartListening();
         });
+        mode_button_.OnPressUp([this]() {
+            Application::GetInstance().StopListening();
+        });
+        // mode_button_.OnLongPress([this]() {
+        //     // 长按1.5秒切换语音对话/哼唱模式
+        //     is_singing_mode_ = !is_singing_mode_;
+        //     auto& app = Application::GetInstance();
+            
+        //     if (is_singing_mode_) {
+        //         app.StopListening();  // 停止语音对话
+        //         ESP_LOGI(TAG, "Switching to singing mode");
+        //         // TODO: 启动哼唱模式
+        //     } else {
+        //         ESP_LOGI(TAG, "Switching to voice dialogue mode");
+        //         app.StartListening();
+        //     }
+        // });
     }
     // 物联网初始化，添加对 AI 可见设备
     void InitializeIot() {

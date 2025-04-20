@@ -402,8 +402,21 @@ int NoAudioCodecSimplexPdm::Read(int16_t* dest, int samples) {
     // 计算实际读取的样本数
     samples = bytes_read / sizeof(int16_t);
 
-    // 将 16 位数据直接复制到目标缓冲区
-    memcpy(dest, bit16_buffer.data(), samples * sizeof(int16_t));
+    // 放大音频信号（放大4倍）
+    const int amplification = 20;
+    for (int i = 0; i < samples; i++) {
+        // 使用int32_t避免溢出
+        int32_t amplified = static_cast<int32_t>(bit16_buffer[i]) * amplification;
+        
+        // 限制在int16_t范围内
+        if (amplified > INT16_MAX) {
+            amplified = INT16_MAX;
+        } else if (amplified < INT16_MIN) {
+            amplified = INT16_MIN;
+        }
+        
+        dest[i] = static_cast<int16_t>(amplified);
+    }
 
     return samples;
 }
