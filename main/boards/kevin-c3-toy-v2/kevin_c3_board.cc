@@ -1,4 +1,5 @@
 #include "wifi_board.h"
+#include "blufi_board.h"
 #include "audio_codecs/es8311_audio_codec.h"
 #include "application.h"
 #include "button.h"
@@ -16,8 +17,9 @@
 #include "power_manager.h"
 
 #define TAG "KevinBoxBoard"
+class KevinBoxBoard : public BlufiBoard {
 
-class KevinBoxBoard : public WifiBoard {
+// class KevinBoxBoard : public WifiBoard {
 private:
     i2c_master_bus_handle_t codec_i2c_bus_;
     Button boot_button_;
@@ -166,7 +168,7 @@ public:
         if (!enabled) {
             power_save_timer_->WakeUp();
         }
-        WifiBoard::SetPowerSaveMode(enabled);
+        BlufiBoard::SetPowerSaveMode(enabled);
     }
 };
 

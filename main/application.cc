@@ -321,7 +321,15 @@ void Application::Start() {
     /* Setup the audio codec */
     auto codec = board.GetAudioCodec();
     opus_decode_sample_rate_ = codec->output_sample_rate();
+    int free_sram = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+        int min_free_sram = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
+        ESP_LOGI(TAG, "Free internal: %u minimal internal: %u", free_sram, min_free_sram);
+
+    printf("Free heap: %u, Largest block: %u\n", 
+    heap_caps_get_free_size(MALLOC_CAP_INTERNAL), heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
     opus_decoder_ = std::make_unique<OpusDecoderWrapper>(opus_decode_sample_rate_, 1);
+    printf("Free heap: %u, Largest block: %u\n", 
+        heap_caps_get_free_size(MALLOC_CAP_INTERNAL), heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
     opus_encoder_ = std::make_unique<OpusEncoderWrapper>(16000, 1, OPUS_FRAME_DURATION_MS);
     // For ML307 boards, we use complexity 5 to save bandwidth
     // For other boards, we use complexity 3 to save CPU
@@ -348,7 +356,8 @@ void Application::Start() {
         return higher_priority_task_woken == pdTRUE;
     });
     codec->Start();
-
+    Alert(Lang::Strings::WIFI_CONFIG_MODE, " ", "", Lang::Sounds::P3_SUCCESS);
+    
     /* Start the main loop */
     xTaskCreate([](void* arg) {
         Application* app = (Application*)arg;
