@@ -45,6 +45,18 @@ Button::~Button() {
     }
 }
 
+void Button::OnLongPressHold(std::function<void()> callback) {
+    if (button_handle_ == nullptr) {
+        return;
+    }
+    on_long_press_hold_ = callback;
+    iot_button_register_cb(button_handle_, BUTTON_LONG_PRESS_HOLD, [](void* handle, void* usr_data) {
+        Button* button = static_cast<Button*>(usr_data);
+        if (button->on_long_press_hold_) {
+            button->on_long_press_hold_();
+        }
+    }, this);
+}
 void Button::OnMultiClick(uint8_t clicks, std::function<void()> callback) {
     if (button_handle_ == nullptr) {
         return;
@@ -58,8 +70,8 @@ void Button::OnMultiClick(uint8_t clicks, std::function<void()> callback) {
         Button* button = static_cast<Button*>(usr_data);
         int64_t current_time = esp_timer_get_time() / 1000; // 转换为毫秒
         
-        // 消抖处理：忽略太快的连续点击
-        if (current_time - button->last_click_time_ < 50) { // 50ms消抖时间
+        // 消抖处理：减少到20ms以提高响应速度
+        if (current_time - button->last_click_time_ < 20) {
             return;
         }
         
@@ -71,18 +83,25 @@ void Button::OnMultiClick(uint8_t clicks, std::function<void()> callback) {
         button->last_click_time_ = current_time;
         button->click_count_++;
         
-        ESP_LOGI(TAG, "Button clicked, count: %d", button->click_count_);
+        ESP_LOGI(TAG, "Button clicked, count: %d/%d", button->click_count_, button->required_clicks_);
         
-        // 启动一个定时器，在超时后检查点击次数
+        // 如果达到目标点击次数，立即触发回调
+        if (button->click_count_ == button->required_clicks_) {
+            if (button->on_multi_click_) {
+                button->on_multi_click_();
+            }
+            button->click_count_ = 0;
+            return;
+        }
+        
+        // 启动一个定时器，在超时后重置计数
         esp_timer_create_args_t timer_args = {
             .callback = [](void* arg) {
                 Button* button = static_cast<Button*>(arg);
-                if (button->click_count_ == button->required_clicks_) {
-                    if (button->on_multi_click_) {
-                        button->on_multi_click_();
-                    }
+                if (button->click_count_ > 0) {
+                    ESP_LOGI(TAG, "Multi-click timeout, resetting count");
+                    button->click_count_ = 0;
                 }
-                button->click_count_ = 0;
             },
             .arg = button,
             .dispatch_method = ESP_TIMER_TASK,

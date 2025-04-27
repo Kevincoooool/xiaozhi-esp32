@@ -26,6 +26,10 @@ private:
     CircularStrip* led_strip_;
     PowerSaveTimer* power_save_timer_;
     PowerManager* power_manager_;
+    
+    bool has_clicked_ = false;
+    int64_t last_click_time_ = 0;
+    static constexpr int64_t CLICK_TIMEOUT_MS = 3000; // 短按后5秒内需要完成长按
     void InitializePowerManager() {
         power_manager_ = new PowerManager(GPIO_NUM_NC);
         // power_manager_->OnChargingStatusChanged([this](bool is_charging) {
@@ -41,7 +45,7 @@ private:
         // Initialize power save timer
         
         ESP_LOGW(TAG, "Initialize power save timer...");
-        power_save_timer_ = new PowerSaveTimer(-1, -1, 600);
+        power_save_timer_ = new PowerSaveTimer(-1, -1, 300);
         power_save_timer_->OnShutdownRequest([this]() {
             ESP_LOGI(TAG, "Shutting down...");
             gpio_set_level(GPIO_NUM_11, 0);
@@ -67,6 +71,8 @@ private:
 
     void InitializeButtons() {
         boot_button_.OnClick([this]() {
+            has_clicked_ = true;
+            last_click_time_ = esp_timer_get_time() / 1000; // 转换为毫秒
             auto& app = Application::GetInstance();
             if (app.GetDeviceState() == kDeviceStateStarting && !WifiStation::GetInstance().IsConnected()) {
                 // ResetWifiConfiguration();
@@ -76,13 +82,6 @@ private:
                 // Application::GetInstance().ToggleChatState();
             }
         });
-        // boot_button_.OnDoubleClick([this]() {
-        //     auto& app = Application::GetInstance();
-        //     if (app.GetDeviceState() == kDeviceStateStarting && !WifiStation::GetInstance().IsConnected()) {
-        //         ResetWifiConfiguration();
-        //     }
-        // });
-
         // 添加错误处理到其他按键回调
         boot_button_.OnMultiClick(5, [this]() {
             ESP_LOGI(TAG, "Detected 5 clicks, entering WiFi configuration mode");
@@ -114,6 +113,13 @@ private:
                 ESP_LOGE(TAG, "Exception in OnPressUp: %s", e.what());
             } catch (...) {
                 ESP_LOGE(TAG, "Unknown exception in OnPressUp");
+            }
+        });
+        boot_button_.OnLongPress([this]() {
+            int64_t current_time = esp_timer_get_time() / 1000;
+            if (has_clicked_ && (current_time - last_click_time_ < CLICK_TIMEOUT_MS)) {
+                ESP_LOGI(TAG, "Shutting down by long press after click");
+                gpio_set_level(GPIO_NUM_11, 0);
             }
         });
     }
