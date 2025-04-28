@@ -86,30 +86,240 @@ static const ThemeColors LIGHT_THEME = {
 
 // Current theme - initialize based on default config
 static ThemeColors current_theme = LIGHT_THEME;
-
-
 LV_FONT_DECLARE(font_awesome_30_4);
+#define NO_USE_ESP_PORT_LVGL 1
+#if NO_USE_ESP_PORT_LVGL
+static SemaphoreHandle_t lvgl_mux = NULL;
+static lv_display_t *disp;
+#define EXAMPLE_LVGL_TICK_PERIOD_MS 10
+#define EXAMPLE_LVGL_TASK_MAX_DELAY_MS 500
+#define EXAMPLE_LVGL_TASK_MIN_DELAY_MS 1
+#define EXAMPLE_LVGL_TASK_STACK_SIZE (4 * 1024)
+#define EXAMPLE_LVGL_TASK_PRIORITY 10
+// static void lcd_lvgl_flush_cb(lv_display_t *drv, const lv_area_t *area, unsigned char *color_map)
+// {
+//     esp_lcd_panel_handle_t panel_handle = (esp_lcd_panel_handle_t)lv_display_get_user_data(drv);
 
+//     int offsetx1 = area->x1;
+//     int offsetx2 = area->x2;
+//     int offsety1 = area->y1;
+//     int offsety2 = area->y2;
+//     size_t len = lv_area_get_size(area);
+//     lv_draw_sw_rgb565_swap(color_map, len);
+//     esp_lcd_panel_draw_bitmap(panel_handle, offsetx1, offsety1, offsetx2 + 1, offsety2 + 1, color_map);
+    
+//     lv_disp_flush_ready(drv);
+// }
+#define LCD_CS_LEFT_PIN  GPIO_NUM_48
+#define LCD_CS_RIGHT_PIN GPIO_NUM_41
+
+static void lcd_lvgl_flush_cb(lv_display_t *drv, const lv_area_t *area, unsigned char *color_map)
+{
+    esp_lcd_panel_handle_t panel_handle = (esp_lcd_panel_handle_t)lv_display_get_user_data(drv);
+    int offsetx1 = area->x1;
+    int offsetx2 = area->x2;
+    int offsety1 = area->y1;
+    int offsety2 = area->y2;
+    size_t len = lv_area_get_size(area);
+    lv_draw_sw_rgb565_swap(color_map, len);
+    ESP_LOGD(TAG, "绘制区域: x1=%d, x2=%d, y1=%d, y2=%d", offsetx1, offsetx2, offsety1, offsety2);
+    esp_lcd_panel_draw_bitmap(panel_handle, offsetx1, offsety1, offsetx2 + 1, offsety2 + 1, color_map);
+    lv_disp_flush_ready(drv);
+}
+// static void lcd_lvgl_flush_cb(lv_display_t *drv, const lv_area_t *area, unsigned char *color_map)
+// {
+//     esp_lcd_panel_handle_t panel_handle = (esp_lcd_panel_handle_t)lv_display_get_user_data(drv);
+
+//     int offsetx1 = area->x1;
+//     int offsetx2 = area->x2;
+//     int offsety1 = area->y1;
+//     int offsety2 = area->y2;
+//     size_t len = lv_area_get_size(area);
+//     lv_draw_sw_rgb565_swap(color_map, len);
+    
+//     ESP_LOGD(TAG, "绘制区域: x1=%d, x2=%d, y1=%d, y2=%d", offsetx1, offsetx2, offsety1, offsety2);
+     
+//     // 根据X坐标判断应该使用哪个屏幕
+//     if (offsetx2 < 240) {
+//         // 只在左屏(CS=48)绘制
+//         gpio_set_level(LCD_CS_RIGHT_PIN, 1); // 禁用右屏
+//         vTaskDelay(pdMS_TO_TICKS(1)); // 添加短暂延时
+//         gpio_set_level(LCD_CS_LEFT_PIN, 0);  // 启用左屏
+//         vTaskDelay(pdMS_TO_TICKS(1)); // 添加短暂延时
+//         esp_lcd_panel_draw_bitmap(panel_handle, offsetx1, offsety1, offsetx2 + 1, offsety2 + 1, color_map);
+//         vTaskDelay(pdMS_TO_TICKS(1)); // 添加短暂延时
+//         gpio_set_level(LCD_CS_LEFT_PIN, 1);  // 绘制完成后禁用左屏
+//     } else if (offsetx1 >= 240) {
+//         // 只在右屏(CS=41)绘制，需要调整x坐标
+//         gpio_set_level(LCD_CS_LEFT_PIN, 1);  // 禁用左屏
+//         vTaskDelay(pdMS_TO_TICKS(1)); // 添加短暂延时
+//         gpio_set_level(LCD_CS_RIGHT_PIN, 0); // 启用右屏
+//         vTaskDelay(pdMS_TO_TICKS(1)); // 添加短暂延时
+//         // 修正：确保坐标从0开始
+//         esp_lcd_panel_draw_bitmap(panel_handle, offsetx1 - 240, offsety1, offsetx2 - 240 + 1, offsety2 + 1, color_map);
+//         vTaskDelay(pdMS_TO_TICKS(1)); // 添加短暂延时
+//         gpio_set_level(LCD_CS_RIGHT_PIN, 1); // 绘制完成后禁用右屏
+//     } else {
+//         // 跨屏绘制，需要分别处理左右屏幕
+//         int left_width = 240 - offsetx1;
+//         int right_width = offsetx2 - 239;
+//         int height = offsety2 - offsety1 + 1;
+        
+//         // 计算左屏幕数据大小（以像素为单位）
+//         size_t left_pixels = left_width * height;
+        
+//         // 左屏部分
+//         gpio_set_level(LCD_CS_RIGHT_PIN, 1); // 禁用右屏
+//         vTaskDelay(pdMS_TO_TICKS(1)); // 添加短暂延时
+//         gpio_set_level(LCD_CS_LEFT_PIN, 0);  // 启用左屏
+//         vTaskDelay(pdMS_TO_TICKS(1)); // 添加短暂延时
+//         esp_lcd_panel_draw_bitmap(panel_handle, offsetx1, offsety1, 240, offsety2 + 1, color_map);
+//         vTaskDelay(pdMS_TO_TICKS(1)); // 添加短暂延时
+//         gpio_set_level(LCD_CS_LEFT_PIN, 1);  // 绘制完成后禁用左屏
+        
+//         // 右屏部分 - 修正数据偏移计算
+//         unsigned char *right_data = color_map + (left_pixels * 2); // RGB565格式，每个像素2字节
+        
+//         vTaskDelay(pdMS_TO_TICKS(1)); // 添加短暂延时
+//         gpio_set_level(LCD_CS_LEFT_PIN, 1);  // 禁用左屏
+//         vTaskDelay(pdMS_TO_TICKS(1)); // 添加短暂延时
+//         gpio_set_level(LCD_CS_RIGHT_PIN, 0); // 启用右屏
+//         vTaskDelay(pdMS_TO_TICKS(1)); // 添加短暂延时
+//         esp_lcd_panel_draw_bitmap(panel_handle, 0, offsety1, right_width, offsety2 + 1, right_data);
+//         vTaskDelay(pdMS_TO_TICKS(1)); // 添加短暂延时
+//         gpio_set_level(LCD_CS_RIGHT_PIN, 1); // 绘制完成后禁用右屏
+//     }
+    
+//     lv_disp_flush_ready(drv);
+// }
+lv_disp_t *ksdiy_lvgl_get_disp(void)
+{
+    // 如果 lvgl_port_get_disp 函数不可用，可以直接返回 lv_disp_get_default()
+    return lv_disp_get_default();
+}
+static void ksdiy_increase_lvgl_tick(void *arg)
+{
+    /* Tell LVGL how many milliseconds has elapsed */
+    lv_tick_inc(EXAMPLE_LVGL_TICK_PERIOD_MS);
+}
+
+bool ksdiy_lvgl_lock(int timeout_ms)
+{
+    // Convert timeout in milliseconds to FreeRTOS ticks
+    // If `timeout_ms` is set to -1, the program will block until the condition is met
+    const TickType_t timeout_ticks = (timeout_ms == -1) ? portMAX_DELAY : pdMS_TO_TICKS(timeout_ms);
+    return xSemaphoreTakeRecursive(lvgl_mux, timeout_ticks) == pdTRUE;
+}
+
+void ksdiy_lvgl_unlock(void)
+{
+    xSemaphoreGiveRecursive(lvgl_mux);
+}
+static void ksdiy_lvgl_port_task(void *arg)
+{
+    ESP_LOGI(TAG, "Starting LVGL task");
+    uint32_t task_delay_ms = EXAMPLE_LVGL_TASK_MAX_DELAY_MS;
+    while (1)
+    {
+        // Lock the mutex due to the LVGL APIs are not thread-safe
+        if (ksdiy_lvgl_lock(-1))
+        {
+            task_delay_ms = lv_timer_handler();
+            // Release the mutex
+            ksdiy_lvgl_unlock();
+        }
+        if (task_delay_ms > EXAMPLE_LVGL_TASK_MAX_DELAY_MS)
+        {
+            task_delay_ms = EXAMPLE_LVGL_TASK_MAX_DELAY_MS;
+        }
+        else if (task_delay_ms < EXAMPLE_LVGL_TASK_MIN_DELAY_MS)
+        {
+            task_delay_ms = EXAMPLE_LVGL_TASK_MIN_DELAY_MS;
+        }
+        vTaskDelay(pdMS_TO_TICKS(task_delay_ms));
+    }
+}
+#endif
 SpiLcdDisplay::SpiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_t panel,
                            int width, int height, int offset_x, int offset_y, bool mirror_x, bool mirror_y, bool swap_xy,
                            DisplayFonts fonts)
     : LcdDisplay(panel_io, panel, fonts) {
+#if NO_USE_ESP_PORT_LVGL == 1
     width_ = width;
+#else
+    width_ = width;
+#endif
     height_ = height;
 
     // draw white
-    std::vector<uint16_t> buffer(width_, 0xFFFF);
+    // std::vector<uint16_t> buffer(width_, 0xFFFF);
+    // for (int y = 0; y < height_; y++) {
+    //     esp_lcd_panel_draw_bitmap(panel_, 0, y, width_, y + 1, buffer.data());
+    // }
+ // 分别初始化两个屏幕
+    // 左屏清屏
+    gpio_set_level(LCD_CS_LEFT_PIN, 0);
+    std::vector<uint16_t> buffer(width, 0xFFFF);
     for (int y = 0; y < height_; y++) {
-        esp_lcd_panel_draw_bitmap(panel_, 0, y, width_, y + 1, buffer.data());
+        esp_lcd_panel_draw_bitmap(panel_, 0, y, width, y + 1, buffer.data());
     }
+    gpio_set_level(LCD_CS_LEFT_PIN, 1);
+    
+    // 右屏清屏
+    gpio_set_level(LCD_CS_RIGHT_PIN, 0);
+    for (int y = 0; y < height_; y++) {
+        esp_lcd_panel_draw_bitmap(panel_, 0, y, width, y + 1, buffer.data());
+    }
+    gpio_set_level(LCD_CS_RIGHT_PIN, 1);
 
+    // Set the display to on
+    ESP_LOGI(TAG, "Turning display on");
+    
+    // 左屏打开
+    gpio_set_level(LCD_CS_LEFT_PIN, 0);
+    ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel_, true));
+    gpio_set_level(LCD_CS_LEFT_PIN, 1);
+    
+    // 右屏打开
+    gpio_set_level(LCD_CS_RIGHT_PIN, 0);
+    ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel_, true));
+    gpio_set_level(LCD_CS_RIGHT_PIN, 1);
     // Set the display to on
     ESP_LOGI(TAG, "Turning display on");
     ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel_, true));
 
+    gpio_set_level(LCD_CS_RIGHT_PIN, 0);
+    
+    gpio_set_level(LCD_CS_LEFT_PIN, 0);
     ESP_LOGI(TAG, "Initialize LVGL library");
     lv_init();
+#if NO_USE_ESP_PORT_LVGL == 1
+    ESP_LOGI(TAG, "Allocating LVGL buffers from PSRAM");
+    void *buf1 = heap_caps_malloc(width_ * 10, MALLOC_CAP_DMA);
+    assert(buf1);
+    void *buf2 = heap_caps_malloc(width_ * 10, MALLOC_CAP_DMA);
+    assert(buf2);
 
+    ESP_LOGI(TAG, "Register buffers and display callback with LVGL");
+    disp = lv_display_create(width_, height_);
+    lv_display_set_buffers(disp, buf1, buf2, width_ *  10, LV_DISPLAY_RENDER_MODE_PARTIAL);
+    lv_display_set_user_data(disp, panel_);
+    lv_display_set_flush_cb(disp, lcd_lvgl_flush_cb);
+    lv_display_set_color_format(disp, LV_COLOR_FORMAT_RGB565);
+
+    ESP_LOGI(TAG, "Install LVGL tick timer");
+    // Tick interface for LVGL (using esp_timer to generate 2ms periodic event)
+    const esp_timer_create_args_t lvgl_tick_timer_args = {
+        .callback = &ksdiy_increase_lvgl_tick,
+        .name = "lvgl_tick"};
+    esp_timer_handle_t lvgl_tick_timer = NULL;
+    ESP_ERROR_CHECK(esp_timer_create(&lvgl_tick_timer_args, &lvgl_tick_timer));
+    ESP_ERROR_CHECK(esp_timer_start_periodic(lvgl_tick_timer, EXAMPLE_LVGL_TICK_PERIOD_MS * 1000));
+        lvgl_mux = xSemaphoreCreateRecursiveMutex();
+    assert(lvgl_mux);
+    ESP_LOGI(TAG, "Create LVGL task");
+    xTaskCreate(ksdiy_lvgl_port_task, "LVGL", EXAMPLE_LVGL_TASK_STACK_SIZE, NULL, EXAMPLE_LVGL_TASK_PRIORITY, NULL);
+#else
     ESP_LOGI(TAG, "Initialize LVGL port");
     lvgl_port_cfg_t port_cfg = ESP_LVGL_PORT_INIT_CONFIG();
     port_cfg.task_priority = 1;
@@ -152,7 +362,7 @@ SpiLcdDisplay::SpiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_h
     if (offset_x != 0 || offset_y != 0) {
         lv_display_set_offset(display_, offset_x, offset_y);
     }
-
+#endif
     // Update the theme
     if (current_theme_name_ == "dark") {
         current_theme = DARK_THEME;
@@ -277,11 +487,20 @@ LcdDisplay::~LcdDisplay() {
 }
 
 bool LcdDisplay::Lock(int timeout_ms) {
+    #if NO_USE_ESP_PORT_LVGL == 1
+    return ksdiy_lvgl_lock(timeout_ms);
+    #else
     return lvgl_port_lock(timeout_ms);
+    #endif
+
 }
 
 void LcdDisplay::Unlock() {
+    #if NO_USE_ESP_PORT_LVGL == 1
+    ksdiy_lvgl_unlock();
+    #else
     lvgl_port_unlock();
+    #endif
 } 
 
 #if CONFIG_USE_WECHAT_MESSAGE_STYLE

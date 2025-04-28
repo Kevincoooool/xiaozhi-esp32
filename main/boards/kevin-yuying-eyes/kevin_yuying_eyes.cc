@@ -148,6 +148,8 @@ private:
         ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi(SPI3_HOST, &io_config, &io_handle));
         esp_rom_gpio_pad_select_gpio(GPIO_NUM_41); // 打开功放使能
         gpio_set_direction(GPIO_NUM_41, GPIO_MODE_OUTPUT);
+        esp_rom_gpio_pad_select_gpio(GPIO_NUM_48); // 打开功放使能
+        gpio_set_direction(GPIO_NUM_48, GPIO_MODE_OUTPUT);
         gpio_set_level(GPIO_NUM_41, 1);
         ESP_LOGI(TAG, "Install GC9A01 panel driver");
         esp_lcd_panel_handle_t panel_handle = NULL;
@@ -159,6 +161,7 @@ private:
         ESP_ERROR_CHECK(esp_lcd_new_panel_gc9a01(io_handle, &panel_config, &panel_handle));
         ESP_ERROR_CHECK(esp_lcd_panel_reset(panel_handle));
         gpio_set_level(GPIO_NUM_41, 0);
+        gpio_set_level(GPIO_NUM_48, 0);
         ESP_ERROR_CHECK(esp_lcd_panel_init(panel_handle));
         ESP_ERROR_CHECK(esp_lcd_panel_invert_color(panel_handle, true));
         ESP_ERROR_CHECK(esp_lcd_panel_mirror(panel_handle, true, false));
