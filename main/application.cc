@@ -482,9 +482,9 @@ void Application::Start() {
         ESP_LOGI(TAG, "Using server provided OTA URL: %s", ota_url.c_str());
     }
     
-    ota_.SetCheckVersionUrl(ota_url);
+    // ota_.SetCheckVersionUrl(ota_url);
     // Check for new firmware version or get the MQTT broker address
-    // ota_.SetCheckVersionUrl(CONFIG_OTA_VERSION_URL);
+    ota_.SetCheckVersionUrl(CONFIG_OTA_VERSION_URL);
     ota_.SetHeader("Device-Id", SystemInfo::GetMacAddress().c_str());
     ota_.SetHeader("Client-Id", board.GetUuid());
     ota_.SetHeader("Accept-Language", Lang::CODE);
