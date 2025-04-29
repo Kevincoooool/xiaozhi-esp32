@@ -74,7 +74,12 @@ public:
 private:
     Application();
     ~Application();
-
+// 看门狗相关
+    esp_timer_handle_t watchdog_timer_handle_ = nullptr;
+    int watchdog_counter_ = 0;
+    static constexpr int WATCHDOG_THRESHOLD = 10; // 60秒无响应则重启
+    void ResetWatchdog();
+    void InitializeWatchdog();
 #if CONFIG_USE_WAKE_WORD_DETECT
     WakeWordDetect wake_word_detect_;
 #endif

@@ -12,16 +12,19 @@ private:
     esp_timer_handle_t timer_handle_;
     std::function<void(bool)> on_charging_status_changed_;
     std::function<void(bool)> on_low_battery_status_changed_;
+    std::function<void(bool)> on_critical_battery_status_changed_;
 
     gpio_num_t charging_pin_ = GPIO_NUM_NC;
     std::vector<uint16_t> adc_values_;
     uint32_t battery_level_ = 0;
     bool is_charging_ = false;
     bool is_low_battery_ = false;
+    bool is_critical_battery_ = false;
     int ticks_ = 0;
     const int kBatteryAdcInterval = 2;
     const int kBatteryAdcDataCount = 3;
     const int kLowBatteryLevel = 20;
+    const int kCriticalBatteryLevel = 5;
 
     adc_oneshot_unit_handle_t adc_handle_;
 
@@ -111,6 +114,15 @@ private:
                     on_low_battery_status_changed_(is_low_battery_);
                 }
             }
+            
+            // 检查严重低电量状态（5%以下）
+            bool new_critical_battery_status = battery_level_ <= kCriticalBatteryLevel;
+            if (new_critical_battery_status != is_critical_battery_) {
+                is_critical_battery_ = new_critical_battery_status;
+                if (on_critical_battery_status_changed_) {
+                    on_critical_battery_status_changed_(is_critical_battery_);
+                }
+            }
         }
 
         ESP_LOGI("PowerManager", "ADC value: %d average: %ld voltage: %.2f mV level: %ld%%", 
@@ -190,5 +202,8 @@ public:
 
     void OnChargingStatusChanged(std::function<void(bool)> callback) {
         on_charging_status_changed_ = callback;
+    }
+    void OnCriticalBatteryStatusChanged(std::function<void(bool)> callback) {
+        on_critical_battery_status_changed_ = callback;
     }
 };

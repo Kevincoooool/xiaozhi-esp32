@@ -27,9 +27,9 @@ private:
     PowerSaveTimer* power_save_timer_;
     PowerManager* power_manager_;
     
-    bool has_clicked_ = false;
+    int click_count_ = 0;
     int64_t last_click_time_ = 0;
-    static constexpr int64_t CLICK_TIMEOUT_MS = 3000; // 短按后5秒内需要完成长按
+    static constexpr int64_t CLICK_TIMEOUT_MS = 5000; // 双击后5秒内需要完成长按
     void InitializePowerManager() {
         power_manager_ = new PowerManager(GPIO_NUM_NC);
         // power_manager_->OnChargingStatusChanged([this](bool is_charging) {
@@ -39,13 +39,19 @@ private:
         //         power_save_timer_->SetEnabled(true);
         //     }
         // });
+        power_manager_->OnCriticalBatteryStatusChanged([this](bool is_critical) {
+            if (is_critical) {
+                auto& app = Application::GetInstance();
+                app.Alert(Lang::Strings::BATTERY_LOW, Lang::Strings::BATTERY_LOW, "sad", Lang::Sounds::P3_BATRTERY_LOW);
+            }
+        });
         power_save_timer_->SetEnabled(true);
     }
     void InitializePowerSaveTimer() {
         // Initialize power save timer
         
         ESP_LOGW(TAG, "Initialize power save timer...");
-        power_save_timer_ = new PowerSaveTimer(-1, -1, 300);
+        power_save_timer_ = new PowerSaveTimer(-1, -1, 600);
         power_save_timer_->OnShutdownRequest([this]() {
             ESP_LOGI(TAG, "Shutting down...");
             gpio_set_level(GPIO_NUM_11, 0);
@@ -71,8 +77,27 @@ private:
 
     void InitializeButtons() {
         boot_button_.OnClick([this]() {
-            has_clicked_ = true;
-            last_click_time_ = esp_timer_get_time() / 1000; // 转换为毫秒
+        click_count_++;
+        last_click_time_ = esp_timer_get_time() / 1000; // 转换为毫秒
+        
+        // 如果超过2秒没有新的点击，重置计数器
+        if (click_count_ == 1) {
+            esp_timer_handle_t reset_timer;
+            esp_timer_create_args_t timer_args = {
+                .callback = [](void* arg) {
+                    KevinBoxBoard* board = static_cast<KevinBoxBoard*>(arg);
+                    if (board->click_count_ == 1) {
+                        board->click_count_ = 0;
+                    }
+                },
+                .arg = this,
+                .dispatch_method = ESP_TIMER_TASK,
+                .name = "click_reset"
+            };
+            esp_timer_create(&timer_args, &reset_timer);
+            esp_timer_start_once(reset_timer, 2000 * 1000); // 2秒
+        }
+        
             auto& app = Application::GetInstance();
             if (app.GetDeviceState() == kDeviceStateStarting && !WifiStation::GetInstance().IsConnected()) {
                 // ResetWifiConfiguration();
@@ -83,8 +108,8 @@ private:
             }
         });
         // 添加错误处理到其他按键回调
-        boot_button_.OnMultiClick(5, [this]() {
-            ESP_LOGI(TAG, "Detected 5 clicks, entering WiFi configuration mode");
+        boot_button_.OnMultiClick(6, [this]() {
+            ESP_LOGI(TAG, "Detected 6 clicks, entering WiFi configuration mode");
             try {
                 ResetWifiConfiguration();
             } catch (const std::exception& e) {
@@ -103,6 +128,7 @@ private:
             } catch (...) {
                 ESP_LOGE(TAG, "Unknown exception in OnPressDown");
             }
+            
         });
 
         boot_button_.OnPressUp([this]() {
@@ -117,8 +143,8 @@ private:
         });
         boot_button_.OnLongPress([this]() {
             int64_t current_time = esp_timer_get_time() / 1000;
-            if (has_clicked_ && (current_time - last_click_time_ < CLICK_TIMEOUT_MS)) {
-                ESP_LOGI(TAG, "Shutting down by long press after click");
+            if (click_count_ >= 2 && (current_time - last_click_time_ < CLICK_TIMEOUT_MS)) {
+                ESP_LOGI(TAG, "Shutting down by long press after double click");
                 gpio_set_level(GPIO_NUM_11, 0);
             }
         });

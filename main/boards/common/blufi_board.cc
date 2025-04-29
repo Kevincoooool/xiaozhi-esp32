@@ -314,7 +314,7 @@ void BlufiBoard::StartBlufiConfig() {
         .skip_unhandled_events = true
     };
     ESP_ERROR_CHECK(esp_timer_create(&timer_args, &config_mode_timer_));
-    ESP_ERROR_CHECK(esp_timer_start_once(config_mode_timer_, 300000000));  // 10分钟 = 600秒 = 600000000微秒
+    ESP_ERROR_CHECK(esp_timer_start_once(config_mode_timer_, 600000000));  // 10分钟 = 600秒 = 600000000微秒
     while (blufi.IsWifiConnected() == false) {
         int free_sram = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
         int min_free_sram = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
@@ -330,7 +330,8 @@ void BlufiBoard::StartBlufiConfig() {
 
     // 清理资源
     blufi.Deinitialize();
-
+    Settings settings("wifi", true);
+    settings.SetInt("current_reason", 2);
     // 重启设备以连接新的 WiFi
     esp_restart();
 }

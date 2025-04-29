@@ -286,15 +286,17 @@ void CircularStrip::OnStateChanged() {
             break;
         case kDeviceStateConnecting: {
             // 连接状态：蓝色常亮
-            StripColor color = { 0, 0, default_brightness_ };  // 纯蓝色
-            SetAllColor(color);
+            // StripColor color = { 0, 0, default_brightness_ };  // 纯蓝色
+            // SetAllColor(color);
+            StripColor color = { 0, default_brightness_, 0 };  // 纯绿色
+            Blink(color, 300);  // 300ms的闪烁间隔
             break;
         }
         case kDeviceStateListening: {
             // 录音状态：鲜红色
-            // StripColor color = { default_brightness_, 0, 0 };  // 纯红色
-            // SetAllColor(color);
-            RainbowBreathe(50);  // 每20ms更新一次亮度
+            StripColor color = { default_brightness_, 0, 0 };  // 纯红色
+            SetAllColor(color);
+            // RainbowBreathe(50);  // 每20ms更新一次亮度
             break;
         }
         case kDeviceStateSpeaking: {

@@ -27,7 +27,7 @@ private:
     uint8_t required_clicks_ = 0;
     uint8_t click_count_ = 0;
     int64_t last_click_time_ = 0;
-    static constexpr int64_t MULTI_CLICK_TIMEOUT_MS = 2000; // 连续点击超时时间
+    static constexpr int64_t MULTI_CLICK_TIMEOUT_MS = 3000; // 连续点击超时时间
 
     std::function<void()> on_press_down_;
     std::function<void()> on_press_up_;

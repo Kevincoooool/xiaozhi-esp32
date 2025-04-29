@@ -49,9 +49,15 @@ Application::Application() {
         .skip_unhandled_events = true
     };
     esp_timer_create(&clock_timer_args, &clock_timer_handle_);
+    // 初始化看门狗
+    InitializeWatchdog();
 }
 
 Application::~Application() {
+    if (watchdog_timer_handle_ != nullptr) {
+        esp_timer_stop(watchdog_timer_handle_);
+        esp_timer_delete(watchdog_timer_handle_);
+    }
     if (clock_timer_handle_ != nullptr) {
         esp_timer_stop(clock_timer_handle_);
         esp_timer_delete(clock_timer_handle_);
@@ -596,6 +602,8 @@ void Application::Schedule(std::function<void()> callback) {
 // they should use Schedule to call this function
 void Application::MainLoop() {
     while (true) {
+        // 重置看门狗计数器
+        ResetWatchdog();
         auto bits = xEventGroupWaitBits(event_group_,
             SCHEDULE_EVENT | AUDIO_INPUT_READY_EVENT | AUDIO_OUTPUT_READY_EVENT,
             pdTRUE, pdFALSE, portMAX_DELAY);
@@ -813,6 +821,31 @@ void Application::UpdateIotStates() {
     if (thing_manager.GetStatesJson(states, true)) {
         protocol_->SendIotStates(states);
     }
+}
+
+void Application::InitializeWatchdog() {
+    esp_timer_create_args_t watchdog_timer_args = {
+        .callback = [](void* arg) {
+            Application* app = (Application*)arg;
+            app->watchdog_counter_++;
+            if (app->watchdog_counter_ >= app->WATCHDOG_THRESHOLD) {
+                ESP_LOGE(TAG, "Watchdog timeout, system seems unresponsive for %d seconds, rebooting...", 
+                    app->WATCHDOG_THRESHOLD);
+                app->Reboot();
+            }
+        },
+        .arg = this,
+        .dispatch_method = ESP_TIMER_TASK,
+        .name = "watchdog_timer",
+        .skip_unhandled_events = true
+    };
+    esp_timer_create(&watchdog_timer_args, &watchdog_timer_handle_);
+    esp_timer_start_periodic(watchdog_timer_handle_, 1000000); // 1秒检查一次
+    ESP_LOGI(TAG, "Watchdog timer initialized, threshold: %d seconds", WATCHDOG_THRESHOLD);
+}
+
+void Application::ResetWatchdog() {
+    watchdog_counter_ = 0;
 }
 
 void Application::Reboot() {
