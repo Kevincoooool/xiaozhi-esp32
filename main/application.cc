@@ -15,6 +15,8 @@
 #include <cJSON.h>
 #include <driver/gpio.h>
 #include <arpa/inet.h>
+#include "avi_player_port.h"
+#include <esp_app_desc.h>
 
 #define TAG "Application"
 
@@ -341,7 +343,16 @@ void Application::Start() {
 
     /* Setup the display */
     auto display = board.GetDisplay();
-
+    avi_player_port_config_t config = {
+        .buffer_size = 50 * 1024,
+        .core_id = 1,
+        .display = display  // 传入LCD显示对象指针
+    };
+    avi_player_port_init(&config);
+    int free_sram = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+    int min_free_sram = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
+    int free_psram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+    ESP_LOGI(TAG, "Free internal: %u minimal internal: %u free_psram: %u", free_sram, min_free_sram, free_psram);
     /* Setup the audio codec */
     auto codec = board.GetAudioCodec();
     opus_decoder_ = std::make_unique<OpusDecoderWrapper>(codec->output_sample_rate(), 1, OPUS_FRAME_DURATION_MS);
@@ -464,7 +475,8 @@ void Application::Start() {
             auto emotion = cJSON_GetObjectItem(root, "emotion");
             if (emotion != NULL) {
                 Schedule([this, display, emotion_str = std::string(emotion->valuestring)]() {
-                    display->SetEmotion(emotion_str.c_str());
+                    // display->SetEmotion(emotion_str.c_str());
+                    display->SetEmotion("talk");
                 });
             }
         } else if (strcmp(type->valuestring, "iot") == 0) {

@@ -8,7 +8,7 @@
 #include <font_emoji.h>
 
 #include <atomic>
-
+#include <cstring>
 class LcdDisplay : public Display {
 protected:
     esp_lcd_panel_io_handle_t panel_io_ = nullptr;
@@ -19,7 +19,6 @@ protected:
     lv_obj_t* content_ = nullptr;
     lv_obj_t* container_ = nullptr;
     lv_obj_t* side_bar_ = nullptr;
-
     DisplayFonts fonts_;
 
     void SetupUI();
@@ -35,6 +34,7 @@ public:
     ~LcdDisplay();
     virtual void SetEmotion(const char* emotion) override;
     virtual void SetIcon(const char* icon) override;
+    virtual void SetFaceImage(uint8_t* frame_buffer, int width, int height);
 #if CONFIG_USE_WECHAT_MESSAGE_STYLE
     virtual void SetChatMessage(const char* role, const char* content) override; 
 #endif  
