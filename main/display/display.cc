@@ -254,7 +254,7 @@ void Display::SetChatMessage(const char* role, const char* content) {
     if (chat_message_label_ == nullptr) {
         return;
     }
-    lv_label_set_text(chat_message_label_, content);
+    // lv_label_set_text(chat_message_label_, content);
 }
 
 

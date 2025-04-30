@@ -2199,6 +2199,12 @@ CONFIG_WIFI_PROV_STA_ALL_CHANNEL_SCAN=y
 # end of Wi-Fi Provisioning Manager
 
 #
+# AVI Player
+#
+# CONFIG_AVI_PLAYER_DEBUG_INFO is not set
+# end of AVI Player
+
+#
 # IoT Button
 #
 CONFIG_BUTTON_PERIOD_TIME_MS=5

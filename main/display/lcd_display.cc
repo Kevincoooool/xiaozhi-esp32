@@ -559,11 +559,7 @@ void LcdDisplay::SetupUI() {
     status_bar_ = lv_obj_create(container_);
     lv_obj_set_size(status_bar_, LV_HOR_RES, fonts_.text_font->line_height);
     lv_obj_set_style_radius(status_bar_, 0, 0);
-    avi_image = lv_canvas_create(container_);
-    lv_obj_set_size(avi_image, LV_HOR_RES, 220); // 设置合适的大小
-    lv_obj_center(avi_image);
-    lv_obj_set_style_bg_color(status_bar_, current_theme.background, 0);
-    lv_obj_set_style_text_color(status_bar_, current_theme.text, 0);
+    
     
     /* Content */
     content_ = lv_obj_create(container_);
@@ -577,7 +573,11 @@ void LcdDisplay::SetupUI() {
 
     lv_obj_set_flex_flow(content_, LV_FLEX_FLOW_COLUMN); // 垂直布局（从上到下）
     lv_obj_set_flex_align(content_, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_SPACE_EVENLY); // 子对象居中对齐，等距分布
-
+    avi_image = lv_canvas_create(content_);
+    lv_obj_set_size(avi_image, LV_HOR_RES, 240); // 设置合适的大小
+    lv_obj_center(avi_image);
+    lv_obj_set_style_bg_color(status_bar_, current_theme.background, 0);
+    lv_obj_set_style_text_color(status_bar_, current_theme.text, 0);
     // emotion_label_ = lv_label_create(content_);
     // lv_obj_set_style_text_font(emotion_label_, &font_awesome_30_4, 0);
     // lv_label_set_text(emotion_label_, FONT_AWESOME_AI_CHIP);
@@ -687,7 +687,7 @@ void LcdDisplay::SetEmotion(const char* emotion) {
     //     lv_label_set_text(emotion_label_, "😶");
     // }
      // 可以根据emotion选择不同的视频文件
-     const char* video_path = "/spiffs/neutral.avi"; // 默认视频
+     const char* video_path = "/spiffs/daiji.avi"; // 默认视频
     printf("emotion: %s\n", emotion);
     if (strcmp(emotion, "happy") == 0) {
         video_path = "/spiffs/happy.avi";
@@ -716,7 +716,7 @@ void LcdDisplay::SetEmotion(const char* emotion) {
     } else if (strcmp(emotion, "confused") == 0) {
         video_path = "/spiffs/confused.avi";
     } else if (strcmp(emotion, "talk") == 0) {
-        video_path = "/spiffs/talk.avi";
+        video_path = "/spiffs/shuohua.avi";
     }
      // ... 添加更多情绪对应的视频
      
