@@ -17,9 +17,9 @@
 #include "power_manager.h"
 
 #define TAG "KevinBoxBoard"
-// class KevinBoxBoard : public BlufiBoard {
+class KevinBoxBoard : public BlufiBoard {
 
-class KevinBoxBoard : public WifiBoard {
+// class KevinBoxBoard : public WifiBoard {
 private:
     i2c_master_bus_handle_t codec_i2c_bus_;
     Button boot_button_;
@@ -200,8 +200,8 @@ public:
         if (!enabled) {
             power_save_timer_->WakeUp();
         }
-        // BlufiBoard::SetPowerSaveMode(enabled);
-        WifiBoard::SetPowerSaveMode(enabled);
+        BlufiBoard::SetPowerSaveMode(enabled);
+        // WifiBoard::SetPowerSaveMode(enabled);
     }
 };
 
