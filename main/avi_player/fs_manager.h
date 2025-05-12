@@ -48,6 +48,14 @@ typedef struct {
 esp_err_t fs_manager_init(fs_config_t *config);
 
 /**
+ * @brief 自动初始化文件系统，先尝试TF卡，失败则使用SPIFFS
+ * @param sd_config TF卡配置
+ * @param spiffs_config SPIFFS配置
+ * @return esp_err_t
+ */
+esp_err_t fs_manager_auto_init(fs_config_t *sd_config, fs_config_t *spiffs_config);
+
+/**
  * @brief 列出指定目录下的文件
  * @param path 目录路径
  */

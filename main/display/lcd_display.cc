@@ -87,7 +87,9 @@ static const ThemeColors LIGHT_THEME = {
 // Current theme - initialize based on default config
 static ThemeColors current_theme = LIGHT_THEME;
 LV_FONT_DECLARE(font_awesome_30_4);
-#define NO_USE_ESP_PORT_LVGL 1
+#define LCD_CS_LEFT_PIN  GPIO_NUM_48
+#define LCD_CS_RIGHT_PIN GPIO_NUM_41
+#define NO_USE_ESP_PORT_LVGL 0
 #if NO_USE_ESP_PORT_LVGL
 static SemaphoreHandle_t lvgl_mux = NULL;
 static lv_display_t *disp;
@@ -110,8 +112,7 @@ static lv_display_t *disp;
     
 //     lv_disp_flush_ready(drv);
 // }
-#define LCD_CS_LEFT_PIN  GPIO_NUM_48
-#define LCD_CS_RIGHT_PIN GPIO_NUM_41
+
 
 static void lcd_lvgl_flush_cb(lv_display_t *drv, const lv_area_t *area, unsigned char *color_map)
 {
@@ -881,8 +882,8 @@ void LcdDisplay::changeEyeStyle() {
     if(avi_image) {
         // 定义眼球视频文件路径数组
         static const char* eye_videos[] = {
-            "/spiffs/eye1.avi",
-            "/spiffs/eye2.avi"
+            "eye1.avi",
+            "eye2.avi"
         };
         static int current_eye_index = 0;
         
@@ -1061,39 +1062,39 @@ void LcdDisplay::SetEmotion(const char* emotion) {
     //     lv_label_set_text(emotion_label_, "😶");
     // }
      // 可以根据emotion选择不同的视频文件
-     const char* video_path = "/spiffs/neutral.avi"; // 默认视频
+     const char* video_path = "neutral.avi"; // 默认视频
     printf("emotion: %s\n", emotion);
     if (strcmp(emotion, "happy") == 0) {
-        video_path = "/spiffs/happy.avi";
+        video_path = "happy.avi";
     } else if (strcmp(emotion, "laughing") == 0) {
-        video_path = "/spiffs/laughing.avi";
+        video_path = "laughing.avi";
     } else if (strcmp(emotion, "funny") == 0) {
-        video_path = "/spiffs/funny.avi";
+        video_path = "funny.avi";
     } else if (strcmp(emotion, "sad") == 0) {
-        video_path = "/spiffs/sad.avi";
+        video_path = "sad.avi";
     } else if (strcmp(emotion, "angry") == 0) {
-        video_path = "/spiffs/angry.avi";
+        video_path = "angry.avi";
     } else if (strcmp(emotion, "crying") == 0) {
-        video_path = "/spiffs/crying.avi";
+        video_path = "crying.avi";
     } else if (strcmp(emotion, "loving") == 0) {
-        video_path = "/spiffs/loving.avi";
+        video_path = "loving.avi";
     } else if (strcmp(emotion, "embarrassed") == 0) {
-        video_path = "/spiffs/embarrassed.avi";
+        video_path = "embarrassed.avi";
     } else if (strcmp(emotion, "surprised") == 0) {
-        video_path = "/spiffs/surprised.avi";
+        video_path = "surprised.avi";
     } else if (strcmp(emotion, "thinking") == 0) {
-        video_path = "/spiffs/thinking.avi";
+        video_path = "thinking.avi";
     } else if (strcmp(emotion, "sleepy") == 0) {
-        video_path = "/spiffs/sleepy.avi";
+        video_path = "sleepy.avi";
     } else if (strcmp(emotion, "cool") == 0) {
-        video_path = "/spiffs/cool.avi";
+        video_path = "cool.avi";
     } else if (strcmp(emotion, "confused") == 0) {
-        video_path = "/spiffs/confused.avi";
+        video_path = "confused.avi";
     } else if (strcmp(emotion, "talk") == 0) {
-        video_path = "/spiffs/talk.avi";
+        video_path = "talk.avi";
     }
      // ... 添加更多情绪对应的视频
-     video_path = "/spiffs/eye1.avi";
+     video_path = "eye1.avi";
      // 播放对应的视频文件
      avi_player_port_play_file(video_path);
 }
