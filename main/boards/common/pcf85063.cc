@@ -5,17 +5,114 @@
 
 PCF85063::PCF85063(i2c_master_bus_handle_t i2c_bus, uint8_t addr) : I2cDevice(i2c_bus, addr) {
 }
-
 void PCF85063::Initialize() {
     // 控制寄存器1: 正常模式，无外部时钟测试模式，无周期性中断
     WriteReg(PCF85063_REG_CONTROL_1, 0x00);
     
-    // 控制寄存器2: 无报警中断，无倒计时中断
-    WriteReg(PCF85063_REG_CONTROL_2, 0x00);
+    // 读取控制寄存器2，检查是否有闹钟设置
+    uint8_t ctrl2 = ReadReg(PCF85063_REG_CONTROL_2);
     
-    ESP_LOGI(TAG, "PCF85063 RTC initialized");
+    // 检查闹钟是否触发
+    bool alarm_triggered = (ctrl2 & PCF85063_CTRL2_AF) != 0;
+    
+    if (alarm_triggered) {
+        ESP_LOGI(TAG, "检测到闹钟已触发");
+        
+        // 获取闹钟时间并打印
+        struct tm alarm_time;
+        if (GetAlarmTime(&alarm_time)) {
+            ESP_LOGI(TAG, "已触发的闹钟时间为: %02d:%02d:%02d, 日期: %d, 星期: %d",
+                     alarm_time.tm_hour, alarm_time.tm_min, alarm_time.tm_sec,
+                     alarm_time.tm_mday, alarm_time.tm_wday);
+        }
+        
+         
+        // 清除闹钟标志和中断使能
+        ctrl2 &= ~(PCF85063_CTRL2_AF | PCF85063_CTRL2_AIE);
+        WriteReg(PCF85063_REG_CONTROL_2, ctrl2);
+        
+        // 禁用所有闹钟字段
+        WriteReg(PCF85063_REG_SECOND_ALARM, PCF85063_ALARM_DISABLE);
+        WriteReg(PCF85063_REG_MINUTE_ALARM, PCF85063_ALARM_DISABLE);
+        WriteReg(PCF85063_REG_HOUR_ALARM, PCF85063_ALARM_DISABLE);
+        WriteReg(PCF85063_REG_DAY_ALARM, PCF85063_ALARM_DISABLE);
+        WriteReg(PCF85063_REG_WEEKDAY_ALARM, PCF85063_ALARM_DISABLE);
+        
+        ESP_LOGI(TAG, "闹钟已触发，闹钟设置已清除");
+    } else {
+        // 检查是否有闹钟设置
+        struct tm alarm_time;
+        bool has_alarm = GetAlarmTime(&alarm_time);
+        
+        if (has_alarm) {
+            // 获取当前时间
+            struct tm current_time;
+            GetTimeStruct(&current_time);
+            
+            // 比较闹钟时间和当前时间
+            bool is_expired = false;
+            
+            // 如果设置了具体日期，则进行完整的日期时间比较
+            if (alarm_time.tm_mday > 0) {
+                // 由于闹钟不存储月份和年份，我们假设闹钟设置在当前月份
+                alarm_time.tm_mon = current_time.tm_mon;
+                alarm_time.tm_year = current_time.tm_year;
+                
+                time_t alarm_timestamp = mktime(&alarm_time);
+                time_t current_timestamp = mktime(&current_time);
+                
+                is_expired = (alarm_timestamp < current_timestamp);
+            } else if (alarm_time.tm_wday >= 0) {
+                // 如果设置了星期，检查是否是过去的时间
+                int days_diff = alarm_time.tm_wday - current_time.tm_wday;
+                if (days_diff == 0) {
+                    // 同一天，比较时间
+                    is_expired = (alarm_time.tm_hour < current_time.tm_hour ||
+                                (alarm_time.tm_hour == current_time.tm_hour &&
+                                 alarm_time.tm_min < current_time.tm_min) ||
+                                (alarm_time.tm_hour == current_time.tm_hour &&
+                                 alarm_time.tm_min == current_time.tm_min &&
+                                 alarm_time.tm_sec <= current_time.tm_sec));
+                }
+            } else {
+                // 只设置了时间，比较时间部分
+                is_expired = (alarm_time.tm_hour < current_time.tm_hour ||
+                            (alarm_time.tm_hour == current_time.tm_hour &&
+                             alarm_time.tm_min < current_time.tm_min) ||
+                            (alarm_time.tm_hour == current_time.tm_hour &&
+                             alarm_time.tm_min == current_time.tm_min &&
+                             alarm_time.tm_sec <= current_time.tm_sec));
+            }
+            
+            if (is_expired) {
+                ESP_LOGI(TAG, "检测到过期闹钟，时间为: %02d:%02d:%02d, 日期: %d, 星期: %d",
+                         alarm_time.tm_hour, alarm_time.tm_min, alarm_time.tm_sec,
+                         alarm_time.tm_mday, alarm_time.tm_wday);
+                
+                // 清除闹钟设置
+                ctrl2 &= ~PCF85063_CTRL2_AIE;
+                WriteReg(PCF85063_REG_CONTROL_2, ctrl2);
+                
+                // 禁用所有闹钟字段
+                WriteReg(PCF85063_REG_SECOND_ALARM, PCF85063_ALARM_DISABLE);
+                WriteReg(PCF85063_REG_MINUTE_ALARM, PCF85063_ALARM_DISABLE);
+                WriteReg(PCF85063_REG_HOUR_ALARM, PCF85063_ALARM_DISABLE);
+                WriteReg(PCF85063_REG_DAY_ALARM, PCF85063_ALARM_DISABLE);
+                WriteReg(PCF85063_REG_WEEKDAY_ALARM, PCF85063_ALARM_DISABLE);
+                
+                ESP_LOGI(TAG, "过期闹钟已清除");
+            } else {
+                ESP_LOGI(TAG, "检测到有效闹钟，时间为: %02d:%02d:%02d, 日期: %d, 星期: %d",
+                         alarm_time.tm_hour, alarm_time.tm_min, alarm_time.tm_sec,
+                         alarm_time.tm_mday, alarm_time.tm_wday);
+            }
+        } else {
+            ESP_LOGI(TAG, "未检测到闹钟设置");
+        }
+    }
+    
+    ESP_LOGI(TAG, "PCF85063 RTC 初始化完成");
 }
-
 uint8_t PCF85063::BcdToDec(uint8_t val) {
     return (val / 16 * 10) + (val % 16);
 }
@@ -79,4 +176,140 @@ void PCF85063::SetTimeStruct(const struct tm* time_info) {
     ESP_LOGI(TAG, "Set time: %04d-%02d-%02d %02d:%02d:%02d",
              time_info->tm_year + 1900, time_info->tm_mon + 1, time_info->tm_mday,
              time_info->tm_hour, time_info->tm_min, time_info->tm_sec);
+}
+
+void PCF85063::SetAlarm(const struct tm* alarm_time, bool enable_seconds, 
+                       bool enable_minutes, bool enable_hours, 
+                       bool enable_day, bool enable_weekday) {
+    // 转换闹钟时间到BCD格式
+    uint8_t seconds = enable_seconds ? DecToBcd(alarm_time->tm_sec) : PCF85063_ALARM_DISABLE;
+    uint8_t minutes = enable_minutes ? DecToBcd(alarm_time->tm_min) : PCF85063_ALARM_DISABLE;
+    uint8_t hours = enable_hours ? DecToBcd(alarm_time->tm_hour) : PCF85063_ALARM_DISABLE;
+    uint8_t days = enable_day ? DecToBcd(alarm_time->tm_mday) : PCF85063_ALARM_DISABLE;
+    uint8_t weekdays = enable_weekday ? DecToBcd(alarm_time->tm_wday + 1) : PCF85063_ALARM_DISABLE;
+    
+    // 如果启用了某个字段，需要清除AEN位
+    if (enable_seconds) seconds &= ~PCF85063_ALARM_AEN;
+    if (enable_minutes) minutes &= ~PCF85063_ALARM_AEN;
+    if (enable_hours) hours &= ~PCF85063_ALARM_AEN;
+    if (enable_day) days &= ~PCF85063_ALARM_AEN;
+    if (enable_weekday) weekdays &= ~PCF85063_ALARM_AEN;
+    
+    // 写入闹钟寄存器
+    WriteReg(PCF85063_REG_SECOND_ALARM, seconds);
+    WriteReg(PCF85063_REG_MINUTE_ALARM, minutes);
+    WriteReg(PCF85063_REG_HOUR_ALARM, hours);
+    WriteReg(PCF85063_REG_DAY_ALARM, days);
+    WriteReg(PCF85063_REG_WEEKDAY_ALARM, weekdays);
+    
+    ESP_LOGI(TAG, "Set alarm: %02d:%02d:%02d, day: %d, weekday: %d",
+             enable_hours ? alarm_time->tm_hour : -1,
+             enable_minutes ? alarm_time->tm_min : -1,
+             enable_seconds ? alarm_time->tm_sec : -1,
+             enable_day ? alarm_time->tm_mday : -1,
+             enable_weekday ? alarm_time->tm_wday : -1);
+}
+
+void PCF85063::EnableAlarm(bool enable) {
+    uint8_t ctrl2 = ReadReg(PCF85063_REG_CONTROL_2);
+    
+    if (enable) {
+        // 设置AIE位启用闹钟中断
+        ctrl2 |= PCF85063_CTRL2_AIE;
+    } else {
+        // 清除AIE位禁用闹钟中断
+        ctrl2 &= ~PCF85063_CTRL2_AIE;
+    }
+    
+    // 写回控制寄存器2
+    WriteReg(PCF85063_REG_CONTROL_2, ctrl2);
+    
+    ESP_LOGI(TAG, "Alarm interrupt %s", enable ? "enabled" : "disabled");
+}
+bool PCF85063::IsAlarmEnabled() {
+    // 读取控制寄存器2，检查AIE位
+    uint8_t ctrl2 = ReadReg(PCF85063_REG_CONTROL_2);
+    return (ctrl2 & PCF85063_CTRL2_AIE) != 0;
+}
+bool PCF85063::IsAlarmTriggered() {
+    // 读取控制寄存器2，检查AF位
+    uint8_t ctrl2 = ReadReg(PCF85063_REG_CONTROL_2);
+    return (ctrl2 & PCF85063_CTRL2_AF) != 0;
+}
+
+void PCF85063::ClearAlarmFlag() {
+    // 读取控制寄存器2
+    uint8_t ctrl2 = ReadReg(PCF85063_REG_CONTROL_2);
+    
+    // 清除AF位
+    ctrl2 &= ~PCF85063_CTRL2_AF;
+    
+    // 写回控制寄存器2
+    WriteReg(PCF85063_REG_CONTROL_2, ctrl2);
+    
+    ESP_LOGI(TAG, "Alarm flag cleared");
+}
+
+bool PCF85063::GetAlarmTime(struct tm* alarm_time) {
+    // 读取闹钟寄存器
+    uint8_t buffer[5];
+    ReadRegs(PCF85063_REG_SECOND_ALARM, buffer, 5);
+    
+    // 检查是否有任何闹钟字段被启用（AEN位为0表示启用）
+    bool any_enabled = false;
+    
+    // 秒
+    if ((buffer[0] & PCF85063_ALARM_AEN) == 0) {
+        alarm_time->tm_sec = BcdToDec(buffer[0] & 0x7F);
+        any_enabled = true;
+    } else {
+        alarm_time->tm_sec = 0;
+    }
+    
+    // 分
+    if ((buffer[1] & PCF85063_ALARM_AEN) == 0) {
+        alarm_time->tm_min = BcdToDec(buffer[1] & 0x7F);
+        any_enabled = true;
+    } else {
+        alarm_time->tm_min = 0;
+    }
+    
+    // 时
+    if ((buffer[2] & PCF85063_ALARM_AEN) == 0) {
+        alarm_time->tm_hour = BcdToDec(buffer[2] & 0x3F);
+        any_enabled = true;
+    } else {
+        alarm_time->tm_hour = 0;
+    }
+    
+    // 日
+    if ((buffer[3] & PCF85063_ALARM_AEN) == 0) {
+        alarm_time->tm_mday = BcdToDec(buffer[3] & 0x3F);
+        any_enabled = true;
+    } else {
+        alarm_time->tm_mday = 1;
+    }
+    
+    // 星期
+    if ((buffer[4] & PCF85063_ALARM_AEN) == 0) {
+        alarm_time->tm_wday = BcdToDec(buffer[4] & 0x07) - 1;
+        any_enabled = true;
+    } else {
+        alarm_time->tm_wday = 0;
+    }
+    
+    // 其他字段设置为默认值
+    alarm_time->tm_mon = 0;
+    alarm_time->tm_year = 100; // 2000年
+    alarm_time->tm_isdst = -1;
+    
+    if (any_enabled) {
+        ESP_LOGI(TAG, "Get alarm: %02d:%02d:%02d, day: %d, weekday: %d",
+                 alarm_time->tm_hour, alarm_time->tm_min, alarm_time->tm_sec,
+                 alarm_time->tm_mday, alarm_time->tm_wday);
+    } else {
+        ESP_LOGI(TAG, "No alarm is set");
+    }
+    
+    return any_enabled;
 }

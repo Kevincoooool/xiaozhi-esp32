@@ -20,6 +20,8 @@
 #include "pcf85063.h"  // 添加PCF85063头文件
 #include <esp_sleep.h>  // 添加休眠头文件
 #include <time.h>
+#include "driver/rtc_io.h"
+#include "soc/rtc.h"
 #define TAG "kevin-lcd1.8"
 
 LV_FONT_DECLARE(font_puhui_20_4);
@@ -103,13 +105,6 @@ private:
     void InitializeRTC() {
         rtc_ = new PCF85063(codec_i2c_bus_);
         rtc_->Initialize();
-        
-        // 检查是否是RTC唤醒
-        esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
-        if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0) {
-            ESP_LOGI(TAG, "系统从RTC唤醒");
-            rtc_wakeup_ = true;
-        }
         
         // 获取并打印当前时间
         struct tm time_info;
@@ -313,18 +308,12 @@ public:
         codec->EnableInput(false);
         codec->EnableOutput(false);
         
-        // 如果没有指定休眠时间，则使用默认的最大休眠时间
-        if (sleep_time_us <= 0) {
-            sleep_time_us = 24 * 60 * 60 * 1000000LL; // 默认24小时
-        }
         
-        ESP_LOGI(TAG, "设置深度休眠时间: %lld 微秒", sleep_time_us);
-        
-        // 配置唤醒源
-        esp_sleep_enable_timer_wakeup(sleep_time_us);
+        rtc_gpio_pullup_en(VOLUME_DOWN_BUTTON_GPIO);
+        rtc_gpio_pulldown_dis(VOLUME_DOWN_BUTTON_GPIO);
         
         // 可以添加按键唤醒
-        esp_sleep_enable_ext0_wakeup(BOOT_BUTTON_GPIO, 0); // 低电平唤醒
+        esp_sleep_enable_ext0_wakeup(VOLUME_DOWN_BUTTON_GPIO, 0); // 低电平唤醒
         
         // 进入深度休眠
         ESP_LOGI(TAG, "正在进入深度休眠...");
