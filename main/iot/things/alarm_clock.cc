@@ -28,33 +28,33 @@ public:
             return alarm_enabled_;
         });
 
-        // properties_.AddBooleanProperty("triggered", "闹钟是否已触发", [this]() -> bool {
-        //     auto rtc = Board::GetInstance().GetRTC();
-        //     if (!rtc) return false;
+        properties_.AddBooleanProperty("triggered", "闹钟是否已触发", [this]() -> bool {
+            auto rtc = Board::GetInstance().GetRTC();
+            if (!rtc) return false;
             
-        //     alarm_triggered_ = rtc->IsAlarmTriggered();
-        //     return alarm_triggered_;
-        // });
+            alarm_triggered_ = rtc->IsAlarmTriggered();
+            return alarm_triggered_;
+        });
 
-        // properties_.AddStringProperty("time", "已设置的闹钟时间", [this]() -> std::string {
-        //     auto rtc = Board::GetInstance().GetRTC();
-        //     if (!rtc) return "未设置";
+        properties_.AddStringProperty("time", "已设置的闹钟时间", [this]() -> std::string {
+            auto rtc = Board::GetInstance().GetRTC();
+            if (!rtc) return "未设置";
             
-        //     if (rtc->GetAlarmTime(&alarm_time_)) {
-        //         char time_str[64];
-        //         const char* weekdays[] = {"周日", "周一", "周二", "周三", "周四", "周五", "周六"};
-        //         snprintf(time_str, sizeof(time_str), "%04d年%02d月%02d日 %s %02d:%02d:%02d", 
-        //                  alarm_time_.tm_year + 1900,  // 年份需要加上1900
-        //                  alarm_time_.tm_mon + 1,      // 月份需要加1（0-11变为1-12）
-        //                  alarm_time_.tm_mday,
-        //                  weekdays[alarm_time_.tm_wday],
-        //                  alarm_time_.tm_hour, 
-        //                  alarm_time_.tm_min, 
-        //                  alarm_time_.tm_sec);
-        //         return time_str;
-        //     }
-        //     return "未设置";
-        // });
+            if (rtc->GetAlarmTime(&alarm_time_)) {
+                char time_str[64];
+                const char* weekdays[] = {"周日", "周一", "周二", "周三", "周四", "周五", "周六"};
+                snprintf(time_str, sizeof(time_str), "%04d年%02d月%02d日 %s %02d:%02d:%02d", 
+                         alarm_time_.tm_year + 1900,  // 年份需要加上1900
+                         alarm_time_.tm_mon + 1,      // 月份需要加1（0-11变为1-12）
+                         alarm_time_.tm_mday,
+                         weekdays[alarm_time_.tm_wday],
+                         alarm_time_.tm_hour, 
+                         alarm_time_.tm_min, 
+                         alarm_time_.tm_sec);
+                return time_str;
+            }
+            return "未设置";
+        });
 
         // 设置闹钟方法
         methods_.AddMethod("SetAlarm", "设置闹钟时间", ParameterList({

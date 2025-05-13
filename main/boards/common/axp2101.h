@@ -11,7 +11,9 @@ public:
     bool IsChargingDone();
     int GetBatteryLevel();
     void PowerOff();
-
+ // ALDO3 控制方法
+    void EnableAldo3(bool enable);
+    bool IsAldo3Enabled();
 private:
     int GetBatteryCurrentDirection();
 };
