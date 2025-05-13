@@ -17,7 +17,9 @@
 #include <driver/i2c_master.h>
 #include <wifi_station.h>
 #include <esp_lcd_st77916.h>
-
+#include "pcf85063.h"  // 添加PCF85063头文件
+#include <esp_sleep.h>  // 添加休眠头文件
+#include <time.h>
 #define TAG "kevin-lcd1.8"
 
 LV_FONT_DECLARE(font_puhui_20_4);
@@ -59,14 +61,23 @@ private:
     LcdDisplay* display_;
     i2c_master_bus_handle_t codec_i2c_bus_;
     Pmic* pmic_ = nullptr;
-
+    PCF85063* rtc_ = nullptr;  // 添加RTC对象
+    // 添加RTC唤醒标志
+    bool rtc_wakeup_ = false;
+        
     Button volume_up_button_;
     Button volume_down_button_;
     PowerSaveTimer* power_save_timer_;
     void InitializePowerSaveTimer() {
         power_save_timer_ = new PowerSaveTimer(-1, -1, 600);
         power_save_timer_->OnShutdownRequest([this]() {
-            pmic_->PowerOff();
+            if (HasAlarm()) {
+                ESP_LOGI(TAG, "检测到闹钟设置，进入深度休眠模式而不是关机");
+                EnterDeepSleep();
+            } else {
+                ESP_LOGI(TAG, "无闹钟设置，执行正常关机");
+                pmic_->PowerOff();
+            }
         });
         power_save_timer_->SetEnabled(true);
     }
@@ -88,6 +99,25 @@ private:
         ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_bus_cfg, &codec_i2c_bus_));
     }
 
+    // 初始化RTC时钟芯片
+    void InitializeRTC() {
+        rtc_ = new PCF85063(codec_i2c_bus_);
+        rtc_->Initialize();
+        
+        // 检查是否是RTC唤醒
+        esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+        if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0) {
+            ESP_LOGI(TAG, "系统从RTC唤醒");
+            rtc_wakeup_ = true;
+        }
+        
+        // 获取并打印当前时间
+        struct tm time_info;
+        rtc_->GetTimeStruct(&time_info);
+        ESP_LOGI(TAG, "当前RTC时间: %04d-%02d-%02d %02d:%02d:%02d",
+                time_info.tm_year + 1900, time_info.tm_mon + 1, time_info.tm_mday,
+                time_info.tm_hour, time_info.tm_min, time_info.tm_sec);
+    }
     void Enable4GModule() {
         // Make GPIO HIGH to enable the 4G module
         gpio_config_t ml307_enable_config = {
@@ -207,6 +237,7 @@ private:
     // 物联网初始化，添加对 AI 可见设备
     void InitializeIot() {
         auto& thing_manager = iot::ThingManager::GetInstance();
+        thing_manager.AddThing(iot::CreateThing("AlarmClock")); // 添加闹钟组件
         thing_manager.AddThing(iot::CreateThing("Speaker"));
         thing_manager.AddThing(iot::CreateThing("Screen"));
     }
@@ -227,6 +258,7 @@ public:
         InitializeIot();
         InitializePowerSaveTimer();
         GetBacklight()->RestoreBrightness();
+        InitializeRTC();
     }
     
 
@@ -245,6 +277,61 @@ public:
         static PwmBacklight backlight(DISPLAY_BACKLIGHT_PIN, DISPLAY_BACKLIGHT_OUTPUT_INVERT);
         return &backlight;
     }
+     // 获取RTC对象
+     virtual PCF85063* GetRTC() override {
+        return rtc_;
+    }
+    
+    // 设置RTC时间
+    void SetRTCTime(time_t time) {
+        if (rtc_) {
+            rtc_->SetTime(time);
+        }
+    }
+    virtual void SyncTimeToRTC(time_t time) override {
+        if (rtc_ != nullptr) {
+            ESP_LOGI(TAG, "同步系统时间到RTC芯片");
+            rtc_->SetTime(time);
+            
+            // 获取并打印同步后的RTC时间
+            struct tm time_info;
+            rtc_->GetTimeStruct(&time_info);
+            ESP_LOGI(TAG, "RTC时间已更新: %04d-%02d-%02d %02d:%02d:%02d",
+                    time_info.tm_year + 1900, time_info.tm_mon + 1, time_info.tm_mday,
+                    time_info.tm_hour, time_info.tm_min, time_info.tm_sec);
+        }
+    }
+    // 实现深度休眠方法
+    virtual void EnterDeepSleep(int64_t sleep_time_us = 0) override {
+        ESP_LOGI(TAG, "准备进入深度休眠模式");
+        
+        // 保存必要的状态
+        GetBacklight()->SetBrightness(0);
+        
+        // 关闭外设
+        auto codec = GetAudioCodec();
+        codec->EnableInput(false);
+        codec->EnableOutput(false);
+        
+        // 如果没有指定休眠时间，则使用默认的最大休眠时间
+        if (sleep_time_us <= 0) {
+            sleep_time_us = 24 * 60 * 60 * 1000000LL; // 默认24小时
+        }
+        
+        ESP_LOGI(TAG, "设置深度休眠时间: %lld 微秒", sleep_time_us);
+        
+        // 配置唤醒源
+        esp_sleep_enable_timer_wakeup(sleep_time_us);
+        
+        // 可以添加按键唤醒
+        esp_sleep_enable_ext0_wakeup(BOOT_BUTTON_GPIO, 0); // 低电平唤醒
+        
+        // 进入深度休眠
+        ESP_LOGI(TAG, "正在进入深度休眠...");
+        esp_deep_sleep_start();
+    }
+    
+   
 };
 
 DECLARE_BOARD(KEVIN_LCD_18);

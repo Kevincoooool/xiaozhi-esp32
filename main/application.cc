@@ -595,6 +595,21 @@ void Application::Start() {
 void Application::OnClockTimer() {
     clock_ticks_++;
 
+    // 每分钟检查一次是否需要同步时间到RTC
+    if (clock_ticks_ % 60 == 0) {
+        // 获取当前系统时间
+        time_t now;
+        time(&now);
+        struct tm timeinfo;
+        localtime_r(&now, &timeinfo);
+        
+        // 如果年份大于2022年，说明已经通过NTP同步过时间
+        if (timeinfo.tm_year > 122) { // 122 = 2022 - 1900
+            // 尝试将NTP时间同步到RTC
+            auto& board = Board::GetInstance();
+            board.SyncTimeToRTC(now);
+        }
+    }
     // Print the debug info every 10 seconds
     if (clock_ticks_ % 10 == 0) {
         // SystemInfo::PrintRealTimeStats(pdMS_TO_TICKS(1000));
