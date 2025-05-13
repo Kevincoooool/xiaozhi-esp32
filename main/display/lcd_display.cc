@@ -880,15 +880,9 @@ void LcdDisplay::changeEyeStyle() {
         eye_animation_->switchEyeType(next_type);
     }
     if(avi_image) {
-        // 定义眼球视频文件路径数组
-        static const char* eye_videos[] = {
-            "eye1.avi",
-            "eye2.avi"
-        };
-        static int current_eye_index = 0;
         
         // 切换到下一个眼球视频
-        current_eye_index = (current_eye_index + 1) % 2;
+        current_eye_index = (current_eye_index + 1) % 10;
         avi_player_port_play_file(eye_videos[current_eye_index]);
     }
 }
@@ -898,6 +892,9 @@ uint8_t LcdDisplay::getCurrentEyeType() {
         // 获取当前眼睛类型
         EyeAnimation::EyeType current_type = eye_animation_->getCurrentEyeType();
         return current_type;
+    }
+    if(avi_image) {
+        return current_eye_index;
     }
     return 0;
 }
@@ -921,14 +918,15 @@ void LcdDisplay::SetupUI() {
 
    
     /* Status bar */
-    status_bar_ = lv_obj_create(container_);
-    lv_obj_set_size(status_bar_, LV_HOR_RES, fonts_.text_font->line_height);
-    lv_obj_set_style_radius(status_bar_, 0, 0);
+    // status_bar_ = lv_obj_create(container_);
+    // lv_obj_set_size(status_bar_, LV_HOR_RES, fonts_.text_font->line_height);
+    // lv_obj_set_style_radius(status_bar_, 0, 0);
+    // lv_obj_set_style_bg_color(status_bar_, current_theme.background, 0);
+    // lv_obj_set_style_text_color(status_bar_, current_theme.text, 0);
     avi_image = lv_canvas_create(container_);
-    lv_obj_set_size(avi_image, LV_HOR_RES, 220); // 设置合适的大小
+    lv_obj_set_size(avi_image, LV_HOR_RES, 240); // 设置合适的大小
     lv_obj_center(avi_image);
-    lv_obj_set_style_bg_color(status_bar_, current_theme.background, 0);
-    lv_obj_set_style_text_color(status_bar_, current_theme.text, 0);
+    
     
     /* Content */
     content_ = lv_obj_create(container_);
@@ -964,40 +962,40 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_text_color(chat_message_label_, current_theme.text, 0);
 
     /* Status bar */
-    lv_obj_set_flex_flow(status_bar_, LV_FLEX_FLOW_ROW);
-    lv_obj_set_style_pad_all(status_bar_, 0, 0);
-    lv_obj_set_style_border_width(status_bar_, 0, 0);
-    lv_obj_set_style_pad_column(status_bar_, 0, 0);
-    lv_obj_set_style_pad_left(status_bar_, 2, 0);
-    lv_obj_set_style_pad_right(status_bar_, 2, 0);
+    // lv_obj_set_flex_flow(status_bar_, LV_FLEX_FLOW_ROW);
+    // lv_obj_set_style_pad_all(status_bar_, 0, 0);
+    // lv_obj_set_style_border_width(status_bar_, 0, 0);
+    // lv_obj_set_style_pad_column(status_bar_, 0, 0);
+    // lv_obj_set_style_pad_left(status_bar_, 2, 0);
+    // lv_obj_set_style_pad_right(status_bar_, 2, 0);
 
-    network_label_ = lv_label_create(status_bar_);
-    lv_label_set_text(network_label_, "");
-    lv_obj_set_style_text_font(network_label_, fonts_.icon_font, 0);
-    lv_obj_set_style_text_color(network_label_, current_theme.text, 0);
+    // network_label_ = lv_label_create(status_bar_);
+    // lv_label_set_text(network_label_, "");
+    // lv_obj_set_style_text_font(network_label_, fonts_.icon_font, 0);
+    // lv_obj_set_style_text_color(network_label_, current_theme.text, 0);
 
-    notification_label_ = lv_label_create(status_bar_);
-    lv_obj_set_flex_grow(notification_label_, 1);
-    lv_obj_set_style_text_align(notification_label_, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_style_text_color(notification_label_, current_theme.text, 0);
-    lv_label_set_text(notification_label_, "");
-    lv_obj_add_flag(notification_label_, LV_OBJ_FLAG_HIDDEN);
+    // notification_label_ = lv_label_create(status_bar_);
+    // lv_obj_set_flex_grow(notification_label_, 1);
+    // lv_obj_set_style_text_align(notification_label_, LV_TEXT_ALIGN_CENTER, 0);
+    // lv_obj_set_style_text_color(notification_label_, current_theme.text, 0);
+    // lv_label_set_text(notification_label_, "");
+    // lv_obj_add_flag(notification_label_, LV_OBJ_FLAG_HIDDEN);
 
-    status_label_ = lv_label_create(status_bar_);
-    lv_obj_set_flex_grow(status_label_, 1);
-    lv_label_set_long_mode(status_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
-    lv_obj_set_style_text_align(status_label_, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_style_text_color(status_label_, current_theme.text, 0);
-    lv_label_set_text(status_label_, Lang::Strings::INITIALIZING);
-    mute_label_ = lv_label_create(status_bar_);
-    lv_label_set_text(mute_label_, "");
-    lv_obj_set_style_text_font(mute_label_, fonts_.icon_font, 0);
-    lv_obj_set_style_text_color(mute_label_, current_theme.text, 0);
+    // status_label_ = lv_label_create(status_bar_);
+    // lv_obj_set_flex_grow(status_label_, 1);
+    // lv_label_set_long_mode(status_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    // lv_obj_set_style_text_align(status_label_, LV_TEXT_ALIGN_CENTER, 0);
+    // lv_obj_set_style_text_color(status_label_, current_theme.text, 0);
+    // lv_label_set_text(status_label_, Lang::Strings::INITIALIZING);
+    // mute_label_ = lv_label_create(status_bar_);
+    // lv_label_set_text(mute_label_, "");
+    // lv_obj_set_style_text_font(mute_label_, fonts_.icon_font, 0);
+    // lv_obj_set_style_text_color(mute_label_, current_theme.text, 0);
 
-    battery_label_ = lv_label_create(status_bar_);
-    lv_label_set_text(battery_label_, "");
-    lv_obj_set_style_text_font(battery_label_, fonts_.icon_font, 0);
-    lv_obj_set_style_text_color(battery_label_, current_theme.text, 0);
+    // battery_label_ = lv_label_create(status_bar_);
+    // lv_label_set_text(battery_label_, "");
+    // lv_obj_set_style_text_font(battery_label_, fonts_.icon_font, 0);
+    // lv_obj_set_style_text_color(battery_label_, current_theme.text, 0);
 
     low_battery_popup_ = lv_obj_create(screen);
     lv_obj_set_scrollbar_mode(low_battery_popup_, LV_SCROLLBAR_MODE_OFF);
@@ -1094,9 +1092,10 @@ void LcdDisplay::SetEmotion(const char* emotion) {
         video_path = "talk.avi";
     }
      // ... 添加更多情绪对应的视频
-     video_path = "eye1.avi";
+    //  video_path = "eye1.avi";
+     avi_player_port_play_file(eye_videos[current_eye_index]);
      // 播放对应的视频文件
-     avi_player_port_play_file(video_path);
+    //  avi_player_port_play_file(video_path);
 }
 
 void LcdDisplay::SetIcon(const char* icon) {

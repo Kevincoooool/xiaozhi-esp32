@@ -10,6 +10,23 @@
 
 #include <atomic>
 #include <cstring>
+// 眼球视频数组定义
+static const char* eye_videos[] = {
+    "eye1.avi",
+    "eye2.avi",
+    "eye3.avi",
+    "eye4.avi",
+    "eye5.avi",
+    "eye6.avi",
+    "eye7.avi",
+    "eye8.avi",
+    "eye9.avi",
+    "eye10.avi",
+};
+
+// 眼球视频数量
+static const size_t eye_videos_count = sizeof(eye_videos) / sizeof(eye_videos[0]);
+
 class LcdDisplay : public Display {
 protected:
     esp_lcd_panel_io_handle_t panel_io_ = nullptr;
@@ -39,7 +56,7 @@ private:
     void* eye_canvas_buf_ = nullptr;
     EyeAnimation* eye_animation_ = nullptr;
     esp_timer_handle_t eye_timer_ = nullptr;
-
+    uint8_t current_eye_index = 0;
     static void UpdateEyeAnimation(lv_timer_t* timer);
     void SetupEyeCanvas();
     static void EyeTimerCallback(void* arg);
