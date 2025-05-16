@@ -11,7 +11,7 @@ public:
     bool IsChargingDone();
     int GetBatteryLevel();
     void PowerOff();
-
+    float GetTsTemperature(); // 添加获取温度的方法
 private:
     int GetBatteryCurrentDirection();
 };

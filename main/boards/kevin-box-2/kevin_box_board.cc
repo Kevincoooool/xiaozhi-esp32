@@ -43,10 +43,22 @@ public:
     
         WriteReg(0x14, 0x00); // set minimum system voltage to 4.1V (default 4.7V), for poor USB cables
         WriteReg(0x15, 0x00); // set input voltage limit to 3.88v, for poor USB cables
-        WriteReg(0x16, 0x05); // set input current limit to 2000mA
+        WriteReg(0x16, 0x01); // set input current limit to 500mA
     
         WriteReg(0x24, 0x01); // set Vsys for PWROFF threshold to 3.2V (default - 2.6V and kill battery)
-        WriteReg(0x50, 0x14); // set TS pin to EXTERNAL input (not temperature)
+        WriteReg(0x50, 0x06); // 配置TS引脚功能（REG 50） 使能 TS 引脚做温度传感，并打开恒流源 TS引脚电流源配置为50μA
+        WriteReg(0x30, 0x1F); // 启用ADC温度检测（REG 30） Bit 1: 设为 1（启用TS通道ADC）
+        WriteReg(0x40, 0x0c); // 启用温度保护功能
+        WriteReg(0x18, 0x02); // 关联温度保护与充电控制 Bit 1: 设为 1（启用电池充电）
+        WriteReg(0x13, 0x01); // 二进制00000011（启用检测+阈值125°C）
+
+        // 添加充电温度限制配置
+        WriteReg(0x52, 0x02); // 低→正常 滞回默认32mV
+        WriteReg(0x53, 0x01); // 高→正常 滞回默认4mV
+        WriteReg(0x54, 0x36); // 充电低温阈值 对应0°C（1.74V）断充
+        WriteReg(0x55, 0x3c); // 充电高温阈值 对应60°C（0.1195V）断充
+        WriteReg(0x58, 0x00); // 确保不走 JEITA 算法，而完全由上面阈值控制
+
     }
 };
 
@@ -63,7 +75,22 @@ private:
     Button volume_up_button_;
     Button volume_down_button_;
     PowerSaveTimer* power_save_timer_;
+    esp_timer_handle_t temp_timer_;
 
+    void InitializeTemperatureMonitor() {
+        esp_timer_create_args_t timer_args = {
+            .callback = [](void* arg) {
+                auto board = static_cast<KevinBoxBoard*>(arg);
+                float temp = board->pmic_->GetTsTemperature();
+                ESP_LOGI(TAG, "AXP2101 Temperature: %.1f°C", temp);
+            },
+            .arg = this,
+            .name = "temp_monitor"
+        };
+        
+        ESP_ERROR_CHECK(esp_timer_create(&timer_args, &temp_timer_));
+        ESP_ERROR_CHECK(esp_timer_start_periodic(temp_timer_, 500000)); // 500ms = 500,000us
+    }
     void InitializePowerSaveTimer() {
         power_save_timer_ = new PowerSaveTimer(-1, -1, 600);
         power_save_timer_->OnShutdownRequest([this]() {
@@ -227,11 +254,13 @@ public:
         InitializeCodecI2c();
         pmic_ = new Pmic(codec_i2c_bus_, AXP2101_I2C_ADDR);
 
+        InitializeTemperatureMonitor(); // 添加这一行
         Enable4GModule();
 
         InitializeButtons();
         InitializePowerSaveTimer();
         InitializeIot();
+
     }
 
     virtual Led* GetLed() override {
