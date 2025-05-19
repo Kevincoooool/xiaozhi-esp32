@@ -68,6 +68,8 @@ public:
         alarm_count_ = count;
     }
     virtual std::string GetBoardJson() = 0;
+    virtual void InitializeAlarm() {}
+    virtual void CheckAlarmAfterInit() {}
 };
 
 #define DECLARE_BOARD(BOARD_CLASS_NAME) \

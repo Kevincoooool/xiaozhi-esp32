@@ -67,12 +67,13 @@ private:
     PCF85063* rtc_ = nullptr;  // 添加RTC对象
     // 添加RTC唤醒标志
     bool rtc_wakeup_ = false;
-        
+    esp_timer_handle_t alarm_timer_ = nullptr;
+
     Button volume_up_button_;
     // Button volume_down_button_;
     PowerSaveTimer* power_save_timer_;
     void InitializePowerSaveTimer() {
-        power_save_timer_ = new PowerSaveTimer(-1, -1, 600);
+        power_save_timer_ = new PowerSaveTimer(-1, -1, 20);
         power_save_timer_->OnShutdownRequest([this]() {
             // 检查闹钟是否启用且未触发
             bool has_alarm = false;
@@ -88,11 +89,20 @@ private:
                         rtc_->GetTimeStruct(&current_time);
                         
                         // 比较时间,检查闹钟是否已过期
+                        alarm_time.tm_mon = current_time.tm_mon;
+                        alarm_time.tm_year = current_time.tm_year;
                         time_t alarm_timestamp = mktime(&alarm_time);
                         time_t current_timestamp = mktime(&current_time);
                         
-                        if (alarm_timestamp <= current_timestamp) {
-                            has_alarm = false; // 闹钟已过期
+                        // 修改判断逻辑：如果闹钟时间大于当前时间，则认为是有效闹钟
+                        has_alarm = (alarm_timestamp > current_timestamp);
+                        
+                        if (has_alarm) {
+                            ESP_LOGI(TAG, "检测到有效闹钟，时间为: %02d:%02d:%02d",
+                                     alarm_time.tm_hour, alarm_time.tm_min, alarm_time.tm_sec);
+                        } else {
+                            ESP_LOGI(TAG, "闹钟时间已过期: %02d:%02d:%02d",
+                                     alarm_time.tm_hour, alarm_time.tm_min, alarm_time.tm_sec);
                         }
                     }
                 }
@@ -100,9 +110,11 @@ private:
             
             if (has_alarm) {
                 ESP_LOGI(TAG, "检测到有效闹钟设置，进入深度休眠模式而不是关机");
+                vTaskDelay(1000 / portTICK_PERIOD_MS);
                 EnterDeepSleep();
             } else {
                 ESP_LOGI(TAG, "无有效闹钟设置，执行正常关机");
+                vTaskDelay(1000 / portTICK_PERIOD_MS);
                 pmic_->PowerOff();
             }
         });
@@ -126,8 +138,82 @@ private:
         ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_bus_cfg, &codec_i2c_bus_));
     }
 
+    esp_timer_handle_t alarm_check_timer_ = nullptr;
+    volatile bool alarm_triggered_ = false;
+    
+    // 闹钟中断处理函数，只设置标志位
+    static void IRAM_ATTR OnAlarmInterruptHandler(void* arg) {
+        KEVIN_LCD_18* board = (KEVIN_LCD_18*)arg;
+        board->alarm_triggered_ = true;
+    }
+    
+    // 定时器回调函数，检查闹钟状态
+    static void OnAlarmCheckTimer(void* arg) {
+        KEVIN_LCD_18* board = (KEVIN_LCD_18*)arg;
+        if (board->alarm_triggered_) {
+            board->alarm_triggered_ = false;
+            if (board->rtc_ != nullptr && board->rtc_->IsAlarmEnabled() && board->rtc_->IsAlarmTriggered()) {
+                // 在定时器中执行Alert
+                Application::GetInstance().Alert(Lang::Strings::ALARM, "", "", Lang::Sounds::P3_ALARM);
+            }
+        }
+    }
+    
+    // 实现闹钟初始化方法
+    void InitializeAlarm() override {
+        if (rtc_ != nullptr) {
+            // 检查唤醒源
+            esp_sleep_wakeup_cause_t wakeup_cause = esp_sleep_get_wakeup_cause();
+            if (wakeup_cause == ESP_SLEEP_WAKEUP_EXT0) {
+                rtc_wakeup_ = true;
+                ESP_LOGI(TAG, "Wakeup from EXT0");
+            } else if (wakeup_cause == ESP_SLEEP_WAKEUP_EXT1) {
+                // 获取触发唤醒的 GPIO 位掩码
+                uint64_t wakeup_pin_mask = esp_sleep_get_ext1_wakeup_status();
+                // 找出具体是哪个引脚触发了唤醒
+                for (int i = 0; i < 64; i++) {
+                    if (wakeup_pin_mask & (1ULL << i)) {
+                        ESP_LOGI(TAG, "Wakeup from GPIO %d", i);
+                        rtc_wakeup_ = true;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+// 定时器回调函数
+    static void alarm_timer_callback(void* arg) {
+        
+        Application::GetInstance().Alert(Lang::Strings::ALARM, "", "", Lang::Sounds::P3_ALARM);
+        
+    }
+    // 实现闹钟检查方法
+    
+    void CheckAlarmAfterInit() override {
+        if (rtc_ != nullptr && rtc_wakeup_) {
+            // 创建定时器配置
+            esp_timer_create_args_t timer_args = {
+                .callback = alarm_timer_callback,
+                .arg = this,
+                .dispatch_method = ESP_TIMER_TASK,
+                .name = "alarm_timer",
+                .skip_unhandled_events = true
+            };
+
+            // 创建定时器
+            ESP_ERROR_CHECK(esp_timer_create(&timer_args, &alarm_timer_));
+            
+            // 启动定时器，每3秒触发一次
+            ESP_ERROR_CHECK(esp_timer_start_periodic(alarm_timer_, 5000000));
+            
+            power_save_timer_->SetEnabled(false);
+            // 立即播放第一次提醒
+            Application::GetInstance().Alert(Lang::Strings::ALARM, "", "", Lang::Sounds::P3_ALARM);
+        }
+    }
     // 初始化RTC时钟芯片
     void InitializeRTC() {
+        
         rtc_ = new PCF85063(codec_i2c_bus_);
         rtc_->Initialize();
         
@@ -137,6 +223,32 @@ private:
         ESP_LOGI(TAG, "当前RTC时间: %04d-%02d-%02d %02d:%02d:%02d",
                 time_info.tm_year + 1900, time_info.tm_mon + 1, time_info.tm_mday,
                 time_info.tm_hour, time_info.tm_min, time_info.tm_sec);
+            
+    
+                // 配置RTC中断检测
+                gpio_config_t int_conf = {
+                    .pin_bit_mask = (1ULL << ALARM_INT_GPIO),
+                    .mode = GPIO_MODE_INPUT,
+                    .pull_up_en = GPIO_PULLUP_ENABLE,
+                    .pull_down_en = GPIO_PULLDOWN_DISABLE,
+                    .intr_type = GPIO_INTR_NEGEDGE
+                };
+                gpio_config(&int_conf);
+                gpio_install_isr_service(0);
+                gpio_isr_handler_add(ALARM_INT_GPIO, OnAlarmInterruptHandler, this);
+                
+                // 创建定时器检查闹钟状态
+                esp_timer_create_args_t timer_args = {
+                    .callback = OnAlarmCheckTimer,
+                    .arg = this,
+                    .dispatch_method = ESP_TIMER_TASK,
+                    .name = "alarm_check_timer",
+                    .skip_unhandled_events = true
+                };
+                ESP_ERROR_CHECK(esp_timer_create(&timer_args, &alarm_check_timer_));//100ms检查一次
+                
+                ESP_ERROR_CHECK(esp_timer_start_periodic(alarm_check_timer_, 100000)); // 1
+
     }
     void Enable4GModule() {
         // Make GPIO HIGH to enable the 4G module
@@ -150,7 +262,7 @@ private:
         gpio_config(&ml307_enable_config);
         gpio_set_level(GPIO_NUM_45, 1);
         vTaskDelay(1000 / portTICK_PERIOD_MS);
-        gpio_set_level(GPIO_NUM_45, 0);
+        gpio_set_level(GPIO_NUM_45, 1);
     }
 
     void InitializeSpi() {
@@ -213,6 +325,15 @@ private:
                     auto& wifi_board = static_cast<WifiBoard&>(GetCurrentBoard());
                     wifi_board.ResetWifiConfiguration();
                 }
+            }
+            if (alarm_timer_ != nullptr) {
+                
+                esp_timer_stop(alarm_timer_);
+                esp_timer_delete(alarm_timer_);
+                alarm_timer_ = nullptr;
+                ESP_LOGI(TAG, "Alarm stopped by BOOT button");
+                Application::GetInstance().Alert(Lang::Strings::ALARM, "", "", Lang::Sounds::P3_SUCCESS);
+                power_save_timer_->SetEnabled(true);
             }
         });
         boot_button_.OnPressDown([this]() {
@@ -277,9 +398,15 @@ public:
     boot_button_(BOOT_BUTTON_GPIO) ,
     volume_up_button_(VOLUME_UP_BUTTON_GPIO)
     // ,
-    // volume_down_button_(VOLUME_DOWN_BUTTON_GPIO)
+    // volume_down_button_(ALARM_INT_GPIO)
      {
         ESP_LOGI(TAG, "Initializing KEVIN LCD 1.8 Board");
+        // // 检查唤醒源
+        // esp_sleep_wakeup_cause_t wakeup_cause = esp_sleep_get_wakeup_cause();
+        // if (wakeup_cause == ESP_SLEEP_WAKEUP_EXT0) {
+        //     // 从RTC INT引脚唤醒，检查是否是闹钟触发
+        //     rtc_wakeup_ = true;
+        // }
         InitializeCodecI2c();
         pmic_ = new Pmic(codec_i2c_bus_, AXP2101_I2C_ADDR);
         Enable4GModule();
@@ -290,6 +417,7 @@ public:
         InitializePowerSaveTimer();
         GetBacklight()->RestoreBrightness();
         InitializeRTC();
+
     }
     
 
@@ -345,17 +473,25 @@ public:
         codec->EnableOutput(false);
          
        // 关闭 ALDO3 输出 (3.3V LDO)
-        if (pmic_ != nullptr) {
-            // 写入新状态
-            pmic_->EnableAldo3(false);
-        }
+        // if (pmic_ != nullptr) {
+        //     // 写入新状态
+        //     pmic_->EnableAldo3(false);
+        // }
         
-        rtc_gpio_pullup_en(VOLUME_DOWN_BUTTON_GPIO);
-        rtc_gpio_pulldown_dis(VOLUME_DOWN_BUTTON_GPIO);
-        
-        // 可以添加按键唤醒
-        esp_sleep_enable_ext0_wakeup(VOLUME_DOWN_BUTTON_GPIO, 0); // 低电平唤醒
-        
+        // 配置唤醒引脚
+        const uint64_t wakeup_pin_mask = 
+        (1ULL << GPIO_NUM_0) |      // BOOT按键
+        (1ULL << ALARM_INT_GPIO);   // 闹钟中断
+
+        // 配置上拉
+        // rtc_gpio_pullup_en(GPIO_NUM_0);
+        // rtc_gpio_pulldown_dis(GPIO_NUM_0);
+        // rtc_gpio_pullup_en(ALARM_INT_GPIO);
+        // rtc_gpio_pulldown_dis(ALARM_INT_GPIO);
+
+        // 使用ext1唤醒源，任意一个配置的GPIO变为低电平都会触发唤醒
+        esp_sleep_enable_ext1_wakeup(wakeup_pin_mask, ESP_EXT1_WAKEUP_ANY_LOW);
+                
         // 进入深度休眠
         ESP_LOGI(TAG, "正在进入深度休眠...");
         esp_deep_sleep_start();

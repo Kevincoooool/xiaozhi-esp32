@@ -12,33 +12,50 @@ void PCF85063::Initialize() {
     // 读取控制寄存器2，检查是否有闹钟设置
     uint8_t ctrl2 = ReadReg(PCF85063_REG_CONTROL_2);
     
-    // 检查闹钟是否触发
+    // 检查闹钟标志位是否被设置（表示闹钟已触发）
     bool alarm_triggered = (ctrl2 & PCF85063_CTRL2_AF) != 0;
     
     if (alarm_triggered) {
-        ESP_LOGI(TAG, "检测到闹钟已触发");
-        
-        // 获取闹钟时间并打印
+        // 获取闹钟时间和当前时间
         struct tm alarm_time;
-        if (GetAlarmTime(&alarm_time)) {
-            ESP_LOGI(TAG, "已触发的闹钟时间为: %02d:%02d:%02d, 日期: %d, 星期: %d",
-                     alarm_time.tm_hour, alarm_time.tm_min, alarm_time.tm_sec,
-                     alarm_time.tm_mday, alarm_time.tm_wday);
+        struct tm current_time;
+        GetTimeStruct(&current_time);
+        bool has_alarm = GetAlarmTime(&alarm_time);
+        
+        if (has_alarm) {
+            // 计算时间差（秒）
+            alarm_time.tm_mon = current_time.tm_mon;
+            alarm_time.tm_year = current_time.tm_year;
+            time_t alarm_timestamp = mktime(&alarm_time);
+            time_t current_timestamp = mktime(&current_time);
+            int time_diff = alarm_timestamp - current_timestamp;
+            
+            // 如果闹钟时间在当前时间20秒内，则认为是真正的闹钟触发
+            // 否则可能是由于其他原因（如掉电）导致的标志位被设置
+            if (abs(time_diff) <= 20) {
+                ESP_LOGI(TAG, "检测到闹钟已触发，时间为: %02d:%02d:%02d, 日期: %d, 星期: %d",
+                         alarm_time.tm_hour, alarm_time.tm_min, alarm_time.tm_sec,
+                         alarm_time.tm_mday, alarm_time.tm_wday);
+                
+                // 清除闹钟标志和设置
+                ctrl2 &= ~(PCF85063_CTRL2_AF | PCF85063_CTRL2_AIE);
+                WriteReg(PCF85063_REG_CONTROL_2, ctrl2);
+                
+                // 禁用所有闹钟字段
+                WriteReg(PCF85063_REG_SECOND_ALARM, PCF85063_ALARM_DISABLE);
+                WriteReg(PCF85063_REG_MINUTE_ALARM, PCF85063_ALARM_DISABLE);
+                WriteReg(PCF85063_REG_HOUR_ALARM, PCF85063_ALARM_DISABLE);
+                WriteReg(PCF85063_REG_DAY_ALARM, PCF85063_ALARM_DISABLE);
+                WriteReg(PCF85063_REG_WEEKDAY_ALARM, PCF85063_ALARM_DISABLE);
+                
+                ESP_LOGI(TAG, "闹钟已触发，闹钟设置已清除");
+            } else {
+                // 仅清除标志位，保留闹钟设置
+                ctrl2 &= ~PCF85063_CTRL2_AF;
+                WriteReg(PCF85063_REG_CONTROL_2, ctrl2);
+                ESP_LOGI(TAG, "检测到闹钟标志但时间不匹配，仅清除标志位");
+            }
         }
-        
-         
-        // 清除闹钟标志和中断使能
-        ctrl2 &= ~(PCF85063_CTRL2_AF | PCF85063_CTRL2_AIE);
-        WriteReg(PCF85063_REG_CONTROL_2, ctrl2);
-        
-        // 禁用所有闹钟字段
-        WriteReg(PCF85063_REG_SECOND_ALARM, PCF85063_ALARM_DISABLE);
-        WriteReg(PCF85063_REG_MINUTE_ALARM, PCF85063_ALARM_DISABLE);
-        WriteReg(PCF85063_REG_HOUR_ALARM, PCF85063_ALARM_DISABLE);
-        WriteReg(PCF85063_REG_DAY_ALARM, PCF85063_ALARM_DISABLE);
-        WriteReg(PCF85063_REG_WEEKDAY_ALARM, PCF85063_ALARM_DISABLE);
-        
-        ESP_LOGI(TAG, "闹钟已触发，闹钟设置已清除");
     } else {
         // 检查是否有闹钟设置
         struct tm alarm_time;
@@ -62,18 +79,6 @@ void PCF85063::Initialize() {
                 time_t current_timestamp = mktime(&current_time);
                 
                 is_expired = (alarm_timestamp < current_timestamp);
-            } else if (alarm_time.tm_wday >= 0) {
-                // 如果设置了星期，检查是否是过去的时间
-                int days_diff = alarm_time.tm_wday - current_time.tm_wday;
-                if (days_diff == 0) {
-                    // 同一天，比较时间
-                    is_expired = (alarm_time.tm_hour < current_time.tm_hour ||
-                                (alarm_time.tm_hour == current_time.tm_hour &&
-                                 alarm_time.tm_min < current_time.tm_min) ||
-                                (alarm_time.tm_hour == current_time.tm_hour &&
-                                 alarm_time.tm_min == current_time.tm_min &&
-                                 alarm_time.tm_sec <= current_time.tm_sec));
-                }
             } else {
                 // 只设置了时间，比较时间部分
                 is_expired = (alarm_time.tm_hour < current_time.tm_hour ||
@@ -186,28 +191,25 @@ void PCF85063::SetAlarm(const struct tm* alarm_time, bool enable_seconds,
     uint8_t minutes = enable_minutes ? DecToBcd(alarm_time->tm_min) : PCF85063_ALARM_DISABLE;
     uint8_t hours = enable_hours ? DecToBcd(alarm_time->tm_hour) : PCF85063_ALARM_DISABLE;
     uint8_t days = enable_day ? DecToBcd(alarm_time->tm_mday) : PCF85063_ALARM_DISABLE;
-    uint8_t weekdays = enable_weekday ? DecToBcd(alarm_time->tm_wday + 1) : PCF85063_ALARM_DISABLE;
     
     // 如果启用了某个字段，需要清除AEN位
     if (enable_seconds) seconds &= ~PCF85063_ALARM_AEN;
     if (enable_minutes) minutes &= ~PCF85063_ALARM_AEN;
     if (enable_hours) hours &= ~PCF85063_ALARM_AEN;
     if (enable_day) days &= ~PCF85063_ALARM_AEN;
-    if (enable_weekday) weekdays &= ~PCF85063_ALARM_AEN;
     
     // 写入闹钟寄存器
     WriteReg(PCF85063_REG_SECOND_ALARM, seconds);
     WriteReg(PCF85063_REG_MINUTE_ALARM, minutes);
     WriteReg(PCF85063_REG_HOUR_ALARM, hours);
     WriteReg(PCF85063_REG_DAY_ALARM, days);
-    WriteReg(PCF85063_REG_WEEKDAY_ALARM, weekdays);
+    WriteReg(PCF85063_REG_WEEKDAY_ALARM, PCF85063_ALARM_DISABLE);
     
-    ESP_LOGI(TAG, "Set alarm: %02d:%02d:%02d, day: %d, weekday: %d",
+    ESP_LOGI(TAG, "Set alarm: %02d:%02d:%02d, day: %d",
              enable_hours ? alarm_time->tm_hour : -1,
              enable_minutes ? alarm_time->tm_min : -1,
              enable_seconds ? alarm_time->tm_sec : -1,
-             enable_day ? alarm_time->tm_mday : -1,
-             enable_weekday ? alarm_time->tm_wday : -1);
+             enable_day ? alarm_time->tm_mday : -1);
 }
 
 void PCF85063::EnableAlarm(bool enable) {
@@ -290,9 +292,11 @@ bool PCF85063::GetAlarmTime(struct tm* alarm_time) {
         alarm_time->tm_mday = 1;
     }
     
-    // 星期
-    if ((buffer[4] & PCF85063_ALARM_AEN) == 0) {
-        alarm_time->tm_wday = BcdToDec(buffer[4] & 0x07) - 1;
+     // 星期
+     if ((buffer[4] & PCF85063_ALARM_AEN) == 0) {
+        uint8_t weekday = BcdToDec(buffer[4] & 0x07);
+        if (weekday == 7) weekday = 0;  // 将星期日(7)转换为0
+        alarm_time->tm_wday = weekday;
         any_enabled = true;
     } else {
         alarm_time->tm_wday = 0;

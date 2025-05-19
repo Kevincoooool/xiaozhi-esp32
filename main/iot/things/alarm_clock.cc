@@ -42,12 +42,10 @@ public:
             
             if (rtc->GetAlarmTime(&alarm_time_)) {
                 char time_str[64];
-                const char* weekdays[] = {"周日", "周一", "周二", "周三", "周四", "周五", "周六"};
-                snprintf(time_str, sizeof(time_str), "%04d年%02d月%02d日 %s %02d:%02d:%02d", 
+                snprintf(time_str, sizeof(time_str), "%04d年%02d月%02d日 %02d:%02d:%02d", 
                          alarm_time_.tm_year + 1900,  // 年份需要加上1900
                          alarm_time_.tm_mon + 1,      // 月份需要加1（0-11变为1-12）
                          alarm_time_.tm_mday,
-                         weekdays[alarm_time_.tm_wday],
                          alarm_time_.tm_hour, 
                          alarm_time_.tm_min, 
                          alarm_time_.tm_sec);
@@ -61,18 +59,16 @@ public:
             Parameter("hour", "小时(0-23)", kValueTypeNumber, true),
             Parameter("minute", "分钟(0-59)", kValueTypeNumber, true),
             Parameter("second", "秒(0-59)", kValueTypeNumber, false),
-            Parameter("day", "日期(1-31)", kValueTypeNumber, false),
-            Parameter("weekday", "星期(0-6,0为周日)", kValueTypeNumber, false),
+            Parameter("day", "一个月中的第几天，也就是日期(1-31)", kValueTypeNumber, false),
             Parameter("enabled", "是否启用闹钟", kValueTypeBoolean, true)
         }), [this](const ParameterList& parameters) {
             int hour = static_cast<int>(parameters["hour"].number());
             int minute = static_cast<int>(parameters["minute"].number());
             int second = static_cast<int>(parameters["second"].number());
             int day = static_cast<int>(parameters["day"].number());
-            int weekday = static_cast<int>(parameters["weekday"].number());
             bool enabled = parameters["enabled"].boolean();
             
-            SetAlarm(hour, minute, second, day, weekday, enabled);
+            SetAlarm(hour, minute, second, day, enabled);
         });
 
         // 启用/禁用闹钟
@@ -90,16 +86,16 @@ public:
         // });
 
         // 检查是否是RTC唤醒
-        esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
-        if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0 || wakeup_reason == ESP_SLEEP_WAKEUP_EXT1) {
-            ESP_LOGI(TAG, "系统从外部中断唤醒，检查是否是闹钟触发");
-            CheckAlarm();
-        }
+        // esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+        // if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0 || wakeup_reason == ESP_SLEEP_WAKEUP_EXT1) {
+        //     ESP_LOGI(TAG, "系统从外部中断唤醒，检查是否是闹钟触发");
+        //     CheckAlarm();
+        // }
     }
 
 private:
     // 设置闹钟
-    void SetAlarm(int hour, int minute, int second = 0, int day = 0, int weekday = -1, bool enabled = true) {
+    void SetAlarm(int hour, int minute, int second = 0, int day = 0, bool enabled = true) {
         auto rtc = Board::GetInstance().GetRTC();
         if (!rtc) {
             ESP_LOGE(TAG, "RTC不可用，无法设置闹钟");
@@ -118,19 +114,12 @@ private:
             return;
         }
 
-        // 如果指定了星期，验证星期有效性
-        if (weekday >= 0 && weekday > 6) {
-            ESP_LOGE(TAG, "无效的闹钟星期: %d", weekday);
-            return;
-        }
-
         // 设置闹钟时间
         struct tm alarm_time = {};
         alarm_time.tm_hour = hour;
         alarm_time.tm_min = minute;
         alarm_time.tm_sec = second;
         alarm_time.tm_mday = day > 0 ? day : 1;
-        alarm_time.tm_wday = weekday >= 0 ? weekday : 0;
 
         // 设置闹钟
         rtc->SetAlarm(&alarm_time, 
@@ -138,23 +127,24 @@ private:
                      true,        // 启用分钟
                      true,        // 启用小时
                      day > 0,     // 是否启用日期
-                     weekday >= 0 // 是否启用星期
+                     false        // 不启用星期
         );
 
         // 启用闹钟
         if (enabled) {
             rtc->EnableAlarm(true);
-            ESP_LOGI(TAG, "闹钟已设置并启用: %02d:%02d:%02d, 日期: %d, 星期: %d", 
-                     hour, minute, second, day, weekday);
+            ESP_LOGI(TAG, "闹钟已设置并启用: %02d:%02d:%02d, 日期: %d", 
+                     hour, minute, second, day);
         } else {
-            ESP_LOGI(TAG, "闹钟已设置但未启用: %02d:%02d:%02d, 日期: %d, 星期: %d", 
-                     hour, minute, second, day, weekday);
+            ESP_LOGI(TAG, "闹钟已设置但未启用: %02d:%02d:%02d, 日期: %d", 
+                     hour, minute, second, day);
         }
 
         // 更新闹钟状态
         Board::GetInstance().SetAlarmState(enabled);
     }
 
+private:
     // 启用/禁用闹钟
     void EnableAlarm(bool enable) {
         auto rtc = Board::GetInstance().GetRTC();
@@ -170,18 +160,6 @@ private:
         Board::GetInstance().SetAlarmState(enable);
     }
 
-    // 清除闹钟触发标志
-    void ClearAlarm() {
-        auto rtc = Board::GetInstance().GetRTC();
-        if (!rtc) {
-            ESP_LOGE(TAG, "RTC不可用，无法清除闹钟标志");
-            return;
-        }
-
-        rtc->ClearAlarmFlag();
-        ESP_LOGI(TAG, "闹钟触发标志已清除");
-    }
-
     // 检查闹钟是否触发
     void CheckAlarm() {
         auto rtc = Board::GetInstance().GetRTC();
@@ -193,16 +171,10 @@ private:
             // 获取闹钟时间并打印
             struct tm alarm_time;
             if (rtc->GetAlarmTime(&alarm_time)) {
-                ESP_LOGI(TAG, "触发的闹钟时间为: %02d:%02d:%02d, 日期: %d, 星期: %d",
+                ESP_LOGI(TAG, "触发的闹钟时间为: %02d:%02d:%02d, 日期: %d",
                          alarm_time.tm_hour, alarm_time.tm_min, alarm_time.tm_sec,
-                         alarm_time.tm_mday, alarm_time.tm_wday);
+                         alarm_time.tm_mday);
             }
-            
-            // 这里可以添加闹钟触发后的操作，比如播放提示音等
-            // ...
-
-            // 如果需要自动清除闹钟标志，取消下面的注释
-            // rtc->ClearAlarmFlag();
         }
     }
 };

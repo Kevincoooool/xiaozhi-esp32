@@ -3,6 +3,7 @@
         "type" :"zh-CN"
     },
     "strings": {
+        "ALARM":"闹钟时间到啦",
         "WARNING":"警告",
         "INFO":"信息",
         "ERROR":"错误",

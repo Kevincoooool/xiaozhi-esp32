@@ -385,7 +385,8 @@ void Application::Start() {
         reference_resampler_.Configure(codec->input_sample_rate(), 16000);
     }
     codec->Start();
-
+    board.InitializeAlarm();
+    board.CheckAlarmAfterInit();
 #if CONFIG_USE_AUDIO_PROCESSOR
     xTaskCreatePinnedToCore([](void* arg) {
         Application* app = (Application*)arg;
