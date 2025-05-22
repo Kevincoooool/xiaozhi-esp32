@@ -268,7 +268,36 @@ void Application::PlaySound(const std::string_view& sound) {
         audio_decode_queue_.emplace_back(std::move(packet));
     }
 }
+void Application::HandleAlarmTrigger() {
+    if (!protocol_) {
+        ESP_LOGE(TAG, "Protocol not initialized");
+        return;
+    }
 
+    Schedule([this]() {
+        if (device_state_ == kDeviceStateIdle) {
+            SetDeviceState(kDeviceStateConnecting);
+            if (!protocol_->OpenAudioChannel()) {
+                return;
+            }
+            // 获取任务UUID
+            Settings settings("wifi", false);
+ 
+            std::string task_uuid = settings.GetString("clock_uuid");
+            // 发送任务触发消息给服务器
+            std::string message = "{\"session_id\":\"" + protocol_->session_id() + "\",";
+            message += "\"type\":\"clock\",";
+            message += "\"state\":\"end\",";
+            message += "\"mode\":\"endclock\",";
+            message += "\"uuid\":\"" + task_uuid + "\"}";
+
+            protocol_->SendStartListening(kListeningModeManualStop);
+
+            // 设置为手动停止模式，等待服务器响应
+            SetListeningMode(kListeningModeManualStop);
+        }
+    });
+}
 void Application::ToggleChatState() {
     if (device_state_ == kDeviceStateActivating) {
         SetDeviceState(kDeviceStateIdle);
@@ -410,14 +439,17 @@ void Application::Start() {
     // Initialize the protocol
     display->SetStatus(Lang::Strings::LOADING_PROTOCOL);
 
-    if (ota_.HasMqttConfig()) {
-        protocol_ = std::make_unique<MqttProtocol>();
-    } else if (ota_.HasWebsocketConfig()) {
+    Settings settings("websocket", true);
+    // settings.SetString("url", "wss://api.tenclass.net/xiaozhi/v1/");
+    settings.SetString("url", "wss://ws.aiapp.wiki");
+    // if (ota_.HasMqttConfig()) {
+    //     protocol_ = std::make_unique<MqttProtocol>();
+    // } else if (ota_.HasWebsocketConfig()) {
         protocol_ = std::make_unique<WebsocketProtocol>();
-    } else {
-        ESP_LOGW(TAG, "No protocol specified in the OTA config, using MQTT");
-        protocol_ = std::make_unique<MqttProtocol>();
-    }
+    // } else {
+    //     ESP_LOGW(TAG, "No protocol specified in the OTA config, using MQTT");
+    //     protocol_ = std::make_unique<MqttProtocol>();
+    // }
 
     protocol_->OnNetworkError([this](const std::string& message) {
         SetDeviceState(kDeviceStateIdle);
@@ -453,6 +485,7 @@ void Application::Start() {
         });
     });
     protocol_->OnIncomingJson([this, display](const cJSON* root) {
+        
         // Parse JSON data
         auto type = cJSON_GetObjectItem(root, "type");
         if (strcmp(type->valuestring, "tts") == 0) {

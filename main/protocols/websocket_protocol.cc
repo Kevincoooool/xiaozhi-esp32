@@ -71,6 +71,7 @@ bool WebsocketProtocol::SendText(const std::string& text) {
         return false;
     }
 
+    ESP_LOGW(TAG, "Send text message: %s", text.c_str());
     if (!websocket_->Send(text)) {
         ESP_LOGE(TAG, "Failed to send text: %s", text.c_str());
         SetError(Lang::Strings::SERVER_ERROR);
@@ -78,6 +79,78 @@ bool WebsocketProtocol::SendText(const std::string& text) {
     }
 
     return true;
+}
+
+void WebsocketProtocol::HandleClockCommand(const cJSON* root) {
+    const char* state = cJSON_GetObjectItem(root, "state")->valuestring;
+    const char* session_id = cJSON_GetObjectItem(root, "session_id")->valuestring;
+    const char* mode = cJSON_GetObjectItem(root, "mode")->valuestring;
+    
+    if (strcmp(state, "start") == 0 && strcmp(mode, "setclock") == 0) {
+        auto clock_params = cJSON_GetObjectItem(root, "clock_params");
+        if (clock_params != NULL) {
+            const char* uuid = cJSON_GetObjectItem(clock_params, "uuid")->valuestring;
+            int64_t end_timer = cJSON_GetObjectItem(clock_params, "end_timer")->valueint;
+            bool loop = cJSON_GetObjectItem(clock_params, "loop")->valueint;
+            int loop_num = cJSON_GetObjectItem(clock_params, "loop_num")->valueint;
+            
+            // 保存任务信息到 NVS
+            Settings settings("wifi", false);
+            settings.SetString("clock_uuid", std::to_string(end_timer));
+            ESP_LOGI(TAG, "Saved clock task: %s, end_timer: %lld", uuid, end_timer);
+            
+            // 保存会话 ID
+            session_id_ = session_id;
+            // 启动定时器
+            StartAlarmTimer(end_timer);
+        }
+    }
+}
+
+void WebsocketProtocol::StartAlarmTimer(int64_t end_timer) {
+    if (alarm_timer_ != nullptr) {
+        esp_timer_stop(alarm_timer_);
+        esp_timer_delete(alarm_timer_);
+        alarm_timer_ = nullptr;
+    }
+
+    alarm_end_time_ = end_timer;
+    esp_timer_create_args_t alarm_timer_args = {
+        .callback = [](void* arg) {
+            WebsocketProtocol* protocol = (WebsocketProtocol*)arg;
+            protocol->CheckAlarmTimer();
+        },
+        .arg = this,
+        .dispatch_method = ESP_TIMER_TASK,
+        .name = "alarm_timer",
+        .skip_unhandled_events = true
+    };
+    
+    esp_timer_create(&alarm_timer_args, &alarm_timer_);
+    // 每秒检查一次是否到达目标时间
+    esp_timer_start_periodic(alarm_timer_, 1000000);
+}
+
+void WebsocketProtocol::CheckAlarmTimer() {
+    time_t now;
+    time(&now);
+    
+    if (now >= alarm_end_time_) {
+        // 时间到达，触发闹钟
+        auto& app = Application::GetInstance();
+        app.HandleAlarmTrigger();
+        
+        // 停止定时器
+        StopAlarmTimer();
+    }
+}
+
+void WebsocketProtocol::StopAlarmTimer() {
+    if (alarm_timer_ != nullptr) {
+        esp_timer_stop(alarm_timer_);
+        esp_timer_delete(alarm_timer_);
+        alarm_timer_ = nullptr;
+    }
 }
 
 bool WebsocketProtocol::IsAudioChannelOpened() const {
@@ -119,7 +192,7 @@ bool WebsocketProtocol::OpenAudioChannel() {
     websocket_->SetHeader("Protocol-Version", std::to_string(version_).c_str());
     websocket_->SetHeader("Device-Id", SystemInfo::GetMacAddress().c_str());
     websocket_->SetHeader("Client-Id", Board::GetInstance().GetUuid().c_str());
-
+    ESP_LOGW(TAG, "Open audio channel with url: %s, token: %s, version: %d", url.c_str(), token.c_str(), version_);
     websocket_->OnData([this](const char* data, size_t len, bool binary) {
         if (binary) {
             if (on_incoming_audio_ != nullptr) {
@@ -161,6 +234,9 @@ bool WebsocketProtocol::OpenAudioChannel() {
                     if (on_incoming_json_ != nullptr) {
                         on_incoming_json_(root);
                     }
+                }
+                if (strcmp(type->valuestring, "clock") == 0) {
+                    HandleClockCommand(root);
                 }
             } else {
                 ESP_LOGE(TAG, "Missing message type, data: %s", data);

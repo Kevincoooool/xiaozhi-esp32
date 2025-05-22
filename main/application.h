@@ -72,6 +72,7 @@ public:
     void WakeWordInvoke(const std::string& wake_word);
     void PlaySound(const std::string_view& sound);
     bool CanEnterSleepMode();
+    void HandleAlarmTrigger();
 
 private:
     Application();
@@ -126,6 +127,8 @@ private:
     void OnClockTimer();
     void SetListeningMode(ListeningMode mode);
     void AudioLoop();
+    bool alarm_triggered_ = false;
+    std::string task_uuid_; // 存储当前任务的UUID
 };
 
 #endif // _APPLICATION_H_
