@@ -86,29 +86,63 @@ void WebsocketProtocol::HandleClockCommand(const cJSON* root) {
     const char* session_id = cJSON_GetObjectItem(root, "session_id")->valuestring;
     const char* mode = cJSON_GetObjectItem(root, "mode")->valuestring;
     
+    ESP_LOGI(TAG, "Received clock command - state: %s, mode: %s", state, mode);
+    
     if (strcmp(state, "start") == 0 && strcmp(mode, "setclock") == 0) {
         auto clock_params = cJSON_GetObjectItem(root, "clock_params");
         if (clock_params != NULL) {
-            const char* uuid = cJSON_GetObjectItem(clock_params, "uuid")->valuestring;
-            int64_t end_timer = cJSON_GetObjectItem(clock_params, "end_timer")->valueint;
-            bool loop = cJSON_GetObjectItem(clock_params, "loop")->valueint;
-            int loop_num = cJSON_GetObjectItem(clock_params, "loop_num")->valueint;
-            
-            // 保存任务信息到 NVS
-            Settings settings("wifi", false);
-            settings.SetString("clock_uuid", std::to_string(end_timer));
-            ESP_LOGI(TAG, "Saved clock task: %s, end_timer: %lld", uuid, end_timer);
-            
-            // 保存会话 ID
-            session_id_ = session_id;
-            // 启动定时器
-            StartAlarmTimer(end_timer);
+            const char* uuid = cJSON_GetObjectItem(root, "uuid")->valuestring;
+        int64_t end_timer = cJSON_GetObjectItem(clock_params, "end_timer")->valueint;
+        
+       // 获取当前UTC+8时间
+        time_t now;
+        time(&now);
+        now -= 8 * 3600; // 添加8小时的偏移，转换为UTC+8
+        
+        // 如果设置的时间已经过去，记录错误并返回
+        if (end_timer <= now) {
+            ESP_LOGE(TAG, "Invalid alarm time: end_timer(%lld) <= current_time(%lld), difference: %lld seconds", 
+                     end_timer, (int64_t)now, (int64_t)now - end_timer);
+            return;
+        }
+
+        // 打印时间信息时也使用本地时间
+        char end_time_str[64], current_time_str[64];
+        struct tm end_tm, current_tm;
+        time_t local_end_time = end_timer;
+        gmtime_r(&local_end_time, &end_tm);    // 使用gmtime_r因为时间戳已经是UTC+8
+        gmtime_r(&now, &current_tm);           // 同上
+        
+        strftime(end_time_str, sizeof(end_time_str), "%Y-%m-%d %H:%M:%S", &end_tm);
+        strftime(current_time_str, sizeof(current_time_str), "%Y-%m-%d %H:%M:%S", &current_tm);
+        
+        ESP_LOGI(TAG, "Setting alarm - Target: %s, Current: %s (UTC+8)", 
+                 end_time_str, current_time_str);
+        ESP_LOGI(TAG, "Time until alarm: %lld seconds", end_timer - (int64_t)now);
+        
+        // 其他参数检查
+        bool loop = cJSON_GetObjectItem(clock_params, "loop")->valueint;
+        int loop_num = cJSON_GetObjectItem(clock_params, "loop_num")->valueint;
+        
+        // 确认时间有效后再保存和启动定时器
+        Settings settings("clock", true);
+        settings.SetString("clock_uuid", uuid);  // 保存真实的uuid而不是时间戳
+        ESP_LOGI(TAG, "Saved clock task to NVS with UUID: %s", uuid);
+        
+        session_id_ = session_id;
+        StartAlarmTimer(end_timer);
+    } else {
+            ESP_LOGW(TAG, "Missing clock_params in clock command");
         }
     }
 }
 
 void WebsocketProtocol::StartAlarmTimer(int64_t end_timer) {
+    ESP_LOGI(TAG, "Starting alarm timer for end time: %lld (current time: %lld)", 
+             end_timer, time(nullptr));
+
     if (alarm_timer_ != nullptr) {
+        ESP_LOGI(TAG, "Stopping existing alarm timer");
         esp_timer_stop(alarm_timer_);
         esp_timer_delete(alarm_timer_);
         alarm_timer_ = nullptr;
@@ -126,16 +160,32 @@ void WebsocketProtocol::StartAlarmTimer(int64_t end_timer) {
         .skip_unhandled_events = true
     };
     
-    esp_timer_create(&alarm_timer_args, &alarm_timer_);
-    // 每秒检查一次是否到达目标时间
-    esp_timer_start_periodic(alarm_timer_, 1000000);
+    esp_err_t err = esp_timer_create(&alarm_timer_args, &alarm_timer_);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to create alarm timer: %s", esp_err_to_name(err));
+        return;
+    }
+    
+    err = esp_timer_start_periodic(alarm_timer_, 1000000); // 1秒
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to start alarm timer: %s", esp_err_to_name(err));
+        return;
+    }
+    
+    ESP_LOGI(TAG, "Alarm timer started successfully");
 }
 
 void WebsocketProtocol::CheckAlarmTimer() {
     time_t now;
     time(&now);
+    now -= 8 * 3600; // 添加8小时的偏移，转换为UTC+8
+    
+    ESP_LOGD(TAG, "Checking alarm timer - Current time: %lld, End time: %lld", 
+             (int64_t)now, alarm_end_time_);
     
     if (now >= alarm_end_time_) {
+        ESP_LOGI(TAG, "Alarm time reached! Triggering alarm at time: %lld", (int64_t)now);
+        
         // 时间到达，触发闹钟
         auto& app = Application::GetInstance();
         app.HandleAlarmTrigger();
@@ -146,10 +196,21 @@ void WebsocketProtocol::CheckAlarmTimer() {
 }
 
 void WebsocketProtocol::StopAlarmTimer() {
+    ESP_LOGI(TAG, "Stopping alarm timer");
+    
     if (alarm_timer_ != nullptr) {
-        esp_timer_stop(alarm_timer_);
-        esp_timer_delete(alarm_timer_);
+        esp_err_t err = esp_timer_stop(alarm_timer_);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to stop alarm timer: %s", esp_err_to_name(err));
+        }
+        
+        err = esp_timer_delete(alarm_timer_);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to delete alarm timer: %s", esp_err_to_name(err));
+        }
+        
         alarm_timer_ = nullptr;
+        ESP_LOGI(TAG, "Alarm timer stopped and deleted successfully");
     }
 }
 

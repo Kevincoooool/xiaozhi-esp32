@@ -281,7 +281,7 @@ void Application::HandleAlarmTrigger() {
                 return;
             }
             // 获取任务UUID
-            Settings settings("wifi", false);
+            Settings settings("clock", false);
  
             std::string task_uuid = settings.GetString("clock_uuid");
             // 发送任务触发消息给服务器
@@ -291,11 +291,58 @@ void Application::HandleAlarmTrigger() {
             message += "\"mode\":\"endclock\",";
             message += "\"uuid\":\"" + task_uuid + "\"}";
 
-            protocol_->SendStartListening(kListeningModeManualStop);
+            // protocol_->SendStartListening(kListeningModeManualStop);
+            protocol_->SendAlarm(message);  
 
             // 设置为手动停止模式，等待服务器响应
             SetListeningMode(kListeningModeManualStop);
         }
+        else if (device_state_ == kDeviceStateListening) {
+            // 停止监听
+            protocol_->SendStopListening();
+            SetDeviceState(kDeviceStateIdle);
+            // 获取任务UUID
+            Settings settings("clock", false);
+ 
+            std::string task_uuid = settings.GetString("clock_uuid");
+            // 发送任务触发消息给服务器
+            std::string message = "{\"session_id\":\"" + protocol_->session_id() + "\",";
+            message += "\"type\":\"clock\",";
+            message += "\"state\":\"end\",";
+            message += "\"mode\":\"endclock\",";
+            message += "\"uuid\":\"" + task_uuid + "\"}";
+
+            // protocol_->SendStartListening(kListeningModeManualStop);
+            protocol_->SendAlarm(message);  
+
+            // 设置为手动停止模式，等待服务器响应
+            SetListeningMode(kListeningModeManualStop);
+        }
+        else if (device_state_ == kDeviceStateSpeaking) {
+            // 停止监听
+            AbortSpeaking(kAbortReasonNone);
+            
+            // 等待语音完全停止
+            vTaskDelay(pdMS_TO_TICKS(200));
+            SetDeviceState(kDeviceStateIdle);
+            // 获取任务UUID
+            Settings settings("clock", false);
+ 
+            std::string task_uuid = settings.GetString("clock_uuid");
+            // 发送任务触发消息给服务器
+            std::string message = "{\"session_id\":\"" + protocol_->session_id() + "\",";
+            message += "\"type\":\"clock\",";
+            message += "\"state\":\"end\",";
+            message += "\"mode\":\"endclock\",";
+            message += "\"uuid\":\"" + task_uuid + "\"}";
+
+            // protocol_->SendStartListening(kListeningModeManualStop);
+            protocol_->SendAlarm(message);  
+
+            // 设置为手动停止模式，等待服务器响应
+            SetListeningMode(kListeningModeManualStop);
+        }
+        
     });
 }
 void Application::ToggleChatState() {

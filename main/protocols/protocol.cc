@@ -64,7 +64,9 @@ void Protocol::SendStopListening() {
     std::string message = "{\"session_id\":\"" + session_id_ + "\",\"type\":\"listen\",\"state\":\"stop\"}";
     SendText(message);
 }
-
+void Protocol::SendAlarm(const std::string& alarm) {
+    SendText(alarm);
+}
 void Protocol::SendIotDescriptors(const std::string& descriptors) {
     cJSON* root = cJSON_Parse(descriptors.c_str());
     if (root == nullptr) {
