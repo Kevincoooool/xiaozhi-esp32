@@ -45,6 +45,19 @@ esp_err_t avi_player_port_play_file(const char* filepath);
 esp_err_t avi_player_port_stop(void);
 
 /**
+ * @brief 设置是否循环播放
+ * @param enable 是否启用循环
+ * @return esp_err_t
+ */
+esp_err_t avi_player_port_set_loop(bool enable);
+
+/**
+ * @brief 重新播放最后一个文件
+ * @return esp_err_t
+ */
+esp_err_t avi_player_port_replay(void);
+
+/**
  * @brief 反初始化播放器
  */
 void avi_player_port_deinit(void);

@@ -441,6 +441,8 @@ void Application::Start() {
     int min_free_sram = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
     int free_psram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
     ESP_LOGI(TAG, "Free internal: %u minimal internal: %u free_psram: %u", free_sram, min_free_sram, free_psram);
+    
+    display->SetEmotion("idle");
     /* Setup the audio codec */
     auto codec = board.GetAudioCodec();
     opus_decoder_ = std::make_unique<OpusDecoderWrapper>(codec->output_sample_rate(), 1, OPUS_FRAME_DURATION_MS);
@@ -485,10 +487,10 @@ void Application::Start() {
 
     // Initialize the protocol
     display->SetStatus(Lang::Strings::LOADING_PROTOCOL);
-
+    
     Settings settings("websocket", true);
-    // settings.SetString("url", "wss://api.tenclass.net/xiaozhi/v1/");
-    settings.SetString("url", "wss://ws.aiapp.wiki");
+    settings.SetString("url", "wss://api.tenclass.net/xiaozhi/v1/");
+    // settings.SetString("url", "wss://ws.aiapp.wiki");
     // if (ota_.HasMqttConfig()) {
     //     protocol_ = std::make_unique<MqttProtocol>();
     // } else if (ota_.HasWebsocketConfig()) {
@@ -576,8 +578,8 @@ void Application::Start() {
             auto emotion = cJSON_GetObjectItem(root, "emotion");
             if (emotion != NULL) {
                 Schedule([this, display, emotion_str = std::string(emotion->valuestring)]() {
-                    // display->SetEmotion(emotion_str.c_str());
-                    display->SetEmotion("talk");
+                    display->SetEmotion(emotion_str.c_str());
+                    // display->SetEmotion("talk");
                 });
             }
         } else if (strcmp(type->valuestring, "iot") == 0) {
@@ -935,7 +937,8 @@ void Application::SetDeviceState(DeviceState state) {
             break;
         case kDeviceStateListening:
             display->SetStatus(Lang::Strings::LISTENING);
-            display->SetEmotion("neutral");
+            // display->SetEmotion("neutral");
+            display->SetEmotion("listen");
 
             // Update the IoT states before sending the start listening command
             UpdateIotStates();
