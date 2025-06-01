@@ -1,0 +1,12 @@
+dependencies:
+  cmake_utilities: 0.*
+  idf: '>=4.4'
+description: Parse the video stream and audio stream of an AVI video file.
+documentation: https://docs.espressif.com/projects/esp-iot-solution/en/latest/multimedia/avi_player.html
+issues: https://github.com/espressif/esp-iot-solution/issues
+repository: git://github.com/espressif/esp-iot-solution.git
+repository_info:
+  commit_sha: a4fdf46f42e57aa20521159dab5146fc511142a4
+  path: components/avi_player
+url: https://github.com/espressif/esp-iot-solution/tree/master/components/avi_player
+version: 1.0.0
