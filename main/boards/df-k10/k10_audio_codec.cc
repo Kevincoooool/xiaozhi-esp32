@@ -1,7 +1,7 @@
 #include "k10_audio_codec.h"
 
 #include <esp_log.h>
-#include <driver/i2c.h>
+#include <driver/i2c_master.h>
 #include <driver/i2s_tdm.h>
 #include <cmath>
 
@@ -74,8 +74,8 @@ void K10AudioCodec::CreateDuplexChannels(gpio_num_t mclk, gpio_num_t bclk, gpio_
     i2s_chan_config_t chan_cfg = {
         .id = I2S_NUM_0,
         .role = I2S_ROLE_MASTER,
-        .dma_desc_num = 6,
-        .dma_frame_num = 240,
+        .dma_desc_num = AUDIO_CODEC_DMA_DESC_NUM,
+        .dma_frame_num = AUDIO_CODEC_DMA_FRAME_NUM,
         .auto_clear_after_cb = true,
         .auto_clear_before_cb = false,
         .intr_priority = 0,
@@ -176,7 +176,7 @@ void K10AudioCodec::EnableInput(bool enable) {
             fs.channel_mask |= ESP_CODEC_DEV_MAKE_CHANNEL_MASK(1);
         }
         ESP_ERROR_CHECK(esp_codec_dev_open(input_dev_, &fs));
-        // ESP_ERROR_CHECK(esp_codec_dev_set_in_channel_gain(input_dev_, ESP_CODEC_DEV_MAKE_CHANNEL_MASK(0), 40.0));
+        ESP_ERROR_CHECK(esp_codec_dev_set_in_gain(input_dev_, 37.5)); //麦克风增益解决收音太小的问题
     } else {
         ESP_ERROR_CHECK(esp_codec_dev_close(input_dev_));
     }

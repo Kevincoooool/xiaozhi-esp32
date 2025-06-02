@@ -28,14 +28,16 @@ public:
 
     void SetOutputState(uint8_t bit, uint8_t level) {
         uint16_t data;
+        int index = bit;
+
         if (bit < 8) {
             data = ReadReg(0x02);
         } else {
             data = ReadReg(0x03);
-            bit -= 8;
+            index -= 8;
         }
 
-        data = (data & ~(1 << bit)) | (level << bit);
+        data = (data & ~(1 << index)) | (level << index);
 
         if (bit < 8) {
             WriteReg(0x02, data);
@@ -91,12 +93,7 @@ private:
             if (app.GetDeviceState() == kDeviceStateStarting && !WifiStation::GetInstance().IsConnected()) {
                 ResetWifiConfiguration();
             }
-        });
-        boot_button_.OnPressDown([this]() {
-            Application::GetInstance().StartListening();
-        });
-        boot_button_.OnPressUp([this]() {
-            Application::GetInstance().StopListening();
+            app.ToggleChatState();
         });
     }
 
@@ -129,7 +126,7 @@ private:
         xl9555_->SetOutputState(2, 0);
 
         esp_lcd_panel_init(panel);
-        esp_lcd_panel_invert_color(panel, true);
+        esp_lcd_panel_invert_color(panel, DISPLAY_BACKLIGHT_OUTPUT_INVERT);
         esp_lcd_panel_swap_xy(panel, DISPLAY_SWAP_XY); 
         esp_lcd_panel_mirror(panel, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y);
         display_ = new SpiLcdDisplay(panel_io, panel,
@@ -137,7 +134,11 @@ private:
                                     {
                                         .text_font = &font_puhui_20_4,
                                         .icon_font = &font_awesome_20_4,
-                                        .emoji_font = font_emoji_64_init(),
+                                        #if CONFIG_USE_WECHAT_MESSAGE_STYLE
+                                            .emoji_font = font_emoji_32_init(),
+                                        #else
+                                            .emoji_font = DISPLAY_HEIGHT >= 240 ? font_emoji_64_init() : font_emoji_32_init(),
+                                        #endif
                                     });
     }
 
@@ -145,6 +146,7 @@ private:
     void InitializeIot() {
         auto& thing_manager = iot::ThingManager::GetInstance();
         thing_manager.AddThing(iot::CreateThing("Speaker"));
+        thing_manager.AddThing(iot::CreateThing("Screen"));
     }
 
 public:

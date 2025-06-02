@@ -3,7 +3,6 @@ import opuslib
 import struct
 import numpy as np
 import sounddevice as sd
-import time
 import argparse
 
 def play_p3_file(input_file):
@@ -53,14 +52,6 @@ def play_p3_file(input_file):
                 
                 # 播放音频
                 stream.write(audio_array)
-                
-                # 等待一帧的时间
-                time.sleep(60 / 1000)  # 60ms
-            
-            # 播放结束后添加0.5秒静音，避免破音
-            silence = np.zeros(int(sample_rate / 2), dtype=np.int16)
-            stream.write(silence)
-            time.sleep(0.5)  # 等待1秒
                 
     except KeyboardInterrupt:
         print("\n播放已停止")

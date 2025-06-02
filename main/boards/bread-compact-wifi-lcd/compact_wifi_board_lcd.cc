@@ -5,6 +5,8 @@
 #include "application.h"
 #include "button.h"
 #include "config.h"
+#include "mcp_server.h"
+#include "lamp_controller.h"
 #include "iot/thing_manager.h"
 #include "led/single_led.h"
 
@@ -127,7 +129,11 @@ private:
                                     {
                                         .text_font = &font_puhui_16_4,
                                         .icon_font = &font_awesome_16_4,
+#if CONFIG_USE_WECHAT_MESSAGE_STYLE
+                                        .emoji_font = font_emoji_32_init(),
+#else
                                         .emoji_font = DISPLAY_HEIGHT >= 240 ? font_emoji_64_init() : font_emoji_32_init(),
+#endif
                                     });
     }
 
@@ -145,12 +151,14 @@ private:
 
     // 物联网初始化，添加对 AI 可见设备
     void InitializeIot() {
+#if CONFIG_IOT_PROTOCOL_XIAOZHI
         auto& thing_manager = iot::ThingManager::GetInstance();
         thing_manager.AddThing(iot::CreateThing("Speaker"));
+        thing_manager.AddThing(iot::CreateThing("Screen"));
         thing_manager.AddThing(iot::CreateThing("Lamp"));
-        if (DISPLAY_BACKLIGHT_PIN != GPIO_NUM_NC) {
-            thing_manager.AddThing(iot::CreateThing("Backlight"));
-        }
+#elif CONFIG_IOT_PROTOCOL_MCP
+        static LampController lamp(LAMP_GPIO);
+#endif
     }
 
 public:
