@@ -11,12 +11,12 @@ protected:
    
     // 新增获取API地址的函数
     bool FetchApiUrl();
-    WifiBoard();
+    
     void EnterWifiConfigMode();
     virtual std::string GetBoardJson() override;
 
 public:
-    
+    WifiBoard();
     virtual std::string GetBoardType() override;
     virtual void StartNetwork() override;
     virtual Http* CreateHttp() override;

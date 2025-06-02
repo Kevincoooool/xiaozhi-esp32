@@ -80,6 +80,9 @@ choice BOARD_TYPE
     config BOARD_TYPE_KEVIN_C3
         bool "Kevin C3"
         depends on IDF_TARGET_ESP32C3
+    config BOARD_TYPE_KEVIN_C3_TOY_V2
+        bool "Kevin C3 TOY_V2"
+        depends on IDF_TARGET_ESP32C3
     config BOARD_TYPE_KEVIN_SP_V3_DEV
         bool "Kevin SP V3开发板"
         depends on IDF_TARGET_ESP32S3

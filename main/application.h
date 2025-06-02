@@ -83,12 +83,12 @@ public:
 private:
     Application();
     ~Application();
-// 看门狗相关
+    // 看门狗相关
     esp_timer_handle_t watchdog_timer_handle_ = nullptr;
-    int watchdog_counter_ = 0;
-    static constexpr int WATCHDOG_THRESHOLD = 10; // 60秒无响应则重启
-    void ResetWatchdog();
+    uint32_t watchdog_counter_ = 0;
+    const uint32_t WATCHDOG_THRESHOLD = 60; // 60秒无响应则重启
     void InitializeWatchdog();
+    void ResetWatchdog();
     std::unique_ptr<WakeWord> wake_word_;
     std::unique_ptr<AudioProcessor> audio_processor_;
     Ota ota_;

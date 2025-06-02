@@ -160,15 +160,15 @@ bool WifiBoard::FetchApiUrl() {
     auto& board = Board::GetInstance();
     // Check if there is a new firmware version available
     post_data_= board.GetJson();
-    // 发送GET请求
-    if (!http->Open("GET", CONFIG_API_URL_ENDPOINT, post_data_)) {
+    http->SetContent(std::move(post_data_));
+     if (!http->Open("GET", CONFIG_API_URL_ENDPOINT)) {
         ESP_LOGE(TAG, "Failed to open HTTP connection");
         delete http;
         return false;
     }
 
     // 读取响应内容
-    auto response = http->GetBody();
+    auto response = http->ReadAll();
     http->Close();
     delete http;
 
@@ -197,14 +197,17 @@ bool WifiBoard::FetchApiUrl() {
 
     api_url_ = api->valuestring;
     ESP_LOGI(TAG, "Got API URL: %s", api_url_.c_str());
-
+    Settings settings("websocket", true);
+    settings.SetString("url", api_url_.c_str());
+        
     // 可选：保存 OTA URL
     cJSON *ota = cJSON_GetObjectItem(data, "ota");
     if (ota && ota->valuestring) {
         // 可以保存 OTA URL 供后续使用
         ota_url_ = ota->valuestring;
         ESP_LOGI(TAG, "Got OTA URL: %s", ota_url_.c_str());
-    
+        Settings settings("wifi", true);
+        settings.SetString("ota_url", ota_url_.c_str());
     }
     cJSON_Delete(root);
     return true;
@@ -215,12 +218,12 @@ Http* WifiBoard::CreateHttp() {
 }
 
 WebSocket* WifiBoard::CreateWebSocket() {
-#ifdef CONFIG_CONNECTION_TYPE_WEBSOCKET
+// #ifdef CONFIG_CONNECTION_TYPE_WEBSOCKET
     // 使用获取到的API地址
     ESP_LOGI(TAG, "API URL: %s", api_url_.c_str());
     // std::string url = "wss://ws.tdstar.net:443/";
     // std::string url = CONFIG_WEBSOCKET_URL;
-    std::string url = api_url_.empty() ? CONFIG_WEBSOCKET_URL : api_url_;
+    std::string url = api_url_.empty() ? "wss://ws.aiapp.wiki" : api_url_;
     // Settings settings("websocket", false);
     // std::string url = settings.GetString("url");
     if (url.find("wss://") == 0) {

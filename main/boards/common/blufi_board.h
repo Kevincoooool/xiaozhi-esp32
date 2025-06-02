@@ -41,6 +41,7 @@ public:
     void SaveWifiCredentials(const std::string& ssid, const std::string& password);
     virtual void SetConfigModeReboot(bool value);
     virtual bool IsConfigModeReboot();
+    virtual std::string GetDeviceStatusJson() override;
 };
 
 #endif // BLUFI_BOARD_H

@@ -21,9 +21,13 @@ public:
     void OnDoubleClick(std::function<void()> callback);
     void OnMultiClick(uint8_t clicks, std::function<void()> callback);
     void OnLongPressHold(std::function<void()> callback);  // 添加新函数声明
+    void OnMultipleClick(std::function<void()> callback, uint8_t click_count); // 添加缺失的声明
+
+protected:
+    button_handle_t button_handle_ = nullptr;
+
 private:
     gpio_num_t gpio_num_;
-    button_handle_t button_handle_ = nullptr;
     std::function<void()> on_multi_click_;
     uint8_t required_clicks_ = 0;
     uint8_t click_count_ = 0;
@@ -36,6 +40,7 @@ private:
     std::function<void()> on_click_;
     std::function<void()> on_double_click_;
     std::function<void()> on_long_press_hold_;
+    std::function<void()> on_multiple_click_; // 添加缺失的成员变量
 };
 
 #if CONFIG_SOC_ADC_SUPPORTED

@@ -86,7 +86,7 @@ Application::Application() {
     };
     esp_timer_create(&clock_timer_args, &clock_timer_handle_);
     // 初始化看门狗
-    InitializeWatchdog();
+    // InitializeWatchdog();
 }
 
 Application::~Application() {
@@ -437,14 +437,14 @@ void Application::Start() {
     McpServer::GetInstance().AddCommonTools();
 #endif
 
-    if (ota_.HasMqttConfig()) {
-        protocol_ = std::make_unique<MqttProtocol>();
-    } else if (ota_.HasWebsocketConfig()) {
+    // if (ota_.HasMqttConfig()) {
+    //     protocol_ = std::make_unique<MqttProtocol>();
+    // } else if (ota_.HasWebsocketConfig()) {
         protocol_ = std::make_unique<WebsocketProtocol>();
-    } else {
-        ESP_LOGW(TAG, "No protocol specified in the OTA config, using MQTT");
-        protocol_ = std::make_unique<MqttProtocol>();
-    }
+    // } else {
+    //     ESP_LOGW(TAG, "No protocol specified in the OTA config, using MQTT");
+    //     protocol_ = std::make_unique<MqttProtocol>();
+    // }
 
     protocol_->OnNetworkError([this](const std::string& message) {
         SetDeviceState(kDeviceStateIdle);
@@ -1014,24 +1014,24 @@ void Application::UpdateIotStates() {
 }
 
 void Application::InitializeWatchdog() {
-    esp_timer_create_args_t watchdog_timer_args = {
-        .callback = [](void* arg) {
-            Application* app = (Application*)arg;
-            app->watchdog_counter_++;
-            if (app->watchdog_counter_ >= app->WATCHDOG_THRESHOLD) {
-                ESP_LOGE(TAG, "Watchdog timeout, system seems unresponsive for %d seconds, rebooting...", 
-                    app->WATCHDOG_THRESHOLD);
-                app->Reboot();
-            }
-        },
-        .arg = this,
-        .dispatch_method = ESP_TIMER_TASK,
-        .name = "watchdog_timer",
-        .skip_unhandled_events = true
-    };
-    esp_timer_create(&watchdog_timer_args, &watchdog_timer_handle_);
-    esp_timer_start_periodic(watchdog_timer_handle_, 1000000); // 1秒检查一次
-    ESP_LOGI(TAG, "Watchdog timer initialized, threshold: %d seconds", WATCHDOG_THRESHOLD);
+    // esp_timer_create_args_t watchdog_timer_args = {
+    //     .callback = [](void* arg) {
+    //         Application* app = (Application*)arg;
+    //         app->watchdog_counter_++;
+    //         if (app->watchdog_counter_ >= app->WATCHDOG_THRESHOLD) {
+    //             ESP_LOGE(TAG, "Watchdog timeout, system seems unresponsive for %d seconds, rebooting...", 
+    //                 app->WATCHDOG_THRESHOLD);
+    //             app->Reboot();
+    //         }
+    //     },
+    //     .arg = this,
+    //     .dispatch_method = ESP_TIMER_TASK,
+    //     .name = "watchdog_timer",
+    //     .skip_unhandled_events = true
+    // };
+    // esp_timer_create(&watchdog_timer_args, &watchdog_timer_handle_);
+    // esp_timer_start_periodic(watchdog_timer_handle_, 1000000); // 1秒检查一次
+    // ESP_LOGI(TAG, "Watchdog timer initialized, threshold: %d seconds", WATCHDOG_THRESHOLD);
 }
 
 void Application::ResetWatchdog() {

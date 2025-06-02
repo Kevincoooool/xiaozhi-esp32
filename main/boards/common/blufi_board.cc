@@ -24,6 +24,8 @@
 
 #include "blufi_manager.hpp"
 
+#include <wifi_station.h>
+#include <wifi_configuration_ap.h>
 static const char *TAG = "BlufiBoard";
 
 BlufiBoard::BlufiBoard() {
@@ -474,15 +476,16 @@ bool BlufiBoard::FetchApiUrl() {
     auto& board = Board::GetInstance();
     // Check if there is a new firmware version available
     post_data_= board.GetJson();
-    // 发送GET请求
-    if (!http->Open("GET", CONFIG_API_URL_ENDPOINT, post_data_)) {
+    // 如果是GET请求，不需要设置内容
+    // 如果需要发送POST数据，应该使用SetContent
+    if (!http->Open("GET", CONFIG_API_URL_ENDPOINT)) {
         ESP_LOGE(TAG, "Failed to open HTTP connection");
         delete http;
         return false;
     }
 
     // 读取响应内容
-    auto response = http->GetBody();
+    auto response = http->ReadAll();
     http->Close();
     delete http;
 
@@ -511,14 +514,16 @@ bool BlufiBoard::FetchApiUrl() {
 
     api_url_ = api->valuestring;
     ESP_LOGI(TAG, "Got API URL: %s", api_url_.c_str());
-
+    Settings settings("websocket", true);
+    settings.SetString("url", api_url_.c_str());
     // 可选：保存 OTA URL
     cJSON *ota = cJSON_GetObjectItem(data, "ota");
     if (ota && ota->valuestring) {
         // 可以保存 OTA URL 供后续使用
         ota_url_ = ota->valuestring;
         ESP_LOGI(TAG, "Got OTA URL: %s", ota_url_.c_str());
-    
+        Settings settings("wifi", true);
+        settings.SetString("ota_url", ota_url_.c_str());
     }
     cJSON_Delete(root);
     return true;
@@ -528,18 +533,18 @@ Http* BlufiBoard::CreateHttp() {
 }
 
 WebSocket* BlufiBoard::CreateWebSocket() {
-#ifdef CONFIG_CONNECTION_TYPE_WEBSOCKET
+// #ifdef CONFIG_CONNECTION_TYPE_WEBSOCKET
     // 使用获取到的API地址
-    ESP_LOGI(TAG, "API URL: %s", api_url_.c_str());
+    // ESP_LOGI(TAG, "API URL: %s", api_url_.c_str());
     // std::string url = "wss://ws.tdstar.net:443/";
     // std::string url = CONFIG_WEBSOCKET_URL;
-    std::string url = api_url_.empty() ? CONFIG_WEBSOCKET_URL : api_url_;
+    std::string url = api_url_.empty() ? "wss://ws.aiapp.wiki" : api_url_;
     if (url.find("wss://") == 0) {
         return new WebSocket(new TlsTransport());
     } else {
         return new WebSocket(new TcpTransport());
     }
-#endif
+// #endif
     return nullptr;
 }
 
@@ -625,4 +630,95 @@ bool BlufiBoard::IsConfigModeReboot() {
     nvs_close(nvs_handle);
     
     return (err == ESP_OK && value == 1);
+}
+
+std::string BlufiBoard::GetDeviceStatusJson() {
+    /*
+     * 返回设备状态JSON
+     * 
+     * 返回的JSON结构如下：
+     * {
+     *     "audio_speaker": {
+     *         "volume": 70
+     *     },
+     *     "screen": {
+     *         "brightness": 100,
+     *         "theme": "light"
+     *     },
+     *     "battery": {
+     *         "level": 50,
+     *         "charging": true
+     *     },
+     *     "network": {
+     *         "type": "wifi",
+     *         "ssid": "Xiaozhi",
+     *         "rssi": -60
+     *     },
+     *     "chip": {
+     *         "temperature": 25
+     *     }
+     * }
+     */
+    auto& board = Board::GetInstance();
+    auto root = cJSON_CreateObject();
+
+    // Audio speaker
+    auto audio_speaker = cJSON_CreateObject();
+    auto audio_codec = board.GetAudioCodec();
+    if (audio_codec) {
+        cJSON_AddNumberToObject(audio_speaker, "volume", audio_codec->output_volume());
+    }
+    cJSON_AddItemToObject(root, "audio_speaker", audio_speaker);
+
+    // Screen brightness
+    auto backlight = board.GetBacklight();
+    auto screen = cJSON_CreateObject();
+    if (backlight) {
+        cJSON_AddNumberToObject(screen, "brightness", backlight->brightness());
+    }
+    auto display = board.GetDisplay();
+    if (display && display->height() > 64) { // For LCD display only
+        cJSON_AddStringToObject(screen, "theme", display->GetTheme().c_str());
+    }
+    cJSON_AddItemToObject(root, "screen", screen);
+
+    // Battery
+    int battery_level = 0;
+    bool charging = false;
+    bool discharging = false;
+    if (board.GetBatteryLevel(battery_level, charging, discharging)) {
+        cJSON* battery = cJSON_CreateObject();
+        cJSON_AddNumberToObject(battery, "level", battery_level);
+        cJSON_AddBoolToObject(battery, "charging", charging);
+        cJSON_AddItemToObject(root, "battery", battery);
+    }
+
+    // Network
+    auto network = cJSON_CreateObject();
+    auto& wifi_station = WifiStation::GetInstance();
+    cJSON_AddStringToObject(network, "type", "wifi");
+    cJSON_AddStringToObject(network, "ssid", wifi_station.GetSsid().c_str());
+    int rssi = wifi_station.GetRssi();
+    if (rssi >= -60) {
+        cJSON_AddStringToObject(network, "signal", "strong");
+    } else if (rssi >= -70) {
+        cJSON_AddStringToObject(network, "signal", "medium");
+    } else {
+        cJSON_AddStringToObject(network, "signal", "weak");
+    }
+    cJSON_AddItemToObject(root, "network", network);
+
+    // Chip
+    float esp32temp = 0.0f;
+    if (board.GetTemperature(esp32temp)) {
+        auto chip = cJSON_CreateObject();
+        cJSON_AddNumberToObject(chip, "temperature", esp32temp);
+        cJSON_AddItemToObject(root, "chip", chip);
+    }
+
+    auto json_str = cJSON_PrintUnformatted(root);
+    std::string json(json_str);
+    cJSON_free(json_str);
+    cJSON_Delete(root);
+    return json;
 }

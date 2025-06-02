@@ -89,21 +89,21 @@ bool WebsocketProtocol::OpenAudioChannel() {
     if (websocket_ != nullptr) {
         delete websocket_;
     }
-auto& board = Board::GetInstance();
+    auto& board = Board::GetInstance();
     error_occurred_ = false;
     // std::string url = board.GetApiUrl().empty() ? CONFIG_WEBSOCKET_URL : board.GetApiUrl();
     // std::string url = "wss://ws.tdstar.net:443/";
-    std::string url = "wss://ws.aiapp.wiki";
+    // std::string url = "wss://ws.aiapp.wiki";
     // std::string url = CONFIG_WEBSOCKET_URL;
-    std::string token = "Bearer " + std::string(CONFIG_WEBSOCKET_ACCESS_TOKEN);
+    // std::string token = "Bearer " + std::string("CONFIG_WEBSOCKET_ACCESS_TOKEN");
 
-    // Settings settings("websocket", false);
-    // std::string url = settings.GetString("url");
-    // std::string token = settings.GetString("token");
-    // int version = settings.GetInt("version");
-    // if (version != 0) {
-    //     version_ = version;
-    // }
+    Settings settings("websocket", false);
+    std::string url = settings.GetString("url");
+    std::string token = settings.GetString("token");
+    int version = settings.GetInt("version");
+    if (version != 0) {
+        version_ = version;
+    }
 
     error_occurred_ = false;
 

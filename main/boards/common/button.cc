@@ -47,7 +47,7 @@ void Button::OnLongPressHold(std::function<void()> callback) {
         return;
     }
     on_long_press_hold_ = callback;
-    iot_button_register_cb(button_handle_, BUTTON_LONG_PRESS_HOLD, [](void* handle, void* usr_data) {
+    iot_button_register_cb(button_handle_, BUTTON_LONG_PRESS_HOLD, nullptr, [](void* handle, void* usr_data) {
         Button* button = static_cast<Button*>(usr_data);
         if (button->on_long_press_hold_) {
             button->on_long_press_hold_();
@@ -63,7 +63,7 @@ void Button::OnMultiClick(uint8_t clicks, std::function<void()> callback) {
     on_multi_click_ = callback;
     
     // 注册单击回调来统计点击次数
-    iot_button_register_cb(button_handle_, BUTTON_PRESS_UP, [](void* handle, void* usr_data) {
+    iot_button_register_cb(button_handle_, BUTTON_PRESS_UP, nullptr, [](void* handle, void* usr_data) {
         Button* button = static_cast<Button*>(usr_data);
         int64_t current_time = esp_timer_get_time() / 1000; // 转换为毫秒
         
