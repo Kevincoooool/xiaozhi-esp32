@@ -119,3 +119,38 @@ fs_type_t fs_manager_get_type(void)
 {
     return current_fs_type;
 }
+
+esp_err_t fs_manager_auto_init(fs_config_t *sd_config, fs_config_t *spiffs_config)
+{
+    esp_err_t ret;
+    
+    if (sd_config == NULL || spiffs_config == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    // 首先尝试初始化SD卡
+    ESP_LOGI(TAG, "尝试初始化SD卡...");
+    sd_config->type = FS_TYPE_SD_CARD;
+    ret = init_sdcard(sd_config);
+    
+    if (ret == ESP_OK) {
+        // SD卡初始化成功
+        current_fs_type = FS_TYPE_SD_CARD;
+        ESP_LOGI(TAG, "SD卡初始化成功，使用SD卡文件系统");
+        return ESP_OK;
+    }
+    
+    // SD卡初始化失败，尝试SPIFFS
+    ESP_LOGW(TAG, "SD卡初始化失败，尝试SPIFFS");
+    spiffs_config->type = FS_TYPE_SPIFFS;
+    ret = init_spiffs(spiffs_config);
+    
+    if (ret == ESP_OK) {
+        current_fs_type = FS_TYPE_SPIFFS;
+        ESP_LOGI(TAG, "SPIFFS初始化成功，使用SPIFFS文件系统");
+        return ESP_OK;
+    }
+    
+    ESP_LOGE(TAG, "所有文件系统初始化失败");
+    return ret;
+}

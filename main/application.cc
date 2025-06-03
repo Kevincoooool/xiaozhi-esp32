@@ -442,7 +442,7 @@ void Application::Start() {
     int free_psram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
     ESP_LOGI(TAG, "Free internal: %u minimal internal: %u free_psram: %u", free_sram, min_free_sram, free_psram);
     
-    display->SetEmotion("idle");
+    // display->SetEmotion("idle");
     /* Setup the audio codec */
     auto codec = board.GetAudioCodec();
     opus_decoder_ = std::make_unique<OpusDecoderWrapper>(codec->output_sample_rate(), 1, OPUS_FRAME_DURATION_MS);

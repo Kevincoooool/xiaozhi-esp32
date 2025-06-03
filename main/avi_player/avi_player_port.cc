@@ -57,7 +57,21 @@ static void play_end_cb(void *arg)
 esp_err_t avi_player_port_init(avi_player_port_config_t *config)
 {
     // 初始化文件系统
-    fs_config_t fs_config = {
+    // 定义SD卡配置
+    fs_config_t sd_config = {
+        .type = FS_TYPE_SD_CARD,
+        .sd_card = {
+            .mount_point = "/sdcard",
+            .clk = GPIO_NUM_9, // 请根据你的硬件配置修改这些引脚
+            .cmd = GPIO_NUM_10,
+            .d0 = GPIO_NUM_3,
+            .format_if_mount_failed = false,
+            .max_files = 5
+        }
+    };
+    
+    // 定义SPIFFS配置作为备选
+    fs_config_t spiffs_config = {
         .type = FS_TYPE_SPIFFS,
         .spiffs = {
             .base_path = "/spiffs",
@@ -66,8 +80,20 @@ esp_err_t avi_player_port_init(avi_player_port_config_t *config)
             .format_if_mount_failed = true
         }
     };
-    ESP_ERROR_CHECK(fs_manager_init(&fs_config));
-    fs_manager_list_files("/spiffs");
+    
+    // 自动初始化最佳可用的文件系统
+    esp_err_t ret = fs_manager_auto_init(&sd_config, &spiffs_config);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize file system: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    
+    // 列出当前文件系统中的文件
+    if (fs_manager_get_type() == FS_TYPE_SD_CARD) {
+        fs_manager_list_files("/sdcard");
+    } else {
+        fs_manager_list_files("/spiffs");
+    }
 
     // 分配RGB缓冲区
     img_rgb565 = (uint8_t *)heap_caps_malloc(360 * 360 * 2, MALLOC_CAP_8BIT | MALLOC_CAP_SPIRAM);
@@ -89,6 +115,35 @@ esp_err_t avi_player_port_init(avi_player_port_config_t *config)
 
 esp_err_t avi_player_port_play_file(const char *filepath)
 {
+    char full_path[256] = {0};
+    
+    // 根据当前使用的文件系统类型，构建完整文件路径
+    if (fs_manager_get_type() == FS_TYPE_SD_CARD) {
+        // 如果路径不是以"/"开头，则添加"/sdcard/"前缀
+        if (filepath[0] != '/') {
+            snprintf(full_path, sizeof(full_path), "/sdcard/%s", filepath);
+        } else if (strncmp(filepath, "/sdcard/", 8) != 0) {
+            // 如果路径以"/"开头但不是以"/sdcard/"开头，则添加"/sdcard"前缀
+            snprintf(full_path, sizeof(full_path), "/sdcard%s", filepath);
+        } else {
+            // 已经是完整SD卡路径，直接使用
+            strncpy(full_path, filepath, sizeof(full_path) - 1);
+        }
+    } else {
+        // 如果路径不是以"/"开头，则添加"/spiffs/"前缀
+        if (filepath[0] != '/') {
+            snprintf(full_path, sizeof(full_path), "/spiffs/%s", filepath);
+        } else if (strncmp(filepath, "/spiffs/", 8) != 0) {
+            // 如果路径以"/"开头但不是以"/spiffs/"开头，则添加"/spiffs"前缀
+            snprintf(full_path, sizeof(full_path), "/spiffs%s", filepath);
+        } else {
+            // 已经是完整SPIFFS路径，直接使用
+            strncpy(full_path, filepath, sizeof(full_path) - 1);
+        }
+    }
+    
+    ESP_LOGI(TAG, "Playing file: %s", full_path);
+    
     // 如果当前正在播放，先停止
     if (is_playing) {
         avi_player_play_stop();
@@ -96,12 +151,12 @@ esp_err_t avi_player_port_play_file(const char *filepath)
     }
     
     // 保存文件路径用于循环播放
-    strncpy(last_filepath, filepath, sizeof(last_filepath) - 1);
+    strncpy(last_filepath, full_path, sizeof(last_filepath) - 1);
     last_filepath[sizeof(last_filepath) - 1] = '\0';
     
     // 开始新的播放
     is_playing = true;
-    esp_err_t ret = avi_player_play_from_file(filepath);
+    esp_err_t ret = avi_player_play_from_file(full_path);
     
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Playback failed: %s", esp_err_to_name(ret));

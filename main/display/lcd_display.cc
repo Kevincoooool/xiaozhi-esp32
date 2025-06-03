@@ -706,40 +706,40 @@ void LcdDisplay::SetEmotion(const char* emotion) {
     //     lv_label_set_text(emotion_label_, "😶");
     // }
      // 可以根据emotion选择不同的视频文件
-     const char* video_path = "/spiffs/idle.avi"; // 默认视频
+     const char* video_path = "idle.avi"; // 默认视频
     printf("emotion: %s\n", emotion);
     if (strcmp(emotion, "happy") == 0) {
-        video_path = "/spiffs/happy.avi";
+        video_path = "happy.avi";
     } else if (strcmp(emotion, "laughing") == 0) {
-        video_path = "/spiffs/laughing.avi";
+        video_path = "laughing.avi";
     } else if (strcmp(emotion, "funny") == 0) {
-        video_path = "/spiffs/funny.avi";
+        video_path = "funny.avi";
     } else if (strcmp(emotion, "sad") == 0) {
-        video_path = "/spiffs/sad.avi";
+        video_path = "sad.avi";
     } else if (strcmp(emotion, "angry") == 0) {
-        video_path = "/spiffs/angry.avi";
+        video_path = "angry.avi";
     } else if (strcmp(emotion, "crying") == 0) {
-        video_path = "/spiffs/crying.avi";
+        video_path = "crying.avi";
     } else if (strcmp(emotion, "loving") == 0) {
-        video_path = "/spiffs/loving.avi";
+        video_path = "loving.avi";
     } else if (strcmp(emotion, "embarrassed") == 0) {
-        video_path = "/spiffs/embarrassed.avi";
+        video_path = "embarrassed.avi";
     } else if (strcmp(emotion, "surprised") == 0) {
-        video_path = "/spiffs/surprised.avi";
+        video_path = "surprised.avi";
     } else if (strcmp(emotion, "thinking") == 0) {
-        video_path = "/spiffs/thinking.avi";
+        video_path = "thinking.avi";
     } else if (strcmp(emotion, "sleepy") == 0) {
-        video_path = "/spiffs/sleepy.avi";
+        video_path = "sleepy.avi";
     } else if (strcmp(emotion, "cool") == 0) {
-        video_path = "/spiffs/cool.avi";
+        video_path = "cool.avi";
     } else if (strcmp(emotion, "confused") == 0) {
-        video_path = "/spiffs/confused.avi";
+        video_path = "confused.avi";
     } else if (strcmp(emotion, "talk") == 0) {
-        video_path = "/spiffs/loving.avi";
+        video_path = "loving.avi";
     }else if (strcmp(emotion, "listen") == 0) {
-        video_path = "/spiffs/listen.avi";
+        video_path = "listen.avi";
     }else if (strcmp(emotion, "neutral") == 0) {
-        video_path = "/spiffs/idle.avi";
+        video_path = "idle.avi";
     }
      // ... 添加更多情绪对应的视频
      

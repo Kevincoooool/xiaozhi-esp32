@@ -93,7 +93,14 @@ static uint32_t read_frame(avi_data_t *avi, uint8_t *buffer, uint32_t length, ui
             return 0;
         }
         
-        size_t read_size = fread(&head, 1, sizeof(AVI_CHUNK_HEAD), avi->file.avi_file);
+        // 再次检查文件指针，防止在读取过程中被其他线程关闭
+        FILE* file_ptr = avi->file.avi_file;
+        if (file_ptr == NULL) {
+            ESP_LOGE(TAG, "File pointer became NULL during read operation");
+            return 0;
+        }
+        
+        size_t read_size = fread(&head, 1, sizeof(AVI_CHUNK_HEAD), file_ptr);
         if (read_size != sizeof(AVI_CHUNK_HEAD)) {
             ESP_LOGE(TAG, "Failed to read chunk head, read %d bytes", read_size);
             return 0;
@@ -127,12 +134,14 @@ static uint32_t read_frame(avi_data_t *avi, uint8_t *buffer, uint32_t length, ui
             return 0;
         }
         
-        if (avi->file.avi_file == NULL) {
-            ESP_LOGE(TAG, "Invalid file pointer");
+        // 再次检查文件指针，防止在读取过程中被其他线程关闭
+        FILE* file_ptr = avi->file.avi_file;
+        if (file_ptr == NULL) {
+            ESP_LOGE(TAG, "File pointer became NULL during read operation");
             return 0;
         }
         
-        size_t read_size = fread(buffer, 1, head.size, avi->file.avi_file);
+        size_t read_size = fread(buffer, 1, head.size, file_ptr);
         if (read_size != head.size) {
             ESP_LOGE(TAG, "Failed to read frame data, expected %"PRIu32" bytes, got %d bytes", head.size, read_size);
             return 0;
@@ -185,7 +194,15 @@ static esp_err_t avi_player(void)
         if (s_avi->avi_data.mode == PLAY_MEMORY) {
             s_avi->avi_data.memory.read_offset = s_avi->avi_data.AVI_file.movi_start;
         } else {
-            fseek(s_avi->avi_data.file.avi_file, s_avi->avi_data.AVI_file.movi_start, SEEK_SET);
+            // 确保文件指针有效
+            if (s_avi->avi_data.file.avi_file != NULL) {
+                fseek(s_avi->avi_data.file.avi_file, s_avi->avi_data.AVI_file.movi_start, SEEK_SET);
+            } else {
+                ESP_LOGE(TAG, "File pointer is NULL before seeking to movi_start");
+                s_avi->avi_data.state = AVI_PARSER_END;
+                xEventGroupSetBits(s_avi->event_group, EVENT_STOP_PLAY);
+                return ESP_FAIL;
+            }
         }
 
         s_avi->avi_data.state = AVI_PARSER_DATA;
@@ -195,19 +212,35 @@ static esp_err_t avi_player(void)
         /*!< clear event */
         xEventGroupClearBits(s_avi->event_group, EVENT_AUDIO_BUF_READY | EVENT_VIDEO_BUF_READY);
         while (1) {
+            // 检查是否收到停止信号
+            if (s_avi->avi_data.state == AVI_PARSER_END) {
+                ESP_LOGI(TAG, "Received stop signal during playback");
+                xEventGroupSetBits(s_avi->event_group, EVENT_AUDIO_BUF_READY | EVENT_VIDEO_BUF_READY);
+                return ESP_OK;
+            }
+            
             if (s_avi->avi_data.mode == PLAY_FILE && s_avi->avi_data.file.avi_file == NULL) {
                 ESP_LOGE(TAG, "File pointer is NULL during playback");
                 s_avi->avi_data.state = AVI_PARSER_END;
                 xEventGroupSetBits(s_avi->event_group, EVENT_STOP_PLAY);
+                xEventGroupSetBits(s_avi->event_group, EVENT_AUDIO_BUF_READY | EVENT_VIDEO_BUF_READY);
                 return ESP_FAIL;
             }
             
             s_avi->avi_data.str_size = read_frame(&s_avi->avi_data, s_avi->avi_data.pbuffer, buffer_size, &Strtype);
             
+            // 再次检查是否收到停止信号
+            if (s_avi->avi_data.state == AVI_PARSER_END) {
+                ESP_LOGI(TAG, "Received stop signal after frame read");
+                xEventGroupSetBits(s_avi->event_group, EVENT_AUDIO_BUF_READY | EVENT_VIDEO_BUF_READY);
+                return ESP_OK;
+            }
+            
             if (s_avi->avi_data.str_size == 0) {
                 ESP_LOGE(TAG, "Failed to read frame");
                 s_avi->avi_data.state = AVI_PARSER_END;
                 xEventGroupSetBits(s_avi->event_group, EVENT_STOP_PLAY);
+                xEventGroupSetBits(s_avi->event_group, EVENT_AUDIO_BUF_READY | EVENT_VIDEO_BUF_READY);
                 return ESP_FAIL;
             }
             
@@ -285,28 +318,57 @@ static void avi_player_task(void *args)
     bool exit = false;
     while (!exit) {
         uxBits = xEventGroupWaitBits(s_avi->event_group, EVENT_ALL, pdTRUE, pdFALSE, portMAX_DELAY);
+        
+        // 首先处理停止事件，优先级最高
         if (uxBits & EVENT_STOP_PLAY) {
+            ESP_LOGI(TAG, "Processing stop event");
             if (s_avi->avi_data.state != AVI_PARSER_NONE) {
                 s_avi->avi_data.state = AVI_PARSER_END;
                 esp_err_t ret = avi_player();
                 if (ret != ESP_OK) {
-                    ESP_LOGI(TAG, "AVI Perse failed");
+                    ESP_LOGE(TAG, "AVI Parse failed during stop");
                 }
+                
+                // 通知停止操作已完成处理
+                xEventGroupSetBits(s_avi->event_group, EVENT_AUDIO_BUF_READY | EVENT_VIDEO_BUF_READY);
             }
+            continue; // 处理完停止事件后，跳过其他事件处理
         }
 
         if (uxBits & EVENT_START_PLAY) {
+            // 确保之前的播放已经完全停止
+            if (s_avi->avi_data.state != AVI_PARSER_NONE) {
+                ESP_LOGW(TAG, "Previous playback not fully stopped, forcing stop");
+                s_avi->avi_data.state = AVI_PARSER_END;
+                if (s_avi->avi_data.mode == PLAY_FILE && s_avi->avi_data.file.avi_file != NULL) {
+                    FILE* tmp = s_avi->avi_data.file.avi_file;
+                    s_avi->avi_data.file.avi_file = NULL;
+                    fclose(tmp);
+                }
+                s_avi->avi_data.state = AVI_PARSER_NONE;
+                vTaskDelay(pdMS_TO_TICKS(50)); // 给一些时间让资源释放
+            }
+            
+            // 确保文件模式下文件指针有效
+            if (s_avi->avi_data.mode == PLAY_FILE && s_avi->avi_data.file.avi_file == NULL) {
+                ESP_LOGE(TAG, "File pointer is NULL before starting playback");
+                continue;
+            }
+            
             s_avi->avi_data.state = AVI_PARSER_HEADER;
             esp_err_t ret = avi_player();
             if (ret != ESP_OK) {
-                ESP_LOGI(TAG, "AVI Perse failed");
+                ESP_LOGE(TAG, "AVI Parse failed");
             }
         }
 
         if (uxBits & EVENT_FPS_TIME_UP) {
-            esp_err_t ret = avi_player();
-            if (ret != ESP_OK) {
-                ESP_LOGI(TAG, "AVI Perse failed");
+            // 只有在播放状态才处理帧事件
+            if (s_avi->avi_data.state == AVI_PARSER_DATA || s_avi->avi_data.state == AVI_PARSER_HEADER) {
+                esp_err_t ret = avi_player();
+                if (ret != ESP_OK) {
+                    ESP_LOGE(TAG, "AVI Parse failed");
+                }
             }
         }
 
@@ -314,7 +376,6 @@ static void avi_player_task(void *args)
             exit = true;
             break;
         }
-
     }
     xEventGroupSetBits(s_avi->event_group, EVENT_DEINIT_DONE);
     vTaskDelete(NULL);
@@ -373,6 +434,26 @@ esp_err_t avi_player_get_audio_buffer(void **buffer, size_t *buffer_size, audio_
 
 esp_err_t avi_player_play_from_memory(uint8_t *avi_data, size_t avi_size)
 {
+    if (s_avi == NULL) {
+        ESP_LOGE(TAG, "AVI player not initialized");
+        return ESP_ERR_INVALID_STATE;
+    }
+    
+    // 检查输入参数
+    if (avi_data == NULL || avi_size == 0) {
+        ESP_LOGE(TAG, "Invalid memory parameters");
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    // 如果当前正在播放，先停止播放
+    if (s_avi->avi_data.state != AVI_PARSER_NONE) {
+        ESP_LOGI(TAG, "Stopping current playback before starting new one");
+        avi_player_play_stop();
+        
+        // 等待一段时间确保停止操作完成
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+    
     ESP_RETURN_ON_FALSE(s_avi->avi_data.state == AVI_PARSER_NONE, ESP_ERR_INVALID_STATE, TAG, "AVI player not ready");
     s_avi->avi_data.mode = PLAY_MEMORY;
     s_avi->avi_data.memory.data = avi_data;
@@ -384,37 +465,98 @@ esp_err_t avi_player_play_from_memory(uint8_t *avi_data, size_t avi_size)
 
 esp_err_t avi_player_play_from_file(const char *filename)
 {
+    if (s_avi == NULL) {
+        ESP_LOGE(TAG, "AVI player not initialized");
+        return ESP_ERR_INVALID_STATE;
+    }
+    
+    // 如果当前正在播放，先停止播放
+    if (s_avi->avi_data.state != AVI_PARSER_NONE) {
+        ESP_LOGI(TAG, "Stopping current playback before starting new one");
+        avi_player_play_stop();
+        
+        // 等待一段时间确保停止操作完成
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+    
     ESP_RETURN_ON_FALSE(s_avi->avi_data.state == AVI_PARSER_NONE, ESP_ERR_INVALID_STATE, TAG, "AVI player not ready");
 
     s_avi->avi_data.mode = PLAY_FILE;
-    s_avi->avi_data.file.avi_file = fopen(filename, "rb");
-    if (s_avi->avi_data.file.avi_file == NULL) {
+    
+    // 先将文件指针设为NULL，防止在打开文件前被访问
+    s_avi->avi_data.file.avi_file = NULL;
+    
+    // 尝试打开文件
+    FILE* file = fopen(filename, "rb");
+    if (file == NULL) {
         ESP_LOGE(TAG, "Cannot open %s", filename);
         return ESP_FAIL;
     }
+    
+    // 文件成功打开后再设置文件指针
+    s_avi->avi_data.file.avi_file = file;
+    
+    // 设置开始播放事件
     xEventGroupSetBits(s_avi->event_group, EVENT_START_PLAY);
     return ESP_OK;
 }
 
 esp_err_t avi_player_play_stop(void)
 {
-    ESP_RETURN_ON_FALSE(s_avi->avi_data.state == AVI_PARSER_HEADER || s_avi->avi_data.state == AVI_PARSER_DATA,
-                        ESP_ERR_INVALID_STATE, TAG, "AVI player not playing");
-    
-    esp_timer_stop(s_avi->timer_handle);
-    
-    xEventGroupSetBits(s_avi->event_group, EVENT_STOP_PLAY);
-    
-    if (s_avi->avi_data.mode == PLAY_FILE && s_avi->avi_data.file.avi_file != NULL) {
-        fclose(s_avi->avi_data.file.avi_file);
-        s_avi->avi_data.file.avi_file = NULL;
+    if (s_avi == NULL) {
+        ESP_LOGE(TAG, "AVI player not initialized");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    // 检查当前状态
+    avi_play_state_t current_state = s_avi->avi_data.state;
+    if (current_state != AVI_PARSER_HEADER && current_state != AVI_PARSER_DATA) {
+        ESP_LOGW(TAG, "AVI player not playing (state: %d)", current_state);
+        return ESP_ERR_INVALID_STATE;
     }
     
+    ESP_LOGI(TAG, "Stopping AVI playback");
+    
+    // 首先停止定时器，防止新的帧处理事件
+    esp_timer_stop(s_avi->timer_handle);
+    
+    // 设置状态为结束状态，防止任务继续处理
+    s_avi->avi_data.state = AVI_PARSER_END;
+    
+    // 设置停止标志，通知播放任务停止处理
+    xEventGroupSetBits(s_avi->event_group, EVENT_STOP_PLAY);
+    
+    // 等待播放任务处理停止事件，给足够时间让任务完成当前操作
+    EventBits_t uxBits = xEventGroupWaitBits(s_avi->event_group, 
+                                           EVENT_AUDIO_BUF_READY | EVENT_VIDEO_BUF_READY, 
+                                           pdTRUE, pdFALSE, pdMS_TO_TICKS(500));
+    
+    // 确保所有文件操作已停止后再关闭文件
+    vTaskDelay(pdMS_TO_TICKS(50)); // 给任务一些时间完成当前文件操作
+    
+    // 安全关闭文件（如果是从文件播放）
+    if (s_avi->avi_data.mode == PLAY_FILE && s_avi->avi_data.file.avi_file != NULL) {
+        FILE* tmp = s_avi->avi_data.file.avi_file;
+        s_avi->avi_data.file.avi_file = NULL; // 先将指针置空，防止任务继续访问
+        
+        // 使用单独的代码块和try-catch机制处理文件关闭
+        {
+            int result = fclose(tmp);
+            if (result != 0) {
+                ESP_LOGW(TAG, "Error closing file: %d", result);
+            }
+        }
+    }
+    
+    // 重置播放状态
     s_avi->avi_data.state = AVI_PARSER_NONE;
     
-    xEventGroupClearBits(s_avi->event_group, EVENT_AUDIO_BUF_READY | EVENT_VIDEO_BUF_READY);
+    // 清除所有相关事件标志
+    xEventGroupClearBits(s_avi->event_group, 
+                        EVENT_AUDIO_BUF_READY | EVENT_VIDEO_BUF_READY | 
+                        EVENT_FPS_TIME_UP | EVENT_START_PLAY | EVENT_STOP_PLAY);
     
-    ESP_LOGI(TAG, "AVI playback stopped immediately");
+    ESP_LOGI(TAG, "AVI playback stopped safely");
     return ESP_OK;
 }
 
@@ -429,6 +571,11 @@ esp_err_t avi_player_init(avi_player_config_t config)
     ESP_LOGI(TAG, "AVI Player Version: %d.%d.%d", AVI_PLAYER_VER_MAJOR, AVI_PLAYER_VER_MINOR, AVI_PLAYER_VER_PATCH);
     ESP_RETURN_ON_FALSE(s_avi == NULL, ESP_ERR_INVALID_STATE, TAG, "avi player already initialized");
     s_avi = (avi_player_handle_t *)calloc(1, sizeof(avi_player_handle_t));
+    if (s_avi == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate memory for AVI player");
+        return ESP_ERR_NO_MEM;
+    }
+    
     s_avi->config = config;
 
     if (s_avi->config.buffer_size == 0) {
@@ -439,18 +586,56 @@ esp_err_t avi_player_init(avi_player_config_t config)
     }
 
     s_avi->avi_data.pbuffer = malloc(s_avi->config.buffer_size);
-    ESP_RETURN_ON_FALSE(s_avi->avi_data.pbuffer != NULL, ESP_ERR_NO_MEM, TAG, "Cannot alloc memory for player");
+    if (s_avi->avi_data.pbuffer == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate buffer memory");
+        free(s_avi);
+        s_avi = NULL;
+        return ESP_ERR_NO_MEM;
+    }
+
+    // 初始化状态
+    s_avi->avi_data.state = AVI_PARSER_NONE;
+    s_avi->avi_data.file.avi_file = NULL;
 
     esp_timer_create_args_t timer = {0};
     timer.arg = NULL;
     timer.callback = esp_timer_cb;
     timer.dispatch_method = ESP_TIMER_TASK;
     timer.name = "avi_player_timer";
+    
     s_avi->event_group = xEventGroupCreate();
-    ESP_RETURN_ON_FALSE(s_avi->event_group != NULL, ESP_ERR_NO_MEM, TAG, "Cannot create event group");
+    if (s_avi->event_group == NULL) {
+        ESP_LOGE(TAG, "Failed to create event group");
+        free(s_avi->avi_data.pbuffer);
+        free(s_avi);
+        s_avi = NULL;
+        return ESP_ERR_NO_MEM;
+    }
 
-    esp_timer_create(&timer, &s_avi->timer_handle);
-    xTaskCreatePinnedToCore(avi_player_task, "avi_player", 4096, NULL, s_avi->config.priority, NULL, s_avi->config.coreID);
+    esp_err_t ret = esp_timer_create(&timer, &s_avi->timer_handle);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to create timer");
+        vEventGroupDelete(s_avi->event_group);
+        free(s_avi->avi_data.pbuffer);
+        free(s_avi);
+        s_avi = NULL;
+        return ret;
+    }
+
+    // 创建播放任务
+    BaseType_t task_created = xTaskCreatePinnedToCore(avi_player_task, "avi_player", 4096, NULL, 
+                                                     s_avi->config.priority, NULL, s_avi->config.coreID);
+    if (task_created != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create AVI player task");
+        esp_timer_delete(s_avi->timer_handle);
+        vEventGroupDelete(s_avi->event_group);
+        free(s_avi->avi_data.pbuffer);
+        free(s_avi);
+        s_avi = NULL;
+        return ESP_ERR_NO_MEM;
+    }
+
+    ESP_LOGI(TAG, "AVI player initialized successfully");
     return ESP_OK;
 }
 
@@ -458,6 +643,11 @@ esp_err_t avi_player_deinit(void)
 {
     if (s_avi == NULL) {
         return ESP_FAIL;
+    }
+
+    // 如果正在播放，先停止播放
+    if (s_avi->avi_data.state == AVI_PARSER_HEADER || s_avi->avi_data.state == AVI_PARSER_DATA) {
+        avi_player_play_stop();
     }
 
     xEventGroupSetBits(s_avi->event_group, EVENT_DEINIT);
