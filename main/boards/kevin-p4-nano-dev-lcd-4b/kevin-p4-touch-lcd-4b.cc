@@ -217,11 +217,11 @@ public:
     KevineEsp32p44b() :
         boot_button_(BOOT_BUTTON_GPIO) {
         InitializeCodecI2c();
-        InitializeIot();
         // InitializeLCDST7703();
         InitializeLCDGC9503();
         // InitializeTouch();
         InitializeButtons();
+        InitializeIot();
         GetBacklight()->RestoreBrightness();
     }
 
