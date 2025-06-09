@@ -23,9 +23,12 @@ set(SOURCES "audio_codecs/audio_codec.cc"
             "settings.cc"
             "background_task.cc"
             "main.cc"
+            "avi_player/avi_player_port.cc"
+            "avi_player/esp_jpeg_decode.c"
+            "avi_player/fs_manager.c"
             )
 
-set(INCLUDE_DIRS "." "display" "audio_codecs" "protocols" "audio_processing")
+set(INCLUDE_DIRS "." "avi_player" "eye" "display" "audio_codecs" "protocols" "audio_processing")
 
 # 添加 IOT 相关文件
 file(GLOB IOT_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/iot/things/*.cc)
@@ -69,6 +72,8 @@ elseif(CONFIG_BOARD_TYPE_KEVIN_P4_NANO_DEV)
     set(BOARD_TYPE "kevin-p4-nano-dev-lcd-4b")
 elseif(CONFIG_BOARD_TYPE_KEVIN_YUYING_313LCD)
     set(BOARD_TYPE "kevin-yuying-313lcd")
+elseif(CONFIG_BOARD_TYPE_KEVIN_YUYING_EYES)
+    set(BOARD_TYPE "kevin-yuying-eyes")
 elseif(CONFIG_BOARD_TYPE_LICHUANG_DEV)
     set(BOARD_TYPE "lichuang-dev")
 elseif(CONFIG_BOARD_TYPE_LICHUANG_C3_DEV)

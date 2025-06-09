@@ -8,6 +8,7 @@
 #include <font_emoji.h>
 
 #include <atomic>
+#include <EyeAnimation.h>
 
 // Theme color structure
 struct ThemeColors {
@@ -21,7 +22,19 @@ struct ThemeColors {
     lv_color_t border;
     lv_color_t low_battery;
 };
-
+// 眼球视频数组定义
+static const char* eye_videos[] = {
+    "eye1.avi",
+    "eye2.avi",
+    "eye3.avi",
+    "eye4.avi",
+    "eye5.avi",
+    "eye6.avi",
+    "eye7.avi",
+    "eye8.avi",
+    "eye9.avi",
+    "eye10.avi",
+};
 
 class LcdDisplay : public Display {
 protected:
@@ -45,7 +58,18 @@ protected:
 protected:
     // 添加protected构造函数
     LcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_t panel, DisplayFonts fonts, int width, int height);
-    
+private:
+
+    // 眼球动画相关
+    lv_obj_t* eye_canvas_ = nullptr;
+    lv_draw_buf_t* eye_draw_buf_ = nullptr;
+    void* eye_canvas_buf_ = nullptr;
+    EyeAnimation* eye_animation_ = nullptr;
+    esp_timer_handle_t eye_timer_ = nullptr;
+    uint8_t current_eye_index = 0;
+    static void UpdateEyeAnimation(lv_timer_t* timer);
+    void SetupEyeCanvas();
+    static void EyeTimerCallback(void* arg);
 public:
     ~LcdDisplay();
     virtual void SetEmotion(const char* emotion) override;
@@ -54,6 +78,11 @@ public:
 #if CONFIG_USE_WECHAT_MESSAGE_STYLE
     virtual void SetChatMessage(const char* role, const char* content) override; 
 #endif  
+    void StartEyeAnimation();
+    void StopEyeAnimation();
+    virtual void changeEyeStyle() override;
+    virtual uint8_t getCurrentEyeType() override;
+    virtual void SetFaceImage(uint8_t* frame_buffer, int width, int height);
 
     // Add theme switching function
     virtual void SetTheme(const std::string& theme_name) override;

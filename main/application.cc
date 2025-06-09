@@ -31,6 +31,7 @@
 #include <cJSON.h>
 #include <driver/gpio.h>
 #include <arpa/inet.h>
+#include "avi_player_port.h"
 
 #define TAG "Application"
 
@@ -378,7 +379,12 @@ void Application::Start() {
 
     /* Setup the display */
     auto display = board.GetDisplay();
-
+    avi_player_port_config_t config = {
+        .buffer_size = 50 * 1024,
+        .core_id = 1,
+        .display = display  // 传入LCD显示对象指针
+    };
+    avi_player_port_init(&config);
     /* Setup the audio codec */
     auto codec = board.GetAudioCodec();
     opus_decoder_ = std::make_unique<OpusDecoderWrapper>(codec->output_sample_rate(), 1, OPUS_FRAME_DURATION_MS);

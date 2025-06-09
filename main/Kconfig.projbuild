@@ -85,6 +85,9 @@ choice BOARD_TYPE
     config BOARD_TYPE_KEVIN_P4_NANO_DEV
         bool "Kevin P4开发板"
         depends on IDF_TARGET_ESP32P4
+    config BOARD_TYPE_KEVIN_YUYING_EYES
+        bool "鱼鹰双眼"
+        depends on IDF_TARGET_ESP32S3
     config BOARD_TYPE_ESP32_CGC
         bool "ESP32 CGC"
         depends on IDF_TARGET_ESP32
