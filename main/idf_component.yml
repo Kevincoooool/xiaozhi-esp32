@@ -32,7 +32,9 @@ dependencies:
   espressif/adc_mic: ^0.2.0
   espressif/esp_mmap_assets: '>=1.2'
   txp666/otto-emoji-gif-component: ~1.0.2
-
+  espressif/avi_player: "^1.0.0"
+  espressif/esp_new_jpeg: "^0.6.1"
+  kevincoooool/esp_lcd_gc9d01: "^0.0.1"
   # SenseCAP Watcher Board
   wvirgil123/esp_jpeg_simd:
     version: 1.0.0

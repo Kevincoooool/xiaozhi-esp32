@@ -12,6 +12,7 @@
 #include "settings.h"
 
 #include "board.h"
+#include "avi_player_port.h"
 
 #define TAG "LcdDisplay"
 
@@ -703,6 +704,137 @@ void LcdDisplay::SetPreviewImage(const lv_img_dsc_t* img_dsc) {
     }
 }
 #else
+void LcdDisplay::SetupEyeCanvas()
+{
+    DisplayLockGuard lock(this);
+
+    // 创建眼球动画实例
+    eye_animation_ = new EyeAnimation();
+    eye_animation_->begin();
+    eye_animation_->setEyelidGap(0);
+
+    // 创建画布缓冲区
+    eye_canvas_buf_ = heap_caps_malloc(REAL_SCREEN_WIDTH * REAL_SCREEN_HEIGHT * 2, MALLOC_CAP_SPIRAM);
+    if (eye_canvas_buf_ == nullptr)
+    {
+        ESP_LOGE(TAG, "Failed to allocate eye canvas buffer");
+        return;
+    }
+
+    // 创建LVGL绘图缓冲区
+    // eye_draw_buf_ = (lv_draw_buf_t*)heap_caps_malloc(sizeof(lv_draw_buf_t), MALLOC_CAP_DMA);
+    // if (eye_draw_buf_ == nullptr) {
+    //     ESP_LOGE(TAG, "Failed to allocate eye draw buffer");
+    //     free(eye_canvas_buf_);
+    //     return;
+    // }
+
+    // 初始化画布
+    eye_canvas_ = lv_canvas_create(content_);
+    if (eye_canvas_ == nullptr)
+    {
+        ESP_LOGE(TAG, "Failed to create eye canvas");
+        // free(eye_draw_buf_);
+        free(eye_canvas_buf_);
+        return;
+    }
+
+    // 设置画布大小和缓冲区
+    lv_canvas_set_buffer(eye_canvas_, eye_canvas_buf_,
+                         REAL_SCREEN_WIDTH, REAL_SCREEN_HEIGHT, LV_COLOR_FORMAT_RGB565);
+
+    // 设置画布位置
+    lv_obj_align(eye_canvas_, LV_ALIGN_CENTER, 0, 0);
+
+    // 创建esp定时器
+    const esp_timer_create_args_t timer_args = {
+        .callback = &LcdDisplay::EyeTimerCallback,
+        .arg = this,
+        .dispatch_method = ESP_TIMER_TASK,
+        .name = "eye_timer",
+        .skip_unhandled_events = true};
+
+    ESP_ERROR_CHECK(esp_timer_create(&timer_args, &eye_timer_));
+}
+
+void LcdDisplay::EyeTimerCallback(void *arg)
+{
+    LcdDisplay *display = static_cast<LcdDisplay *>(arg);
+
+    if (display->eye_animation_ && display->eye_canvas_)
+    {
+        // 获取锁以更新UI
+        if (display->Lock(10))
+        {
+            display->eye_animation_->update();
+
+            // 将动画缓冲区复制到画布
+            memcpy(display->eye_canvas_buf_,
+                   display->eye_animation_->getScaledBuffer(),
+                   REAL_SCREEN_WIDTH * REAL_SCREEN_HEIGHT * 2);
+
+            // 刷新画布
+            lv_obj_invalidate(display->eye_canvas_);
+
+            display->Unlock();
+        }
+    }
+}
+
+void LcdDisplay::StartEyeAnimation()
+{
+    if (eye_timer_)
+    {
+        // 启动定时器,33ms间隔(约30fps)
+        esp_timer_start_periodic(eye_timer_, 30 * 1000); // 微秒为单位
+    }
+}
+
+void LcdDisplay::StopEyeAnimation()
+{
+    if (eye_timer_)
+    {
+        esp_timer_stop(eye_timer_);
+    }
+}
+void LcdDisplay::changeEyeStyle()
+{
+    DisplayLockGuard lock(this);
+    if (eye_animation_ && eye_canvas_)
+    {
+        // 获取当前眼睛类型
+        EyeAnimation::EyeType current_type = eye_animation_->getCurrentEyeType();
+
+        // 计算下一个类型，使用显式类型转换
+        EyeAnimation::EyeType next_type = static_cast<EyeAnimation::EyeType>(
+            (static_cast<int>(current_type) + 1) % static_cast<int>(EyeAnimation::MAX_EYE_TYPE));
+
+        // 切换到新的眼睛类型
+        // eye_animation_->switchEyeType(next_type);
+    }
+    if (avi_image)
+    {
+
+        // 切换到下一个眼球视频
+        current_eye_index = (current_eye_index + 1) % 10;
+        avi_player_port_play_file(eye_videos[current_eye_index]);
+    }
+}
+uint8_t LcdDisplay::getCurrentEyeType()
+{
+    DisplayLockGuard lock(this);
+    if (eye_animation_)
+    {
+        // 获取当前眼睛类型
+        EyeAnimation::EyeType current_type = eye_animation_->getCurrentEyeType();
+        return current_type;
+    }
+    if (avi_image)
+    {
+        return current_eye_index;
+    }
+    return 0;
+}
 void LcdDisplay::SetupUI() {
     DisplayLockGuard lock(this);
 
@@ -720,91 +852,93 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_pad_row(container_, 0, 0);
     lv_obj_set_style_bg_color(container_, current_theme_.background, 0);
     lv_obj_set_style_border_color(container_, current_theme_.border, 0);
-
+    avi_image = lv_canvas_create(container_);
+    lv_obj_set_size(avi_image, 160 * 1, 160); // 设置合适的大小
+    lv_obj_center(avi_image);
     /* Status bar */
-    status_bar_ = lv_obj_create(container_);
-    lv_obj_set_size(status_bar_, LV_HOR_RES, fonts_.text_font->line_height);
-    lv_obj_set_style_radius(status_bar_, 0, 0);
-    lv_obj_set_style_bg_color(status_bar_, current_theme_.background, 0);
-    lv_obj_set_style_text_color(status_bar_, current_theme_.text, 0);
+    // status_bar_ = lv_obj_create(container_);
+    // lv_obj_set_size(status_bar_, LV_HOR_RES, fonts_.text_font->line_height);
+    // lv_obj_set_style_radius(status_bar_, 0, 0);
+    // lv_obj_set_style_bg_color(status_bar_, current_theme_.background, 0);
+    // lv_obj_set_style_text_color(status_bar_, current_theme_.text, 0);
     
-    /* Content */
-    content_ = lv_obj_create(container_);
-    lv_obj_set_scrollbar_mode(content_, LV_SCROLLBAR_MODE_OFF);
-    lv_obj_set_style_radius(content_, 0, 0);
-    lv_obj_set_width(content_, LV_HOR_RES);
-    lv_obj_set_flex_grow(content_, 1);
-    lv_obj_set_style_pad_all(content_, 5, 0);
-    lv_obj_set_style_bg_color(content_, current_theme_.chat_background, 0);
-    lv_obj_set_style_border_color(content_, current_theme_.border, 0); // Border color for content
+    // /* Content */
+    // content_ = lv_obj_create(container_);
+    // lv_obj_set_scrollbar_mode(content_, LV_SCROLLBAR_MODE_OFF);
+    // lv_obj_set_style_radius(content_, 0, 0);
+    // lv_obj_set_width(content_, LV_HOR_RES);
+    // lv_obj_set_flex_grow(content_, 1);
+    // lv_obj_set_style_pad_all(content_, 5, 0);
+    // lv_obj_set_style_bg_color(content_, current_theme_.chat_background, 0);
+    // lv_obj_set_style_border_color(content_, current_theme_.border, 0); // Border color for content
 
-    lv_obj_set_flex_flow(content_, LV_FLEX_FLOW_COLUMN); // 垂直布局（从上到下）
-    lv_obj_set_flex_align(content_, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_SPACE_EVENLY); // 子对象居中对齐，等距分布
+    // lv_obj_set_flex_flow(content_, LV_FLEX_FLOW_COLUMN); // 垂直布局（从上到下）
+    // lv_obj_set_flex_align(content_, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_SPACE_EVENLY); // 子对象居中对齐，等距分布
 
-    emotion_label_ = lv_label_create(content_);
-    lv_obj_set_style_text_font(emotion_label_, &font_awesome_30_4, 0);
-    lv_obj_set_style_text_color(emotion_label_, current_theme_.text, 0);
-    lv_label_set_text(emotion_label_, FONT_AWESOME_AI_CHIP);
+    // emotion_label_ = lv_label_create(content_);
+    // lv_obj_set_style_text_font(emotion_label_, &font_awesome_30_4, 0);
+    // lv_obj_set_style_text_color(emotion_label_, current_theme_.text, 0);
+    // lv_label_set_text(emotion_label_, FONT_AWESOME_AI_CHIP);
 
-    preview_image_ = lv_image_create(content_);
-    lv_obj_set_size(preview_image_, width_ * 0.5, height_ * 0.5);
-    lv_obj_align(preview_image_, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_add_flag(preview_image_, LV_OBJ_FLAG_HIDDEN);
+    // preview_image_ = lv_image_create(content_);
+    // lv_obj_set_size(preview_image_, width_ * 0.5, height_ * 0.5);
+    // lv_obj_align(preview_image_, LV_ALIGN_CENTER, 0, 0);
+    // lv_obj_add_flag(preview_image_, LV_OBJ_FLAG_HIDDEN);
 
-    chat_message_label_ = lv_label_create(content_);
-    lv_label_set_text(chat_message_label_, "");
-    lv_obj_set_width(chat_message_label_, LV_HOR_RES * 0.9); // 限制宽度为屏幕宽度的 90%
-    lv_label_set_long_mode(chat_message_label_, LV_LABEL_LONG_WRAP); // 设置为自动换行模式
-    lv_obj_set_style_text_align(chat_message_label_, LV_TEXT_ALIGN_CENTER, 0); // 设置文本居中对齐
-    lv_obj_set_style_text_color(chat_message_label_, current_theme_.text, 0);
+    // chat_message_label_ = lv_label_create(content_);
+    // lv_label_set_text(chat_message_label_, "");
+    // lv_obj_set_width(chat_message_label_, LV_HOR_RES * 0.9); // 限制宽度为屏幕宽度的 90%
+    // lv_label_set_long_mode(chat_message_label_, LV_LABEL_LONG_WRAP); // 设置为自动换行模式
+    // lv_obj_set_style_text_align(chat_message_label_, LV_TEXT_ALIGN_CENTER, 0); // 设置文本居中对齐
+    // lv_obj_set_style_text_color(chat_message_label_, current_theme_.text, 0);
 
-    /* Status bar */
-    lv_obj_set_flex_flow(status_bar_, LV_FLEX_FLOW_ROW);
-    lv_obj_set_style_pad_all(status_bar_, 0, 0);
-    lv_obj_set_style_border_width(status_bar_, 0, 0);
-    lv_obj_set_style_pad_column(status_bar_, 0, 0);
-    lv_obj_set_style_pad_left(status_bar_, 2, 0);
-    lv_obj_set_style_pad_right(status_bar_, 2, 0);
+    // /* Status bar */
+    // lv_obj_set_flex_flow(status_bar_, LV_FLEX_FLOW_ROW);
+    // lv_obj_set_style_pad_all(status_bar_, 0, 0);
+    // lv_obj_set_style_border_width(status_bar_, 0, 0);
+    // lv_obj_set_style_pad_column(status_bar_, 0, 0);
+    // lv_obj_set_style_pad_left(status_bar_, 2, 0);
+    // lv_obj_set_style_pad_right(status_bar_, 2, 0);
 
-    network_label_ = lv_label_create(status_bar_);
-    lv_label_set_text(network_label_, "");
-    lv_obj_set_style_text_font(network_label_, fonts_.icon_font, 0);
-    lv_obj_set_style_text_color(network_label_, current_theme_.text, 0);
+    // network_label_ = lv_label_create(status_bar_);
+    // lv_label_set_text(network_label_, "");
+    // lv_obj_set_style_text_font(network_label_, fonts_.icon_font, 0);
+    // lv_obj_set_style_text_color(network_label_, current_theme_.text, 0);
 
-    notification_label_ = lv_label_create(status_bar_);
-    lv_obj_set_flex_grow(notification_label_, 1);
-    lv_obj_set_style_text_align(notification_label_, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_style_text_color(notification_label_, current_theme_.text, 0);
-    lv_label_set_text(notification_label_, "");
-    lv_obj_add_flag(notification_label_, LV_OBJ_FLAG_HIDDEN);
+    // notification_label_ = lv_label_create(status_bar_);
+    // lv_obj_set_flex_grow(notification_label_, 1);
+    // lv_obj_set_style_text_align(notification_label_, LV_TEXT_ALIGN_CENTER, 0);
+    // lv_obj_set_style_text_color(notification_label_, current_theme_.text, 0);
+    // lv_label_set_text(notification_label_, "");
+    // lv_obj_add_flag(notification_label_, LV_OBJ_FLAG_HIDDEN);
 
-    status_label_ = lv_label_create(status_bar_);
-    lv_obj_set_flex_grow(status_label_, 1);
-    lv_label_set_long_mode(status_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
-    lv_obj_set_style_text_align(status_label_, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_style_text_color(status_label_, current_theme_.text, 0);
-    lv_label_set_text(status_label_, Lang::Strings::INITIALIZING);
-    mute_label_ = lv_label_create(status_bar_);
-    lv_label_set_text(mute_label_, "");
-    lv_obj_set_style_text_font(mute_label_, fonts_.icon_font, 0);
-    lv_obj_set_style_text_color(mute_label_, current_theme_.text, 0);
+    // status_label_ = lv_label_create(status_bar_);
+    // lv_obj_set_flex_grow(status_label_, 1);
+    // lv_label_set_long_mode(status_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    // lv_obj_set_style_text_align(status_label_, LV_TEXT_ALIGN_CENTER, 0);
+    // lv_obj_set_style_text_color(status_label_, current_theme_.text, 0);
+    // lv_label_set_text(status_label_, Lang::Strings::INITIALIZING);
+    // mute_label_ = lv_label_create(status_bar_);
+    // lv_label_set_text(mute_label_, "");
+    // lv_obj_set_style_text_font(mute_label_, fonts_.icon_font, 0);
+    // lv_obj_set_style_text_color(mute_label_, current_theme_.text, 0);
 
-    battery_label_ = lv_label_create(status_bar_);
-    lv_label_set_text(battery_label_, "");
-    lv_obj_set_style_text_font(battery_label_, fonts_.icon_font, 0);
-    lv_obj_set_style_text_color(battery_label_, current_theme_.text, 0);
+    // battery_label_ = lv_label_create(status_bar_);
+    // lv_label_set_text(battery_label_, "");
+    // lv_obj_set_style_text_font(battery_label_, fonts_.icon_font, 0);
+    // lv_obj_set_style_text_color(battery_label_, current_theme_.text, 0);
 
-    low_battery_popup_ = lv_obj_create(screen);
-    lv_obj_set_scrollbar_mode(low_battery_popup_, LV_SCROLLBAR_MODE_OFF);
-    lv_obj_set_size(low_battery_popup_, LV_HOR_RES * 0.9, fonts_.text_font->line_height * 2);
-    lv_obj_align(low_battery_popup_, LV_ALIGN_BOTTOM_MID, 0, 0);
-    lv_obj_set_style_bg_color(low_battery_popup_, current_theme_.low_battery, 0);
-    lv_obj_set_style_radius(low_battery_popup_, 10, 0);
-    low_battery_label_ = lv_label_create(low_battery_popup_);
-    lv_label_set_text(low_battery_label_, Lang::Strings::BATTERY_NEED_CHARGE);
-    lv_obj_set_style_text_color(low_battery_label_, lv_color_white(), 0);
-    lv_obj_center(low_battery_label_);
-    lv_obj_add_flag(low_battery_popup_, LV_OBJ_FLAG_HIDDEN);
+    // low_battery_popup_ = lv_obj_create(screen);
+    // lv_obj_set_scrollbar_mode(low_battery_popup_, LV_SCROLLBAR_MODE_OFF);
+    // lv_obj_set_size(low_battery_popup_, LV_HOR_RES * 0.9, fonts_.text_font->line_height * 2);
+    // lv_obj_align(low_battery_popup_, LV_ALIGN_BOTTOM_MID, 0, 0);
+    // lv_obj_set_style_bg_color(low_battery_popup_, current_theme_.low_battery, 0);
+    // lv_obj_set_style_radius(low_battery_popup_, 10, 0);
+    // low_battery_label_ = lv_label_create(low_battery_popup_);
+    // lv_label_set_text(low_battery_label_, Lang::Strings::BATTERY_NEED_CHARGE);
+    // lv_obj_set_style_text_color(low_battery_label_, lv_color_white(), 0);
+    // lv_obj_center(low_battery_label_);
+    // lv_obj_add_flag(low_battery_popup_, LV_OBJ_FLAG_HIDDEN);
 }
 
 void LcdDisplay::SetPreviewImage(const lv_img_dsc_t* img_dsc) {
@@ -869,25 +1003,96 @@ void LcdDisplay::SetEmotion(const char* emotion) {
         [&emotion_view](const Emotion& e) { return e.text == emotion_view; });
 
     DisplayLockGuard lock(this);
-    if (emotion_label_ == nullptr) {
+    // if (emotion_label_ == nullptr) {
+    //     return;
+    // }
+
+//     // 如果找到匹配的表情就显示对应图标，否则显示默认的neutral表情
+//     lv_obj_set_style_text_font(emotion_label_, fonts_.emoji_font, 0);
+//     if (it != emotions.end()) {
+//         lv_label_set_text(emotion_label_, it->icon);
+//     } else {
+//         lv_label_set_text(emotion_label_, "😶");
+//     }
+
+// #if !CONFIG_USE_WECHAT_MESSAGE_STYLE
+//     // 显示emotion_label_，隐藏preview_image_
+//     lv_obj_clear_flag(emotion_label_, LV_OBJ_FLAG_HIDDEN);
+//     if (preview_image_ != nullptr) {
+//         lv_obj_add_flag(preview_image_, LV_OBJ_FLAG_HIDDEN);
+//     }
+// #endif
+    const char *video_path = "neutral.avi"; // 默认视频
+    printf("emotion: %s\n", emotion);
+    if (strcmp(emotion, "happy") == 0)
+    {
+        video_path = "happy.avi";
+    }
+    else if (strcmp(emotion, "laughing") == 0)
+    {
+        video_path = "laughing.avi";
+    }
+    else if (strcmp(emotion, "funny") == 0)
+    {
+        video_path = "funny.avi";
+    }
+    else if (strcmp(emotion, "sad") == 0)
+    {
+        video_path = "sad.avi";
+    }
+    else if (strcmp(emotion, "angry") == 0)
+    {
+        video_path = "angry.avi";
+    }
+    else if (strcmp(emotion, "crying") == 0)
+    {
+        video_path = "crying.avi";
+    }
+    else if (strcmp(emotion, "loving") == 0)
+    {
+        video_path = "loving.avi";
+    }
+    else if (strcmp(emotion, "embarrassed") == 0)
+    {
+        video_path = "embarrassed.avi";
+    }
+    else if (strcmp(emotion, "surprised") == 0)
+    {
+        video_path = "surprised.avi";
+    }
+    else if (strcmp(emotion, "thinking") == 0)
+    {
+        video_path = "thinking.avi";
+    }
+    else if (strcmp(emotion, "sleepy") == 0)
+    {
+        video_path = "sleepy.avi";
+    }
+    else if (strcmp(emotion, "cool") == 0)
+    {
+        video_path = "cool.avi";
+    }
+    else if (strcmp(emotion, "confused") == 0)
+    {
+        video_path = "confused.avi";
+    }
+    else if (strcmp(emotion, "talk") == 0)
+    {
+        video_path = "talk.avi";
+    }
+    // ... 添加更多情绪对应的视频
+    //  video_path = "eye1.avi";
+    avi_player_port_play_file(eye_videos[current_eye_index]);
+}
+void LcdDisplay::SetFaceImage(uint8_t *frame_buffer, int width, int height)
+{
+    DisplayLockGuard lock(this);
+    if (avi_image == nullptr || frame_buffer == nullptr)
+    {
         return;
     }
+    lv_canvas_set_buffer(avi_image, frame_buffer, width, height, LV_COLOR_FORMAT_RGB565);
 
-    // 如果找到匹配的表情就显示对应图标，否则显示默认的neutral表情
-    lv_obj_set_style_text_font(emotion_label_, fonts_.emoji_font, 0);
-    if (it != emotions.end()) {
-        lv_label_set_text(emotion_label_, it->icon);
-    } else {
-        lv_label_set_text(emotion_label_, "😶");
-    }
-
-#if !CONFIG_USE_WECHAT_MESSAGE_STYLE
-    // 显示emotion_label_，隐藏preview_image_
-    lv_obj_clear_flag(emotion_label_, LV_OBJ_FLAG_HIDDEN);
-    if (preview_image_ != nullptr) {
-        lv_obj_add_flag(preview_image_, LV_OBJ_FLAG_HIDDEN);
-    }
-#endif
 }
 
 void LcdDisplay::SetIcon(const char* icon) {

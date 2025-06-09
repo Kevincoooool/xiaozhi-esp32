@@ -29,7 +29,9 @@ public:
     virtual void SetTheme(const std::string& theme_name);
     virtual std::string GetTheme() { return current_theme_name_; }
     virtual void UpdateStatusBar(bool update_all = false);
-
+    virtual void changeEyeStyle();
+    virtual uint8_t getCurrentEyeType();
+    virtual void SetFaceImage(uint8_t* frame_buffer, int width, int height);
     inline int width() const { return width_; }
     inline int height() const { return height_; }
 
@@ -49,6 +51,7 @@ protected:
     lv_obj_t* chat_message_label_ = nullptr;
     lv_obj_t* low_battery_popup_ = nullptr;
     lv_obj_t* low_battery_label_ = nullptr;
+    lv_obj_t *avi_image = nullptr;
     
     const char* battery_icon_ = nullptr;
     const char* network_icon_ = nullptr;

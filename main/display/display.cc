@@ -248,3 +248,12 @@ void Display::SetTheme(const std::string& theme_name) {
     Settings settings("display", true);
     settings.SetString("theme", theme_name);
 }
+void Display::SetFaceImage(uint8_t* frame_buffer, int width, int height) {
+}
+void Display::changeEyeStyle() {
+    
+}
+
+uint8_t Display::getCurrentEyeType(){  
+    return 0;
+}
