@@ -2363,6 +2363,12 @@ CONFIG_ADC_MIC_OFFSET=16380
 # end of ADC Mic
 
 #
+# AVI Player
+#
+# CONFIG_AVI_PLAYER_DEBUG_INFO is not set
+# end of AVI Player
+
+#
 # IoT Button
 #
 CONFIG_BUTTON_PERIOD_TIME_MS=5

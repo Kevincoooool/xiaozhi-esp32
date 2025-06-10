@@ -21,7 +21,8 @@ void video_write(frame_data_t *data, void *arg)
         ESP_LOGE(TAG, "jpeg decode error: %d", ret);
     }
     // 通过回调函数更新LCD显示
-    if (img_rgb565 != NULL) {
+    if (img_rgb565 != NULL)
+    {
         auto display = Board::GetInstance().GetDisplay();
         display->SetFaceImage(img_rgb565, get_rgb_width(), get_rgb_height());
         free(img_rgb565);
@@ -34,33 +35,51 @@ void audio_write(frame_data_t *data, void *arg)
     // i2s_channel_write(i2s_tx_handle, data->data, data->data_bytes, &bytes_write, 100);
 }
 
-
 static void play_end_cb(void *arg)
 {
     ESP_LOGI(TAG, "Play end, restart playing: %s", current_filepath);
     is_playing = false;
     // 重新开始播放
-    if (strlen(current_filepath) > 0) {
+    if (strlen(current_filepath) > 0)
+    {
         avi_player_play_from_file(current_filepath);
         is_playing = true;
     }
 }
 
-
 esp_err_t avi_player_port_init(avi_player_port_config_t *config)
 {
+#if CONFIG_IDF_TARGET_ESP32S3
     // 配置SD卡
     fs_config_t sdcard_config = {
         .type = FS_TYPE_SD_CARD,
         .sd_card = {
             .mount_point = "/sdcard",
-            .clk = GPIO_NUM_2,  // 根据您的硬件配置调整这些引脚
+            .clk = GPIO_NUM_2, // 根据您的硬件配置调整这些引脚
             .cmd = GPIO_NUM_42,
             .d0 = GPIO_NUM_1,
+            .d1 = GPIO_NUM_NC, // 1-line模式下不使用，设为NC
+            .d2 = GPIO_NUM_NC, // 1-line模式下不使用，设为NC
+            .d3 = GPIO_NUM_NC, // 1-line模式下不使用，设为NC
             .format_if_mount_failed = false,
-            .max_files = 5
-        }
-    };
+            .max_files = 5}};
+#elif CONFIG_IDF_TARGET_ESP32P4
+    // 配置SD卡
+    fs_config_t sdcard_config = {
+        .type = FS_TYPE_SD_CARD,
+        .sd_card = {
+            .mount_point = "/sdcard",
+            .clk = GPIO_NUM_43, // 根据您的硬件配置调整这些引脚
+            .cmd = GPIO_NUM_44,
+            .d0 = GPIO_NUM_39,
+            .d1 = GPIO_NUM_40,
+            .d2 = GPIO_NUM_41,
+            .d3 = GPIO_NUM_42,
+            .format_if_mount_failed = false,
+            .max_files = 5}};
+#else
+#error "Unsupported target"
+#endif
     // 使用SPIFFS
     fs_config_t spiffs_config = {
         .type = FS_TYPE_SPIFFS,
@@ -68,17 +87,15 @@ esp_err_t avi_player_port_init(avi_player_port_config_t *config)
             .base_path = "/spiffs",
             .partition_label = "storage",
             .max_files = 5,
-            .format_if_mount_failed = true
-        }
-    };
-     
+            .format_if_mount_failed = true}};
+
     // 自动初始化文件系统，先尝试TF卡，失败则使用SPIFFS
-    ESP_ERROR_CHECK(fs_manager_auto_init(&sdcard_config, &spiffs_config));
-    
+    // ESP_ERROR_CHECK(fs_manager_auto_init(&sdcard_config, &spiffs_config));
+    fs_manager_init(&spiffs_config);
     // 获取当前使用的文件系统类型
     fs_type_t fs_type = fs_manager_get_type();
-    const char* mount_path = (fs_type == FS_TYPE_SD_CARD) ? "/sdcard" : "/spiffs";
-    
+    const char *mount_path = (fs_type == FS_TYPE_SD_CARD) ? "/sdcard" : "/spiffs";
+
     // 列出文件
     fs_manager_list_files(mount_path);
 
@@ -109,7 +126,7 @@ esp_err_t avi_player_port_init(avi_player_port_config_t *config)
 //     // 保存文件路径
 //     strncpy(current_filepath, filepath, sizeof(current_filepath) - 1);
 //     current_filepath[sizeof(current_filepath) - 1] = '\0';
-    
+
 //     is_playing = true;
 //     return avi_player_play_from_file(filepath);
 // }
@@ -120,48 +137,55 @@ esp_err_t avi_player_port_play_file(const char *filepath)
         avi_player_port_stop();
         vTaskDelay(300 / portTICK_PERIOD_MS);
     }
-    
+
     // 获取当前使用的文件系统类型
     fs_type_t fs_type = fs_manager_get_type();
-    const char* mount_path = (fs_type == FS_TYPE_SD_CARD) ? "/sdcard" : "/spiffs";
-    
+    const char *mount_path = (fs_type == FS_TYPE_SD_CARD) ? "/sdcard" : "/spiffs";
+
     // 构建完整路径
     char full_path[256] = {0};
-    
+
     // 检查文件路径是否已经包含挂载点
-    if (strncmp(filepath, "/sdcard/", 8) == 0 || strncmp(filepath, "/spiffs/", 8) == 0) {
+    if (strncmp(filepath, "/sdcard/", 8) == 0 || strncmp(filepath, "/spiffs/", 8) == 0)
+    {
         // 已经包含挂载点，直接使用
         strncpy(full_path, filepath, sizeof(full_path) - 1);
-    } else if (filepath[0] == '/') {
+    }
+    else if (filepath[0] == '/')
+    {
         // 路径以/开头但不包含挂载点，添加挂载点
         snprintf(full_path, sizeof(full_path) - 1, "%s%s", mount_path, filepath);
-    } else {
+    }
+    else
+    {
         // 路径不以/开头，添加挂载点和/
         snprintf(full_path, sizeof(full_path) - 1, "%s/%s", mount_path, filepath);
     }
-    
+
     full_path[sizeof(full_path) - 1] = '\0';
     ESP_LOGI(TAG, "Playing file with full path: %s", full_path);
-    
+
     // 检查文件是否存在
     struct stat st;
-    if (stat(full_path, &st) != 0) {
+    if (stat(full_path, &st) != 0)
+    {
         ESP_LOGE(TAG, "File does not exist: %s", full_path);
         return ESP_ERR_NOT_FOUND;
     }
-    
+
     // 检查是否为普通文件（非目录）
-    if (!S_ISREG(st.st_mode)) {
+    if (!S_ISREG(st.st_mode))
+    {
         ESP_LOGE(TAG, "Path is not a regular file: %s", full_path);
         return ESP_ERR_INVALID_ARG;
     }
-    
+
     ESP_LOGI(TAG, "File exists and is valid, size: %ld bytes", (long)st.st_size);
-    
+
     // 保存文件路径
     strncpy(current_filepath, full_path, sizeof(current_filepath) - 1);
     current_filepath[sizeof(current_filepath) - 1] = '\0';
-    
+
     is_playing = true;
     return avi_player_play_from_file(full_path);
 }

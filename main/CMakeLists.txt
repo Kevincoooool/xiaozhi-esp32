@@ -317,3 +317,4 @@ spiffs_create_partition_assets(
     MMAP_FILE_SUPPORT_FORMAT ".aaf"
 )
 endif()
+spiffs_create_partition_image(storage ../spiffs FLASH_IN_PROJECT)

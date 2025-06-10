@@ -34,6 +34,9 @@ typedef struct {
             gpio_num_t clk;
             gpio_num_t cmd;
             gpio_num_t d0;
+            gpio_num_t d1;
+            gpio_num_t d2;
+            gpio_num_t d3;
             bool format_if_mount_failed;
             int max_files;
         } sd_card;

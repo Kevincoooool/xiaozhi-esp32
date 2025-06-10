@@ -1,7 +1,9 @@
 #include "fs_manager.h"
 #include <dirent.h>
 #include <sys/stat.h>  // 添加这一行以支持stat函数
-
+#if CONFIG_IDF_TARGET_ESP32P4
+#include "sd_pwr_ctrl_by_on_chip_ldo.h"
+#endif
 static const char *TAG = "fs_manager";
 static fs_type_t current_fs_type = FS_TYPE_SPIFFS;
 static sdmmc_card_t *sd_card = NULL;
@@ -44,15 +46,37 @@ static esp_err_t init_sdcard(fs_config_t *config)
     // SD卡主机配置
     sdmmc_host_t host = SDMMC_HOST_DEFAULT();
     
+    #if CONFIG_IDF_TARGET_ESP32P4
+    sd_pwr_ctrl_ldo_config_t ldo_config = {
+        .ldo_chan_id = 4,
+    };
+    sd_pwr_ctrl_handle_t pwr_ctrl_handle = NULL;
+
+    ret = sd_pwr_ctrl_new_on_chip_ldo(&ldo_config, &pwr_ctrl_handle);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to create a new on-chip LDO power control driver");
+        return ret;
+    }
+    host.pwr_ctrl_handle = pwr_ctrl_handle;
+    #endif
+    
     // SD卡插槽配置
     sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
+    #if CONFIG_IDF_TARGET_ESP32P4
+    slot_config.width = 4; // 4-line SD模式
+    #elif CONFIG_IDF_TARGET_ESP32S3
     slot_config.width = 1; // 1-line SD模式
+    #endif
     slot_config.flags |= SDMMC_SLOT_FLAG_INTERNAL_PULLUP;
 
     #ifdef SOC_SDMMC_USE_GPIO_MATRIX
     slot_config.clk = config->sd_card.clk;
     slot_config.cmd = config->sd_card.cmd;
     slot_config.d0 = config->sd_card.d0;
+    slot_config.d1 = config->sd_card.d1;
+    slot_config.d2 = config->sd_card.d2;
+    slot_config.d3 = config->sd_card.d3;
     #endif
 
     ESP_LOGI(TAG, "Mounting SD card to %s", config->sd_card.mount_point);
